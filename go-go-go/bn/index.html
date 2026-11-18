@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="bn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visual শেখার Index</title><meta name="description" content="Go আর data structures ও algorithms-এর ধাপে ধাপে দেখা যায় এমন animation পেজ।">
+<link rel="stylesheet" href="../assets/viz.css"></head><body><div class="page">
+<nav class="topnav"><a href="../index.html">English</a></nav>
+<h1>Visual শেখার Index</h1>
+<p class="lead">প্রতিটি পেজ একটি animation, যেটা আপনি run করতে, ধাপে ধাপে দেখতে আর input বদলে পরীক্ষা করতে পারবেন। ক্রম ধরে পড়ুন, কারণ প্রতিটি পেজ আগের পেজগুলোর ওপর দাঁড়িয়ে আছে। পেজে double-click করলেই browser-এ খুলবে, internet লাগবে না।</p>
+<h2>Part 1: Go, concept ধরে ধরে</h2>
+<div class="grid">
+<a class="tile" href="go/variables-and-memory.html"><b>1. Variables and Memory</b><span>Go-র variable-কে memory-র একটা নামওয়ালা box হিসেবে দেখুন: declare, assign, copy, zero value আর shadowing।</span></a>
+<a class="tile" href="go/pointers.html"><b>2. Pointers</b><span>বক্স আর তীর দিয়ে Go-র pointer বুঝুন: address-of, dereference, pass by value বনাম pointer, struct, nil আর panic।</span></a>
+<a class="tile" href="go/arrays-vs-slices.html"><b>3. Arrays vs Slices</b><span>Slice-কে একটা ছোট header (pointer, length, capacity) হিসেবে দেখুন, যা একটা backing array-র ওপর বসানো: append, growth, aliasing আর 3-index slice।</span></a>
+<a class="tile" href="go/maps.html"><b>4. Maps</b><span>Go-র map-কে একটা ফোন বইয়ের মতো দেখুন: set, overwrite, comma-ok lookup, delete, nil map panic আর random iteration order।</span></a>
+<a class="tile" href="go/functions-and-call-stack.html"><b>5. Functions and the Call Stack</b><span>Stack frame কীভাবে push আর pop হয় দেখুন: function call, একাধিক return value আর recursion।</span></a>
+<a class="tile" href="go/closures.html"><b>6. Closures</b><span>দেখুন একটা closure কীভাবে নিজের captured variable গুলো নিজের কাছে রাখে, আর Go 1.22-এ loop variable-এর পরিবর্তন কীভাবে একটা পুরনো bug ঠিক করেছে।</span></a>
+<a class="tile" href="go/defer-panic-recover.html"><b>7. Defer, Panic and Recover</b><span>দেখুন defer stack কীভাবে last-in-first-out ক্রমে run হয়, panic কীভাবে stack unwind করে, আর recover কীভাবে সেটা ধরে ফেলে।</span></a>
+<a class="tile" href="go/strings-bytes-runes.html"><b>8. Strings, Bytes and Runes</b><span>দেখুন Go-র string কীভাবে UTF-8 byte-এর একটা সারি, কেন len গোনে byte, আর rune ও range কীভাবে character ধরে ধরে যায়।</span></a>
+<a class="tile" href="go/structs-and-methods.html"><b>9. Structs and Methods</b><span>দেখুন value receiver একটা copy বদলায় আর pointer receiver আসলটা বদলায়, এবং range কেন struct element-এর copy নেয়।</span></a>
+<a class="tile" href="go/interfaces.html"><b>10. Interfaces</b><span>Interface value-কে (type, value) জোড়া হিসেবে দেখুন: method কীভাবে ঠিক code-এ পৌঁছায়, nil interface gotcha, আর type assertion।</span></a>
+<a class="tile" href="go/goroutines-and-channels.html"><b>11. Goroutines and Channels</b><span>দেখুন goroutine গুলো channel দিয়ে value পাঠানোর সময় unbuffered আর buffered channel-এ কে কখন block হয়, এবং close ও range কীভাবে কাজ করে।</span></a>
+<a class="tile" href="go/select-and-timeouts.html"><b>12. Select and Timeouts</b><span>দেখুন select একসাথে কয়েকটা channel-এর জন্য অপেক্ষা করে যেটা আগে ready হয় সেটা run করে, এবং timeout ও default case কীভাবে কাজ করে।</span></a>
+<a class="tile" href="go/mutex-and-data-race.html"><b>13. Mutex and Data Race</b><span>দুটো goroutine কীভাবে counter++ করতে গিয়ে একটা update হারিয়ে ফেলে (data race) এবং Mutex কীভাবে সেটা ঠিক করে, তা ধাপে ধাপে দেখুন।</span></a>
+<a class="tile" href="go/waitgroup-and-worker-pool.html"><b>14. WaitGroup and Worker Pool</b><span>দেখুন একটা worker pool কীভাবে নির্দিষ্ট সংখ্যক worker দিয়ে job-এর queue সামলায়, আর WaitGroup কীভাবে main-কে সব job শেষ হওয়া পর্যন্ত অপেক্ষা করায়।</span></a>
+<a class="tile" href="go/context-cancellation.html"><b>15. Context and Cancellation</b><span>দেখুন একটা context কীভাবে cancel signal আর deadline নিচের goroutine গুলোর কাছে পৌঁছে দেয়, এবং parent cancel করলে কী হয়।</span></a>
+</div>
+<h2>Part 2: Data structures আর algorithms</h2>
+<div class="grid">
+<a class="tile" href="dsa/binary-search.html"><b>1. Binary Search</b><span>Sorted list-এ প্রতিবার অর্ধেক বাদ দিয়ে দ্রুত একটা মান খুঁজে বের করার পদ্ধতি।</span></a>
+<a class="tile" href="dsa/two-pointers.html"><b>2. Two Pointers</b><span>দুটো pointer দিয়ে list-এর দুই প্রান্ত থেকে বা পাশাপাশি এগিয়ে nested loop ছাড়াই pair আর in place সমস্যার সমাধান।</span></a>
+<a class="tile" href="dsa/sliding-window.html"><b>3. Sliding Window</b><span>আগের position-এর কাজ আবার না করে window সরিয়ে সরিয়ে fixed আর growing সমস্যার সমাধান।</span></a>
+<a class="tile" href="dsa/hash-map-two-sum.html"><b>4. Hash Map: Two Sum</b><span>একটু বেশি memory খরচ করে hash map-এ আগে দেখা মান মনে রেখে Two Sum দ্রুত সমাধান করা।</span></a>
+<a class="tile" href="dsa/prefix-sum.html"><b>5. Prefix Sum</b><span>একবার prefix sum বানিয়ে রাখলে যেকোনো range-এর যোগফল একটা subtraction-এই পাওয়া যায়।</span></a>
+<a class="tile" href="dsa/stack-valid-parentheses.html"><b>6. Stack: Valid Parentheses</b><span>Stack দিয়ে bracket-এর জোড়া ঠিক আছে কিনা check করা: সবশেষে খোলা bracket-টাই আগে বন্ধ হতে হয়।</span></a>
+<a class="tile" href="dsa/queue-and-monotonic-stack.html"><b>7. Queue &amp; Monotonic Stack</b><span>Queue FIFO ক্রমে item serve করে, আর monotonic stack দিয়ে next greater element এক pass-এ পাওয়া যায়।</span></a>
+<a class="tile" href="dsa/linked-list.html"><b>8. Linked List</b><span>Linked list reverse করা আর fast ও slow pointer দিয়ে cycle detect করা, ছবিতে ধাপে ধাপে।</span></a>
+<a class="tile" href="dsa/sorting.html"><b>9. Sorting</b><span>Bubble, insertion, merge আর quick sort: চারটা classic sorting algorithm পাশাপাশি দেখুন।</span></a>
+<a class="tile" href="dsa/recursion-call-tree.html"><b>10. Recursion Call Tree</b><span>Recursion-এর call tree আর memoization কীভাবে একই sub-problem বারবার হিসাব করা থামায়, fib দিয়ে দেখুন।</span></a>
+<a class="tile" href="dsa/backtracking.html"><b>11. Backtracking</b><span>একটা choice নিয়ে এগিয়ে, না মিললে undo করে পরেরটা try করা: subsets আর N-Queens দিয়ে backtracking দেখুন।</span></a>
+<a class="tile" href="dsa/tree-traversals.html"><b>12. Tree Traversals</b><span>Binary tree-র সব node কীভাবে preorder, inorder, postorder (live call stack-সহ) এবং level-order (queue-সহ) ক্রমে ঘুরে দেখা হয়, তা run করে দেখুন।</span></a>
+<a class="tile" href="dsa/bst-insert-search.html"><b>13. Binary Search Tree: Insert and Search</b><span>BST-তে সংখ্যা insert ও search করার সময় প্রতিটি ধাপে left বা right বেছে নেওয়ার পথটি run করে দেখুন।</span></a>
+<a class="tile" href="dsa/trie.html"><b>14. Trie (Prefix Tree)</b><span>Trie-তে word insert করা এবং search বা prefix query করার সময় অক্ষর ধরে ধরে নামার পথটি run করে দেখুন।</span></a>
+<a class="tile" href="dsa/heap-priority-queue.html"><b>15. Heap / Priority Queue</b><span>Heap-এ push, pop ও heapify করার সময় sift up আর sift down কীভাবে কাজ করে, তা array ও tree দুই রূপেই দেখুন।</span></a>
+<a class="tile" href="dsa/graph-bfs-dfs.html"><b>16. Graph: BFS and DFS</b><span>BFS আর DFS কীভাবে queue ও stack ব্যবহার করে একটি graph-এর সব node ঘুরে দেখে, তা step by step দেখুন।</span></a>
+<a class="tile" href="dsa/topological-sort.html"><b>17. Topological Sort</b><span>Kahn&#x27;s algorithm কীভাবে indegree আর queue ব্যবহার করে task গুলোকে dependency মেনে সাজায়, তা step by step দেখুন।</span></a>
+<a class="tile" href="dsa/dijkstra.html"><b>18. Dijkstra&#x27;s Shortest Path</b><span>Dijkstra কীভাবে priority queue ব্যবহার করে রাস্তার দৈর্ঘ্য মেনে সবচেয়ে কম খরচের path খুঁজে পায়, তা step by step দেখুন।</span></a>
+<a class="tile" href="dsa/union-find.html"><b>19. Union-Find (Disjoint Sets)</b><span>Union-Find-এ union আর find কীভাবে root ধরে কাজ করে এবং path compression কীভাবে tree ছোট রাখে, তা step by step দেখুন।</span></a>
+<a class="tile" href="dsa/dp-table.html"><b>20. Dynamic Programming Table</b><span>Dynamic programming-এ ছোট সমস্যার উত্তর table-এর cell-এ লিখে কীভাবে বড় সমস্যার উত্তর বের করা হয়, তা stairs, LCS ও knapsack-এ step by step দেখুন।</span></a>
+<a class="tile" href="dsa/intervals-merge.html"><b>21. Merge Intervals</b><span>Overlap করা interval গুলো sort করে একবার sweep-এ কীভাবে merge করা হয়, তা step by step দেখুন।</span></a>
+<a class="tile" href="dsa/bit-manipulation.html"><b>22. Bit Manipulation</b><span>Binary switch-এর সারি হিসেবে সংখ্যা দেখে AND, OR, XOR, shift ও bit গোনার trick কীভাবে কাজ করে, তা step by step দেখুন।</span></a>
+</div>
+</div></body></html>

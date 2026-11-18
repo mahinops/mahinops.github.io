@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Goroutines and Channels - Go visual</title>
+<meta name="description" content="Watch goroutines hand values through unbuffered and buffered channels, including blocking and close.">
+<link rel="stylesheet" href="../assets/viz.css">
+<style>
+.viz-layout{grid-template-columns:minmax(0,1fr)}
+.viz-stage,.viz-code{min-width:0;max-width:100%}
+@media (max-width:760px){.viz-layout.viz-has-code{grid-template-columns:minmax(0,1fr)}}
+body{overflow-x:hidden}
+.viz-svg .ah{fill:var(--accent)}
+.viz-svg .arrow{fill:none;stroke:var(--accent);stroke-width:2.5}
+.viz-svg .arrow.bad{stroke:var(--bad-line)}
+.viz-svg .node.bad{fill:var(--bad);stroke:var(--bad-line)}
+.viz-svg .node.nilp{stroke-dasharray:5 4}
+.viz-svg .nm{font-size:12px;fill:var(--muted)}
+.viz-svg .val{font-size:17px;font-weight:700}
+.viz-svg .ad{font-size:10px;fill:var(--muted)}
+.viz-svg .val.small{font-size:12px}
+.viz-svg .lbl{font-size:12px;fill:var(--accent);font-weight:700}
+.viz-cell.spare{background:transparent;border-style:dashed;color:var(--muted)}
+.hdrs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.chip{border:2px solid var(--cell-line);background:var(--cell);border-radius:10px;padding:4px 10px;font:600 13px var(--mono)}
+.chip.hit{background:var(--hit);border-color:var(--hit-line)}
+.chip.found{background:var(--found);border-color:var(--found-line)}
+.chip.dim{opacity:.45}
+.chip.bad{background:var(--bad);border-color:var(--bad-line)}
+.stackcol{display:flex;flex-direction:column-reverse;gap:6px;max-width:420px}
+.frame{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:6px 10px;font:13px var(--mono)}
+.frame b{display:block;margin-bottom:2px}
+.frame.hit{background:var(--hit);border-color:var(--hit-line)}
+.frame.found{background:var(--found);border-color:var(--found-line)}
+.frame.bad{background:var(--bad);border-color:var(--bad-line)}
+.frame.dim{opacity:.55}
+.out{font:13px var(--mono);background:var(--code-bg);color:var(--code-ink);padding:8px 10px;border-radius:8px;min-height:2.2em;white-space:pre-wrap;margin-top:10px}
+.out i{color:#6b7a90;font-style:normal}
+.row2{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.lane{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:8px 12px;min-width:170px;font:13px var(--mono)}
+.lane h4{margin:0 0 4px;font:700 13px var(--sans)}
+.lane.hit{background:var(--hit);border-color:var(--hit-line)}
+.lane.found{background:var(--found);border-color:var(--found-line)}
+.lane.bad{background:var(--bad);border-color:var(--bad-line)}
+.lane.dim{opacity:.55}
+.slots{display:flex;gap:6px}
+.slot{width:44px;height:44px;border:2px dashed var(--cell-line);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 15px var(--mono)}
+.slot.full{border-style:solid;background:var(--range);border-color:var(--range-line)}
+.iface{display:inline-flex;border:2px solid var(--cell-line);border-radius:10px;overflow:hidden;background:var(--cell);margin:4px 10px 4px 0}
+.iface div{padding:6px 10px;font:600 13px var(--mono)}
+.iface .t{background:var(--dim)}
+.iface.hit{background:var(--hit);border-color:var(--hit-line)}
+.iface.found{background:var(--found);border-color:var(--found-line)}
+.iface.bad{background:var(--bad);border-color:var(--bad-line)}
+.bar{height:20px;border-radius:5px;background:var(--range);border:2px solid var(--range-line);transition:width .3s}
+.bar.hit{background:var(--hit);border-color:var(--hit-line)}
+.bar.found{background:var(--found);border-color:var(--found-line)}
+.bar.dim{background:var(--dim);border-color:transparent}
+.tl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;align-items:center;font:13px var(--mono)}
+.tree{font:13px var(--mono)} .tree .tn{border:2px solid var(--cell-line);border-radius:8px;padding:4px 8px;margin:4px 0;background:var(--cell);display:inline-block}
+.tree .tn.bad{background:var(--bad);border-color:var(--bad-line)} .tree .tn.hit{background:var(--hit);border-color:var(--hit-line)} .tree .tn.found{background:var(--found);border-color:var(--found-line)}
+.tree ul{list-style:none;margin:0;padding-left:26px;border-left:2px solid var(--line)}
+.lane{min-width:200px}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/go/goroutines-and-channels.html">বাংলা</a></nav>
+  <h1>Goroutines and Channels</h1>
+  <p class="lead">A goroutine is a task running alongside others. A channel is a <b>pipe</b> they use to pass values.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea</h2>
+    <p>A <b>goroutine</b> is like an extra worker in a kitchen: <code>go f()</code> says &ldquo;you, start doing f, I will carry on&rdquo;. Workers should not reach into each other&rsquo;s pockets; they hand things over a <b>channel</b>, like a slot in the kitchen wall.</p>
+ <p>An <b>unbuffered</b> channel has no shelf: the cook and the waiter must meet at the slot at the same moment, so whoever arrives first <b>waits (blocks)</b>. A <b>buffered</b> channel has a shelf with room for N plates: the sender only waits when the shelf is full, the receiver only when it is empty. <code>close(ch)</code> tells the receivers &ldquo;no more plates are coming&rdquo;.</p>
+ <p><b>Note:</b> real Go chooses the order in which goroutines run. These animations show <i>one possible</i> schedule.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Example<select id="sc"></select></label>
+    <span id="inputs" style="display:contents"></span>
+    <button id="run">Run</button>
+  </div>
+  <p class="viz-note" id="scdesc"></p>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul><li>In &ldquo;Buffered channel&rdquo; set capacity to 1, then 4. How does the producer’s waiting change?</li><li>In &ldquo;Sender blocks&rdquo; find the moment the sender finally continues. What triggered it?</li><li>Remove the <code>close</code> in your head: what would the <code>range</code> loop do at the end? (It would wait forever.)</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul><li>Receiving from a channel nobody sends to: <code>fatal error: all goroutines are asleep - deadlock!</code></li><li>Sending on a closed channel panics. Only the sender should close, and only once.</li><li>Forgetting to close a channel that a <code>range</code> loop reads: the loop never ends.</li><li>Starting goroutines that can never finish (blocked forever) is a goroutine leak.</li></ul>
+  </div>
+
+  <div class="pagenav"><a href="interfaces.html">&larr; Interfaces</a><a href="select-and-timeouts.html">Select and Timeouts &rarr;</a></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+
+var E = Viz.el;
+/* ---- scenarios + dynamic inputs ---- */
+function multi(scenarios) {
+  var mount = Viz.$('#app'), sel = Viz.$('#sc'), inputsBox = Viz.$('#inputs'), err = Viz.$('#err'), desc = Viz.$('#scdesc');
+  var cur = 0, store = {}, pendingStep = null;
+  var hm = location.hash.match(/sc=(\d+)(?:&step=(\d+))?/);
+  if (hm && scenarios[+hm[1]]) { cur = +hm[1]; pendingStep = hm[2] ? +hm[2] : null; }
+  window.I = function (id) { var n = document.getElementById('in_' + id); return n ? n.value : ''; };
+  window.N = function (id, lo, hi) {
+    var raw = I(id).trim(); var v = Number(raw);
+    if (raw === '' || isNaN(v)) throw new Error('"' + id + '" must be a number.');
+    if (lo !== undefined && v < lo) throw new Error('"' + id + '" must be at least ' + lo + '.');
+    if (hi !== undefined && v > hi) throw new Error('"' + id + '" must be at most ' + hi + '.');
+    return Math.floor(v) === v ? v : Math.floor(v);
+  };
+  scenarios.forEach(function (sc, i) { sel.appendChild(E('option', { value: String(i), text: sc.name })); });
+  function buildInputs() {
+    inputsBox.innerHTML = '';
+    (scenarios[cur].inputs || []).forEach(function (inp) {
+      var key = cur + ':' + inp.id;
+      var val = store[key] !== undefined ? store[key] : inp.value;
+      var ctl;
+      if (inp.options) {
+        ctl = E('select', { id: 'in_' + inp.id }, inp.options.map(function (o) { return E('option', { value: o[0], text: o[1] }); }));
+        ctl.value = val;
+      } else {
+        ctl = E('input', { id: 'in_' + inp.id, value: val, size: inp.size || 10 });
+      }
+      ctl.addEventListener('change', function () { store[key] = ctl.value; show(); });
+      inputsBox.appendChild(E('label', { text: inp.label }, [ctl]));
+    });
+  }
+  function show() {
+    var sc = scenarios[cur];
+    err.textContent = '';
+    mount.innerHTML = '';
+    desc.textContent = sc.desc || '';
+    var steps;
+    try { steps = sc.steps(); } catch (e) { err.textContent = e.message; return; }
+    var st = Viz.stepper({ mount: mount, code: typeof sc.code === 'function' ? sc.code() : sc.code, render: sc.render });
+    st.load(steps);
+    if (pendingStep !== null) { st.go(pendingStep); pendingStep = null; }
+  }
+  sel.addEventListener('change', function () { cur = +sel.value; buildInputs(); show(); });
+  Viz.$('#run').addEventListener('click', function () { show(); });
+  sel.value = String(cur); buildInputs(); show();
+  if (location.hash === '#test') {
+    var log = [];
+    scenarios.forEach(function (sc, k) {
+      try {
+        cur = k; buildInputs();
+        var steps = sc.steps(), code = typeof sc.code === 'function' ? sc.code() : sc.code, tmp = document.createElement('div');
+        if (!steps.length) throw new Error('no steps');
+        steps.forEach(function (stp, j) {
+          tmp.innerHTML = ''; sc.render(stp, j, tmp);
+          if (!tmp.firstChild) throw new Error('empty render at step ' + j);
+          [].concat(stp.line === undefined ? [] : stp.line).forEach(function (ln) { if (!(ln >= 0 && ln < code.length)) throw new Error('bad line ' + ln + ' at step ' + j); });
+          if (!stp.text) throw new Error('no text at step ' + j);
+        });
+        log.push('OK   ' + sc.name + ' (' + steps.length + ' steps)');
+      } catch (e) { log.push('FAIL ' + sc.name + ': ' + e.message); }
+    });
+    cur = 0; sel.value = '0'; buildInputs(); show();
+    document.body.appendChild(E('pre', { id: 'testresult', text: log.join('\n') }));
+  }
+}
+
+/* ---- memory diagram: boxes + arrows (illustrative addresses) ---- */
+var _mid = 0;
+function mem(body, cells, arrows, o) {
+  o = o || {};
+  var W = 124, H = 70, G = 34, X0 = 12, Y0 = 12, n = Math.max(cells.length, 1), id = 'ah' + (++_mid);
+  var width = X0 * 2 + n * W + (n - 1) * G, hasA = arrows && arrows.length, height = Y0 + H + (hasA ? 92 : 14);
+  var kids = [Viz.s('defs', {}, [Viz.s('marker', { id: id, viewBox: '0 0 10 10', refX: '8', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto' }, [Viz.s('path', { d: 'M0,0L10,5L0,10z', class: 'ah' })])])];
+  cells.forEach(function (c, i) {
+    var x = X0 + i * (W + G);
+    kids.push(Viz.s('rect', { x: x, y: Y0, width: W, height: H, rx: 10, class: 'node ' + (c.cls || '') }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 17, 'text-anchor': 'middle', class: 'nm', text: c.name }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 42, 'text-anchor': 'middle', class: 'val' + (String(c.value).length > 8 ? ' small' : ''), text: String(c.value) }));
+    if (c.addr) kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 62, 'text-anchor': 'middle', class: 'ad', text: c.addr }));
+  });
+  (arrows || []).forEach(function (a) {
+    var x1 = X0 + a.from * (W + G) + W / 2, x2 = X0 + a.to * (W + G) + W / 2, y = Y0 + H, d;
+    if (a.from === a.to) { x1 -= 22; x2 += 22; d = 'M' + x1 + ',' + y + ' C' + (x1 - 10) + ',' + (y + 55) + ' ' + (x2 + 10) + ',' + (y + 55) + ' ' + x2 + ',' + (y + 3); }
+    else d = 'M' + x1 + ',' + y + ' C' + x1 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 4);
+    kids.push(Viz.s('path', { d: d, class: 'arrow ' + (a.cls || ''), 'marker-end': 'url(#' + id + ')' }));
+    if (a.label) kids.push(Viz.s('text', { x: (x1 + x2) / 2, y: y + 66, 'text-anchor': 'middle', class: 'lbl', text: a.label }));
+  });
+  var svgEl = Viz.svg(width, height, kids); svgEl.style.minWidth = Math.min(width, 600) + 'px';
+  body.appendChild(svgEl);
+  if (o.note !== false) body.appendChild(Viz.note('Addresses like 0xc000012000 are made up for illustration; real addresses differ on every run.'));
+}
+function out(body, lines) {
+  body.appendChild(E('div', { class: 'out', html: lines && lines.length ? lines.map(function (l) { return esc(l); }).join('<br>') : '<i>(program output appears here)</i>' }));
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function chips(items) { return E('div', { class: 'hdrs' }, items.map(function (c) { return E('span', { class: 'chip ' + (c.cls || ''), text: c.text }); })); }
+
+document.getElementById('legend').appendChild(Viz.legend([{cls:'hit',label:'running'},{cls:'dim',label:'blocked / waiting'},{cls:'found',label:'finished'},{cls:'range',label:'value in the channel'}]));
+
+function render(st, i, body) {
+  var lanes = st.lanes.map(function (l) {
+    return E('div', { class: 'lane ' + (l.cls || '') }, [E('h4', { text: l.name }), E('div', { text: l.text || '' })]);
+  });
+  var ch = st.ch, chBox;
+  if (ch.cap === 0) {
+    chBox = E('div', { class: 'lane ' + (ch.cls || '') }, [E('h4', { text: 'ch (unbuffered)' }), E('div', { text: ch.text || 'no shelf: sender and receiver must meet' })]);
+  } else {
+    var slots = []; for (var k = 0; k < ch.cap; k++) slots.push(E('div', { class: 'slot' + (k < ch.buf.length ? ' full' : ''), text: k < ch.buf.length ? String(ch.buf[k]) : '' }));
+    chBox = E('div', { class: 'lane ' + (ch.cls || '') }, [E('h4', { text: 'ch (buffered, cap ' + ch.cap + ')' + (ch.closed ? ' CLOSED' : '') }), E('div', { class: 'slots' }, slots), E('div', { text: ch.buf.length + ' / ' + ch.cap + ' used' })]);
+  }
+  body.appendChild(E('div', { class: 'row2' }, lanes.concat([chBox])));
+  if (st.out) out(body, st.out);
+}
+function L(name, text, cls) { return { name: name, text: text, cls: cls }; }
+multi([
+ { name: 'Unbuffered: receiver waits', desc: 'main reaches <-ch before anything was sent, so main blocks until the worker sends.',
+   code: ['ch := make(chan int)      // unbuffered', 'go func() {', '    ch <- 42', '}()', 'v := <-ch', 'fmt.Println(v)'],
+   render: render,
+   steps: function () {
+     var C0 = { cap: 0, buf: [] };
+     return [
+      { line: 0, text: 'An unbuffered channel is created. Nothing can sit inside it.', lanes: [L('main', 'running', 'hit'), L('worker', 'not started')], ch: C0, out: [] },
+      { line: 1, text: '"go func()" starts the worker goroutine. main keeps going (they run side by side).', lanes: [L('main', 'running', 'hit'), L('worker', 'runnable', '')], ch: C0, out: [] },
+      { line: 4, text: 'main reaches <-ch but nobody has sent yet. With no shelf to look at, main BLOCKS (waits).', lanes: [L('main', 'BLOCKED: waiting to receive', 'dim'), L('worker', 'running', 'hit')], ch: C0, out: [] },
+      { line: 2, text: 'The worker runs ch <- 42. A receiver is already waiting, so 42 is handed straight over and main is woken.', lanes: [L('main', 'woken up, got 42', 'hit'), L('worker', 'sent 42, finished', 'found')], ch: Object.assign({}, C0, { text: '42 handed over', cls: 'hit' }), out: [] },
+      { line: 5, text: 'main continues with v = 42 and prints it.', lanes: [L('main', 'v = 42', 'hit'), L('worker', 'finished', 'found')], ch: C0, out: ['42'] }
+     ];
+   } },
+ { name: 'Unbuffered: sender waits', desc: 'Now the worker gets there first. A send on an unbuffered channel does not complete until someone receives.',
+   code: ['ch := make(chan int)', 'go func() {', '    ch <- 1', '    fmt.Println("sent")', '}()', '// ... main is busy for a while ...', 'fmt.Println(<-ch)'],
+   render: render,
+   steps: function () {
+     var C0 = { cap: 0, buf: [] };
+     return [
+      { line: 1, text: 'The worker starts while main is busy doing something else.', lanes: [L('main', 'busy with other work', 'hit'), L('worker', 'running', 'hit')], ch: C0, out: [] },
+      { line: 2, text: 'The worker tries ch <- 1. Nobody is receiving, so it BLOCKS. "sent" is NOT printed yet: the send has not completed.', lanes: [L('main', 'busy with other work', 'hit'), L('worker', 'BLOCKED: waiting for a receiver', 'dim')], ch: C0, out: [] },
+      { line: 6, text: 'main finally reaches <-ch. The blocked sender and the receiver meet: 1 is handed over and the worker is released.', lanes: [L('main', 'received 1', 'hit'), L('worker', 'released', 'hit')], ch: Object.assign({}, C0, { text: '1 handed over', cls: 'hit' }), out: [] },
+      { line: 3, text: 'Both continue. main prints 1 and the worker prints "sent". Which line appears first can vary from run to run.', lanes: [L('main', 'printed 1', 'found'), L('worker', 'printed "sent"', 'found')], ch: C0, out: ['1', 'sent   (these two lines may swap)'] }
+     ];
+   } },
+ { name: 'Buffered channel with close and range', desc: 'A producer fills the shelf; the consumer drains it. Change the capacity and the item count.',
+   inputs: [{ id: 'cap', label: 'capacity', value: '2', size: 4 }, { id: 'n', label: 'items', value: '5', size: 4 }],
+   code: function () { return ['ch := make(chan int, ' + I('cap') + ')', 'go func() {', '    for i := 1; i <= ' + I('n') + '; i++ {', '        ch <- i', '    }', '    close(ch)', '}()', 'for v := range ch {', '    fmt.Println(v)', '}']; },
+   render: render,
+   steps: function () {
+     var cap = N('cap', 1, 4), n = N('n', 1, 6), buf = [], next = 1, closed = false, o = [], steps = [], prodDone = false;
+     function push(line, text, p, c, cls) {
+       steps.push({ line: line, text: text, lanes: [L('producer goroutine', p.t, p.c), L('main (consumer)', c.t, c.c)], ch: { cap: cap, buf: buf.slice(), closed: closed, cls: cls || '' }, out: o.slice() });
+     }
+     push(0, 'A buffered channel with room for ' + cap + ' value(s).', { t: 'starting', c: '' }, { t: 'waiting to start', c: '' });
+     var safety = 0;
+     while (safety++ < 200) {
+       while (!prodDone) {
+         if (next <= n) {
+           if (buf.length < cap) { buf.push(next); push(3, 'The producer sends ' + next + '. There is room on the shelf, so it does not wait.', { t: 'sent ' + next, c: 'hit' }, { t: 'waiting', c: '' }, 'hit'); next++; }
+           else { push(3, 'The producer wants to send ' + next + ' but the shelf is FULL. It BLOCKS until the consumer takes something.', { t: 'BLOCKED: channel full', c: 'dim' }, { t: 'about to receive', c: 'hit' }); break; }
+         } else { closed = true; prodDone = true; push(5, 'All items sent. close(ch) tells receivers that no more values are coming. Values already on the shelf can still be received.', { t: 'closed channel, finished', c: 'found' }, { t: 'waiting', c: '' }, 'hit'); }
+       }
+       if (buf.length > 0) {
+         var v = buf.shift(); o.push(String(v));
+         push(8, 'The consumer receives ' + v + ' and prints it. That frees a slot on the shelf.', { t: prodDone ? 'finished' : 'can continue', c: prodDone ? 'found' : 'hit' }, { t: 'received ' + v, c: 'hit' });
+       } else if (closed) {
+         push(9, 'The shelf is empty AND the channel is closed, so the range loop ends. Without close it would wait forever (deadlock).', { t: 'finished', c: 'found' }, { t: 'loop finished', c: 'found' });
+         break;
+       } else break;
+     }
+     return steps;
+   } }
+]);
+
+})();
+</script>
+</body>
+</html>

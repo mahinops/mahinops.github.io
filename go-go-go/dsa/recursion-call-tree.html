@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recursion Call Tree - visual</title>
+<meta name="description" content="Watch every function call of fibonacci appear in a tree, then see memoization cut the repeated work.">
+<link rel="stylesheet" href="../assets/viz.css">
+<style>.viz-svg .halo{paint-order:stroke;stroke:var(--card);stroke-width:4px;stroke-linejoin:round}.viz-svg .node.memo{fill:#7048e8;stroke:#b197fc}.viz-svg text.memo{fill:#fff}.stat{font:14px var(--mono);margin:4px 0}.stackbox{font:13px var(--mono);margin:6px 0}.frame{display:inline-block;border:2px solid var(--cell-line);border-radius:6px;padding:1px 7px;margin:2px;background:var(--cell)}.frame.top{background:var(--hit);border-color:var(--hit-line)}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/recursion-call-tree.html">বাংলা</a></nav>
+  <h1>Recursion Call Tree</h1>
+  <p class="lead">Recursion is a function that solves a problem by calling itself on smaller pieces.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea</h2>
+    <p>Russian nesting dolls: to know what is inside the biggest doll you open it, find a smaller doll, and ask the same question. At the tiniest doll (the <b>base case</b>) the answer is known and you start returning answers back up.</p>
+<p><code>fib(n)</code> = <code>fib(n-1) + fib(n-2)</code> with <code>fib(0) = 0</code> and <code>fib(1) = 1</code>. Each call is a node in a <b>call tree</b>. You will see the <i>same</i> sub-problem (like <code>fib(3)</code>) calculated again and again. <b>Memoization</b> means writing each answer in a notebook the first time, so a repeated call just reads it back instead of branching further.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+  <label>Version<select id="mode"><option value="naive">Plain recursion</option><option value="memo">With memoization</option></select></label>
+  <label>n (0 to 7)<input id="n" value="5" size="4"></label>
+  <button id="go">Run</button>
+</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul><li>Run plain recursion with <code>n = 5</code>, then <code>7</code>. How fast does the number of calls grow?</li><li>Switch to memoization with the same <code>n</code>. Which nodes turn purple, and why do they have no children?</li><li>Compare the &ldquo;Total calls&rdquo; numbers at the last step for both versions.</li><li>Watch the <b>call stack</b> line: it is the chain of calls waiting for their answer. How deep does it get?</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul><li><b>No base case</b> (or one that is never reached): the function calls itself forever and Go crashes with a stack overflow.</li><li><b>Recomputing the same sub-problems</b>: plain fib is exponential. Memoize (or build the answers bottom-up with a loop).</li><li><b>Forgetting to store the result</b> in the memo map before returning.</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">How fast is it?</h2>
+    <p><b>Plain fib: about O(2<sup>n</sup>)</b> time, because the call tree roughly doubles each level. <b>Memoized: O(n)</b> time, since each value is computed once, and O(n) space for the memo map and call stack.</p>
+  </div>
+
+  <div class="pagenav"><a href="sorting.html">&larr; Sorting</a><a href="backtracking.html">Backtracking &rarr;</a></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script id="algo">
+
+function fibSteps(n, useMemo) {
+  var nodes = [], steps = [], memo = {}, stackIds = [], calls = 0, active = null;
+  function snap(line, text, extra) {
+    steps.push(Object.assign({
+      nodes: nodes, line: line, text: text, calls: calls, n: n, useMemo: useMemo,
+      states: nodes.map(function (nd) { return stackIds.indexOf(nd.id) !== -1 ? (nd.id === active ? 'active' : 'wait') : nd.fin; }),
+      vals: nodes.map(function (nd) { return nd.val; }),
+      stack: stackIds.map(function (id) { return nodes[id].k; }),
+      memo: Object.keys(memo).map(Number).sort(function (a, b) { return a - b; }).map(function (k) { return [k, memo[k]]; }),
+    }, extra || {}));
+  }
+  function call(k, parent) {
+    var nd = { id: nodes.length, k: k, kids: [], parent: parent, val: null, fin: '', edge: parent === null ? '' : (nodes[parent].kids.length === 0 ? 'n-1' : 'n-2') };
+    nodes.push(nd); if (parent !== null) nodes[parent].kids.push(nd.id);
+    stackIds.push(nd.id); calls++; active = nd.id;
+    snap(0, 'Call fib(' + k + ').' + (parent === null ? '' : ' (It was needed by fib(' + nodes[parent].k + ').)'));
+    if (k <= 1) {
+      nd.val = k; nd.fin = 'done';
+      snap([1, 2], 'fib(' + k + ') is a base case: return ' + k + ' straight away, no more calls.');
+      stackIds.pop(); active = parent; return k;
+    }
+    if (useMemo && Object.prototype.hasOwnProperty.call(memo, k)) {
+      nd.val = memo[k]; nd.fin = 'memo';
+      snap([4, 5], 'fib(' + k + ') is already in the memo notebook: return ' + memo[k] + ' immediately. This whole branch is skipped!');
+      stackIds.pop(); active = parent; return memo[k];
+    }
+    var a = call(k - 1, nd.id); active = nd.id;
+    snap(useMemo ? 7 : 4, 'fib(' + (k - 1) + ') returned ' + a + '. Back in fib(' + k + '): now we need fib(' + (k - 2) + ').');
+    var b = call(k - 2, nd.id); active = nd.id;
+    nd.val = a + b; nd.fin = 'done'; if (useMemo) memo[k] = nd.val;
+    snap(useMemo ? [7, 8] : 4, 'fib(' + k + ') = ' + a + ' + ' + b + ' = ' + nd.val + (useMemo ? ', and it is written in the memo.' : '.'));
+    stackIds.pop(); active = parent; return nd.val;
+  }
+  var v = call(n, null);
+  snap(useMemo ? 8 : 4, 'Done: fib(' + n + ') = ' + v + '. Total calls made: ' + calls + '.', { done: true, result: v });
+  return steps;
+}
+function countFibCalls(n, useMemo) {
+  var memo = {}, c = 0;
+  (function f(k) { c++; if (k <= 1) return k; if (useMemo && k in memo) return memo[k]; var r = f(k - 1) + f(k - 2); if (useMemo) memo[k] = r; return r; })(n);
+  return c;
+}
+
+</script>
+<script id="ui">
+
+function $id(x) { return document.getElementById(x); }
+function showErr(m) { $id('err').textContent = m || ''; }
+var current = null;
+function mountStepper(opts) {
+  if (current) current.pause();
+  var app = $id('app'); app.innerHTML = ''; app.className = '';
+  current = Viz.stepper(Object.assign({ mount: '#app' }, opts));
+  return current;
+}
+function setLegend(items) { var l = $id('legend'); l.innerHTML = ''; l.appendChild(Viz.legend(items)); }
+function mark(marks, ix, label) { marks[ix] = (marks[ix] || []).concat(label); }
+
+
+var _layoutCache = null;
+function layoutTree(nodes, dx, dy) {
+  if (_layoutCache && _layoutCache.nodes === nodes && _layoutCache.dx === dx) return _layoutCache.L;
+  var slot = 0, pos = {}, maxD = 0;
+  function visit(id, d) {
+    var nd = nodes[id]; maxD = Math.max(maxD, d);
+    if (!nd.kids.length) { pos[id] = { x: slot * dx + dx / 2, y: d * dy + 30 }; slot++; }
+    else {
+      nd.kids.forEach(function (k) { visit(k, d + 1); });
+      pos[id] = { x: (pos[nd.kids[0]].x + pos[nd.kids[nd.kids.length - 1]].x) / 2, y: d * dy + 30 };
+    }
+  }
+  visit(0, 0);
+  var L = { pos: pos, width: slot * dx, height: maxD * dy + 80 };
+  _layoutCache = { nodes: nodes, dx: dx, L: L };
+  return L;
+}
+var STATE_CLASS = { '': 'dim', wait: 'range', active: 'hit', done: 'found', memo: 'memo' };
+function drawTree(body, nodes, st, o) {
+  var L = layoutTree(nodes, o.dx, o.dy), W = Math.max(L.width, 220), kids = [];
+  nodes.forEach(function (nd) {
+    nd.kids.forEach(function (k) {
+      var a = L.pos[nd.id], b = L.pos[k], stt = st.states[k], seen = stt !== undefined && stt !== '';
+      kids.push(Viz.s('line', { x1: a.x, y1: a.y + 15, x2: b.x, y2: b.y - 15, class: 'edge' + (stt === 'active' ? ' hit' : seen ? ' found' : ''), style: seen ? '' : 'opacity:.2' }));
+      if (nodes[k].edge && seen) kids.push(Viz.s('text', { x: (a.x + b.x) / 2 + (b.x < a.x ? -16 : 16), y: (a.y + b.y) / 2 + 3, 'text-anchor': 'middle', class: 'halo', style: 'font-size:10px', text: nodes[k].edge }));
+    });
+  });
+  nodes.forEach(function (nd) {
+    var p = L.pos[nd.id], stt = st.states[nd.id] || '', cls = STATE_CLASS[stt];
+    kids.push(Viz.s('rect', { x: p.x - o.w / 2, y: p.y - 15, width: o.w, height: 30, rx: 8, class: 'node ' + cls, style: stt === '' ? 'opacity:.35' : '' }));
+    kids.push(Viz.s('text', { x: p.x, y: p.y + 4, 'text-anchor': 'middle', class: stt === 'memo' ? 'memo' : '', style: 'font-size:12px;font-weight:700' + (stt === '' ? ';opacity:.4' : ''), text: o.label(nd) }));
+    var sub = stt === '' ? '' : o.sub(nd, st);
+    if (sub) kids.push(Viz.s('text', { x: p.x, y: p.y + 31, 'text-anchor': 'middle', class: 'halo', style: 'font-size:11px', text: sub }));
+  });
+  var svg = Viz.svg(W, L.height, kids);
+  svg.style.maxWidth = 'none'; svg.style.width = W + 'px'; svg.setAttribute('width', W);
+  body.appendChild(svg);
+}
+
+var NAIVE_CODE = ['func fib(n int) int {',
+'    if n <= 1 {',
+'        return n',
+'    }',
+'    return fib(n-1) + fib(n-2)',
+'}'];
+var MEMO_CODE = ['func fib(n int, memo map[int]int) int {',
+'    if n <= 1 {',
+'        return n',
+'    }',
+'    if v, ok := memo[n]; ok {',
+'        return v',
+'    }',
+'    memo[n] = fib(n-1, memo) + fib(n-2, memo)',
+'    return memo[n]',
+'}'];
+function render(st, i, body) {
+  drawTree(body, st.nodes, st, {
+    dx: 62, dy: 70, w: 56,
+    label: function (nd) { return 'fib(' + nd.k + ')'; },
+    sub: function (nd, s) { return s.vals[nd.id] === null || s.vals[nd.id] === undefined ? '' : '= ' + s.vals[nd.id]; },
+  });
+  body.appendChild(Viz.el('div', { class: 'stackbox' }, [Viz.el('span', { text: 'call stack: ' })].concat(
+    st.stack.length ? st.stack.map(function (k, ix) { return Viz.el('span', { class: 'frame' + (ix === st.stack.length - 1 ? ' top' : ''), text: 'fib(' + k + ')' }); }) : [Viz.el('span', { text: '(empty)' })])));
+  if (st.useMemo) body.appendChild(Viz.el('div', { class: 'stackbox' }, [Viz.el('span', { text: 'memo: ' })].concat(
+    st.memo.length ? st.memo.map(function (kv) { return Viz.el('span', { class: 'frame', text: kv[0] + '→' + kv[1] }); }) : [Viz.el('span', { text: '(empty)' })])));
+  body.appendChild(Viz.el('div', { class: 'stat', html: 'calls so far: <b>' + st.calls + '</b>' + (st.done ? ' &nbsp; (plain would need ' + countFibCalls(st.n, false) + ', memoized needs ' + countFibCalls(st.n, true) + ')' : '') }));
+}
+function run() {
+  showErr('');
+  var n = Number($id('n').value), memo = $id('mode').value === 'memo';
+  if ($id('n').value.trim() === '' || !Number.isInteger(n) || n < 0 || n > 7) { showErr('n must be a whole number from 0 to 7.'); return; }
+  setLegend([{ cls: 'hit', label: 'running now' }, { cls: 'range', label: 'waiting for a child call' }, { cls: 'found', label: 'finished (answer shown)' }, { cls: 'dim', label: 'not called yet' }].concat(memo ? [{ cls: 'memo', label: 'answer read from memo' }] : []));
+  mountStepper({ code: memo ? MEMO_CODE : NAIVE_CODE, render: render }).load(fibSteps(n, memo));
+}
+$id('mode').addEventListener('change', run);
+$id('go').addEventListener('click', run);
+run();
+
+</script>
+</body>
+</html>

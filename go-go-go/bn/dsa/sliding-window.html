@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sliding Window</title>
+<meta name="description" content="আগের position-এর কাজ আবার না করে window সরিয়ে সরিয়ে fixed আর growing সমস্যার সমাধান।">
+<link rel="stylesheet" href="../../assets/viz.css">
+<style>.seen{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.chip{font:600 14px var(--mono);border:2px solid var(--cell-line);border-radius:8px;padding:3px 8px;background:var(--cell)}.chip.hit{background:var(--hit);border-color:var(--hit-line)}.stat{font:14px var(--mono);margin:4px 0}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; সব visual</a> &middot; <a href="../../dsa/sliding-window.html">English</a></nav>
+  <h1>Sliding Window</h1>
+  <p class="lead">আগের position-এর কাজটা আবার করার বদলে সেটাই কাজে লাগান।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা</h2>
+    <p>ভাবুন আপনি রাস্তা ধরে হাঁটছেন আর একটা frame দিয়ে একসাথে 3টা বাড়ি দেখা যাচ্ছে। এক ধাপ এগোনোর পর দৃশ্যমান বাড়িগুলোর মোট দাম জানতে 3টা বাড়ি নতুন করে যোগ করার দরকার নেই: <b>যে নতুন বাড়িটা এল সেটা যোগ করুন</b> আর <b>যেটা বেরিয়ে গেল সেটা বাদ দিন</b>।</p>
+<p>Window <b>বড় আর ছোটও</b> হতে পারে: &ldquo;কোনো অক্ষর repeat না হওয়া সবচেয়ে লম্বা অংশ&rdquo; খুঁজতে ডান প্রান্ত একটা একটা করে অক্ষর এগোয়, আর repeat ধরা পড়লে বাঁ প্রান্ত ততটুকু সামনে লাফ দেয় যতটুকুতে repeat-টা সরে যায়।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+  <label>সমস্যা<select id="mode"><option value="max">পরপর k টা সংখ্যার সর্বোচ্চ sum (fixed window)</option><option value="longest">Repeat ছাড়া সবচেয়ে লম্বা substring (growing window)</option></select></label>
+  <label id="numsWrap">সংখ্যা<input id="arr" value="2, 1, 5, 1, 3, 2, 9, 1"></label>
+  <label id="kWrap">k (window size)<input id="k" value="3" size="4"></label>
+  <label id="strWrap">Text<input id="str" value="abcabcbb" size="16"></label>
+  <button id="go">Run</button>
+</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul><li>Fixed window: k = 1 দিন, তারপর k = পুরো length দিন। দুই ক্ষেত্রে কী হয়?</li><li>লক্ষ করুন প্রতি slide-এ sum বদলায় <i>একটা add আর একটা subtract</i> দিয়ে, পুরোটা নতুন করে যোগ করতে হয় না।</li><li>Longest substring: <code>pwwkew</code> দিন। Repeat আসার সময় বাঁ প্রান্ত কীভাবে লাফ দেয় দেখুন।</li><li>সব অক্ষর আলাদা এমন text দিন, তারপর সব অক্ষর একই এমন text দিন।</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul><li><b>প্রতিবার পুরো window নতুন করে যোগ করলে</b> O(n) বদলে O(n&middot;k) হয়ে যায়।</li><li><b>বাদ পড়া item-এ off-by-one:</b> window <code>i</code>-তে শেষ হলে যে item এইমাত্র বেরিয়ে গেছে সেটা <code>nums[i-k]</code>।</li><li><b>পুরনো entry ভুলে যাওয়া:</b> substring version-এ window শুরুর <i>আগে</i> দেখা অক্ষর ignore করতে হয় (<code>idx &gt;= left</code>)।</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Complexity</h2>
+    <p><b>Time complexity: O(n)</b> &ndash; প্রতিটা item window-তে একবার ঢোকে আর বড়জোর একবার বেরোয়। <b>Space complexity: O(1)</b> fixed window-এর জন্য; substring version-এ O(alphabet) (শেষ দেখা position-এর map)।</p>
+  </div>
+
+  <div class="pagenav"><a href="two-pointers.html">&larr; Two Pointers</a><a href="hash-map-two-sum.html">Hash Map: Two Sum &rarr;</a></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script id="algo">
+
+function maxSumSteps(nums, k) {
+  var steps = [], sum = 0, best = null, bestFrom = 0;
+  function snap(line, text, extra) { steps.push(Object.assign({ mode: 'max', nums: nums, sum: sum, best: best, bestFrom: bestFrom, k: k, line: line, text: text }, extra || {})); }
+  for (var i = 0; i < k; i++) {
+    sum += nums[i];
+    snap([2, 3], 'প্রথম window বানাচ্ছি: add করি nums[' + i + '] = ' + nums[i] + ', তাই sum = ' + sum + '.', { from: 0, to: i, add: i });
+  }
+  best = sum; bestFrom = 0;
+  snap(5, 'প্রথম window তৈরি। sum = ' + sum + ', তাই এখন পর্যন্ত best = ' + best + '।', { from: 0, to: k - 1 });
+  for (var j = k; j < nums.length; j++) {
+    sum += nums[j] - nums[j - k];
+    snap([6, 7], 'ডানে slide করি: add করি nums[' + j + '] = ' + nums[j] + ' আর drop করি nums[' + (j - k) + '] = ' + nums[j - k] + '। নতুন sum = ' + sum + ' (একটা add, একটা subtract)।', { from: j - k + 1, to: j, add: j, drop: j - k });
+    if (sum > best) { best = sum; bestFrom = j - k + 1; snap(8, 'নতুন window sum ' + sum + ' আগের best-এর চেয়ে বেশি, তাই best = ' + best + '।', { from: j - k + 1, to: j }); }
+    else snap(8, 'Sum ' + sum + ' best-কে ছাড়াতে পারেনি (' + best + '), তাই best আগের মতোই ' + best + '।', { from: j - k + 1, to: j });
+  }
+  snap(10, 'আর slide করার item নেই। return করি best = ' + best + '।', { from: bestFrom, to: bestFrom + k - 1, done: true, result: best });
+  return steps;
+}
+function longestSteps(s) {
+  var chars = s.split(''), steps = [], seen = {}, left = 0, best = 0, bl = 0, br = -1;
+  function copy(o) { return JSON.parse(JSON.stringify(o)); }
+  function snap(line, text, extra) { steps.push(Object.assign({ mode: 'longest', chars: chars, left: left, seen: copy(seen), best: best, bl: bl, br: br, line: line, text: text }, extra || {})); }
+  snap(2, 'শুরু: left = 0, আর শেষ দেখা position-এর map খালি।', { right: -1 });
+  for (var right = 0; right < chars.length; right++) {
+    var c = chars[right], has = Object.prototype.hasOwnProperty.call(seen, c), idx = has ? seen[c] : -1, inside = has && idx >= left;
+    var t = 'দেখি "' + c + '", index ' + right + '। ';
+    if (inside) t += 'এটা আগেই আছে index ' + idx + ', window-এর ভেতরেই: এটা repeat!';
+    else if (has) t += 'এটা আগে দেখা গেছে index ' + idx + ', কিন্তু সেটা window শুরুর আগে, তাই ধরা হয় না।';
+    else t += 'আগে কখনো দেখা যায়নি, তাই window বড় হতে পারে।';
+    snap(4, t, { right: right, cur: c });
+    if (inside) {
+      left = idx + 1;
+      snap([4, 5], 'left সরিয়ে ' + left + '-এ নিই (আগের "' + c + '"-এর ঠিক পরে), যাতে window-তে আর repeat না থাকে।', { right: right, cur: c });
+    }
+    seen[c] = right;
+    if (right - left + 1 > best) { best = right - left + 1; bl = left; br = right; }
+    snap([7, 8], 'মনে রাখি "' + c + '" আছে index ' + right + '। Window length = ' + right + ' - ' + left + ' + 1 = ' + (right - left + 1) + '। best = ' + best + '।', { right: right, cur: c });
+  }
+  snap(10, 'শেষ। Repeat ছাড়া সবচেয়ে লম্বা substring-এর length ' + best + (best ? ': "' + chars.slice(bl, br + 1).join('') + '"।' : '।'), { right: chars.length - 1, done: true, result: best });
+  return steps;
+}
+
+</script>
+<script id="ui">
+
+function $id(x) { return document.getElementById(x); }
+function showErr(m) { $id('err').textContent = m || ''; }
+var current = null;
+function mountStepper(opts) {
+  if (current) current.pause();
+  var app = $id('app'); app.innerHTML = ''; app.className = '';
+  current = Viz.stepper(Object.assign({ mount: '#app' }, opts));
+  return current;
+}
+function setLegend(items) { var l = $id('legend'); l.innerHTML = ''; l.appendChild(Viz.legend(items)); }
+function mark(marks, ix, label) { marks[ix] = (marks[ix] || []).concat(label); }
+
+
+var MAX_CODE = ['func maxSum(nums []int, k int) int {',
+'    sum := 0',
+'    for i := 0; i < k; i++ {',
+'        sum += nums[i]',
+'    }',
+'    best := sum',
+'    for i := k; i < len(nums); i++ {',
+'        sum += nums[i] - nums[i-k]',
+'        best = max(best, sum)',
+'    }',
+'    return best',
+'}'];
+var LONG_CODE = ['func lengthOfLongest(s string) int {',
+'    seen := map[byte]int{} // last index of each byte',
+'    left, best := 0, 0',
+'    for right := 0; right < len(s); right++ {',
+'        if idx, ok := seen[s[right]]; ok && idx >= left {',
+'            left = idx + 1',
+'        }',
+'        seen[s[right]] = right',
+'        best = max(best, right-left+1)',
+'    }',
+'    return best',
+'}'];
+function render(st, i, body) {
+  if (st.mode === 'max') {
+    var cls = {}, marks = {};
+    st.nums.forEach(function (_, ix) { cls[ix] = (ix >= st.from && ix <= st.to) ? 'range' : 'dim'; });
+    if (st.drop !== undefined) cls[st.drop] = 'bad';
+    if (st.add !== undefined) cls[st.add] = 'hit';
+    if (st.done) for (var ix = st.from; ix <= st.to; ix++) cls[ix] = 'found';
+    mark(marks, st.from, 'start'); if (st.to !== st.from) mark(marks, st.to, 'end');
+    body.appendChild(Viz.array(st.nums, { marks: marks, classes: cls, title: 'nums (k = ' + st.k + ')' }));
+    body.appendChild(Viz.el('div', { class: 'stat', html: 'window sum = <b>' + st.sum + '</b> &nbsp; best = <b>' + (st.best === null ? '-' : st.best) + '</b>' }));
+  } else {
+    var c2 = {}, m2 = {};
+    st.chars.forEach(function (_, ix) { c2[ix] = (ix >= st.left && ix <= st.right) ? 'range' : 'dim'; });
+    if (st.right >= 0) { c2[st.right] = 'hit'; mark(m2, st.right, 'right'); }
+    if (st.right >= 0 || st.left === 0) mark(m2, st.left, 'left');
+    if (st.done && st.best) for (var q = st.bl; q <= st.br; q++) c2[q] = 'found';
+    body.appendChild(Viz.array(st.chars, { marks: m2, classes: c2, title: 'text' }));
+    var keys = Object.keys(st.seen);
+    var box = Viz.el('div', { class: 'seen' }, keys.map(function (ch) {
+      return Viz.el('span', { class: 'chip' + (st.cur === ch ? ' hit' : ''), text: ch + ' → ' + st.seen[ch] });
+    }));
+    body.appendChild(Viz.el('div', { class: 'viz-array-title', text: 'seen (letter → শেষ index)' }));
+    body.appendChild(box);
+    body.appendChild(Viz.el('div', { class: 'stat', html: 'window length = <b>' + (st.right < 0 ? 0 : st.right - st.left + 1) + '</b> &nbsp; best = <b>' + st.best + '</b>' }));
+  }
+}
+function run() {
+  showErr('');
+  var mode = $id('mode').value;
+  if (mode === 'max') {
+    var nums = Viz.parseNums($id('arr').value), k = Number($id('k').value);
+    if (!nums.length || nums.length > 14) { showErr('1 থেকে 14টার মধ্যে সংখ্যা দিন।'); return; }
+    if (!Number.isInteger(k) || k < 1 || k > nums.length) { showErr('k একটা integer হতে হবে, 1 থেকে ' + nums.length + '-এর মধ্যে।'); return; }
+    setLegend([{ cls: 'range', label: 'window-এর ভেতরে' }, { cls: 'hit', label: 'এইমাত্র add হয়েছে' }, { cls: 'bad', label: 'এইমাত্র drop হয়েছে' }, { cls: 'dim', label: 'window-এর বাইরে' }, { cls: 'found', label: 'সেরা window' }]);
+    mountStepper({ code: MAX_CODE, render: render }).load(maxSumSteps(nums, k));
+  } else {
+    var s = $id('str').value;
+    if (!s.length || s.length > 16) { showErr('1 থেকে 16টা অক্ষর দিন।'); return; }
+    setLegend([{ cls: 'range', label: 'window-এর ভেতরে' }, { cls: 'hit', label: 'যে অক্ষর add হচ্ছে' }, { cls: 'dim', label: 'window-এর বাইরে' }, { cls: 'found', label: 'সেরা window' }]);
+    mountStepper({ code: LONG_CODE, render: render }).load(longestSteps(s));
+  }
+}
+$id('mode').addEventListener('change', function () {
+  var m = $id('mode').value === 'max';
+  $id('numsWrap').style.display = m ? '' : 'none'; $id('kWrap').style.display = m ? '' : 'none'; $id('strWrap').style.display = m ? 'none' : '';
+  run();
+});
+$id('strWrap').style.display = 'none';
+$id('go').addEventListener('click', run);
+run();
+
+</script>
+</body>
+</html>

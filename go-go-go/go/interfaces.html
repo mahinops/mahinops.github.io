@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interfaces - Go visual</title>
+<meta name="description" content="See an interface value as a (type, value) pair, how method calls pick the right code, and the nil-interface gotcha.">
+<link rel="stylesheet" href="../assets/viz.css">
+<style>
+.viz-layout{grid-template-columns:minmax(0,1fr)}
+.viz-stage,.viz-code{min-width:0;max-width:100%}
+@media (max-width:760px){.viz-layout.viz-has-code{grid-template-columns:minmax(0,1fr)}}
+body{overflow-x:hidden}
+.viz-svg .ah{fill:var(--accent)}
+.viz-svg .arrow{fill:none;stroke:var(--accent);stroke-width:2.5}
+.viz-svg .arrow.bad{stroke:var(--bad-line)}
+.viz-svg .node.bad{fill:var(--bad);stroke:var(--bad-line)}
+.viz-svg .node.nilp{stroke-dasharray:5 4}
+.viz-svg .nm{font-size:12px;fill:var(--muted)}
+.viz-svg .val{font-size:17px;font-weight:700}
+.viz-svg .ad{font-size:10px;fill:var(--muted)}
+.viz-svg .val.small{font-size:12px}
+.viz-svg .lbl{font-size:12px;fill:var(--accent);font-weight:700}
+.viz-cell.spare{background:transparent;border-style:dashed;color:var(--muted)}
+.hdrs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.chip{border:2px solid var(--cell-line);background:var(--cell);border-radius:10px;padding:4px 10px;font:600 13px var(--mono)}
+.chip.hit{background:var(--hit);border-color:var(--hit-line)}
+.chip.found{background:var(--found);border-color:var(--found-line)}
+.chip.dim{opacity:.45}
+.chip.bad{background:var(--bad);border-color:var(--bad-line)}
+.stackcol{display:flex;flex-direction:column-reverse;gap:6px;max-width:420px}
+.frame{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:6px 10px;font:13px var(--mono)}
+.frame b{display:block;margin-bottom:2px}
+.frame.hit{background:var(--hit);border-color:var(--hit-line)}
+.frame.found{background:var(--found);border-color:var(--found-line)}
+.frame.bad{background:var(--bad);border-color:var(--bad-line)}
+.frame.dim{opacity:.55}
+.out{font:13px var(--mono);background:var(--code-bg);color:var(--code-ink);padding:8px 10px;border-radius:8px;min-height:2.2em;white-space:pre-wrap;margin-top:10px}
+.out i{color:#6b7a90;font-style:normal}
+.row2{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.lane{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:8px 12px;min-width:170px;font:13px var(--mono)}
+.lane h4{margin:0 0 4px;font:700 13px var(--sans)}
+.lane.hit{background:var(--hit);border-color:var(--hit-line)}
+.lane.found{background:var(--found);border-color:var(--found-line)}
+.lane.bad{background:var(--bad);border-color:var(--bad-line)}
+.lane.dim{opacity:.55}
+.slots{display:flex;gap:6px}
+.slot{width:44px;height:44px;border:2px dashed var(--cell-line);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 15px var(--mono)}
+.slot.full{border-style:solid;background:var(--range);border-color:var(--range-line)}
+.iface{display:inline-flex;border:2px solid var(--cell-line);border-radius:10px;overflow:hidden;background:var(--cell);margin:4px 10px 4px 0}
+.iface div{padding:6px 10px;font:600 13px var(--mono)}
+.iface .t{background:var(--dim)}
+.iface.hit{background:var(--hit);border-color:var(--hit-line)}
+.iface.found{background:var(--found);border-color:var(--found-line)}
+.iface.bad{background:var(--bad);border-color:var(--bad-line)}
+.bar{height:20px;border-radius:5px;background:var(--range);border:2px solid var(--range-line);transition:width .3s}
+.bar.hit{background:var(--hit);border-color:var(--hit-line)}
+.bar.found{background:var(--found);border-color:var(--found-line)}
+.bar.dim{background:var(--dim);border-color:transparent}
+.tl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;align-items:center;font:13px var(--mono)}
+.tree{font:13px var(--mono)} .tree .tn{border:2px solid var(--cell-line);border-radius:8px;padding:4px 8px;margin:4px 0;background:var(--cell);display:inline-block}
+.tree .tn.bad{background:var(--bad);border-color:var(--bad-line)} .tree .tn.hit{background:var(--hit);border-color:var(--hit-line)} .tree .tn.found{background:var(--found);border-color:var(--found-line)}
+.tree ul{list-style:none;margin:0;padding-left:26px;border-left:2px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/go/interfaces.html">বাংলা</a></nav>
+  <h1>Interfaces</h1>
+  <p class="lead">An interface value is a two-slot box: <b>which type is inside</b> and <b>the value itself</b>.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea</h2>
+    <p>An interface is a <b>job description</b>: &ldquo;anyone who can do <code>Area()</code>&rdquo;. A rectangle can do it, a circle can do it, and neither has to announce that it &ldquo;implements&rdquo; the interface. If the methods are there, it fits.</p>
+ <p>Inside, an interface variable is a box with <b>two slots</b>: a <b>type</b> label (what is actually stored) and the <b>value</b>. When you call <code>s.Area()</code>, Go reads the type slot, finds that type&rsquo;s <code>Area</code>, and runs it on the value. An interface is <code>nil</code> only when <b>both</b> slots are empty, which is the source of a famous gotcha.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Example<select id="sc"></select></label>
+    <span id="inputs" style="display:contents"></span>
+    <button id="run">Run</button>
+  </div>
+  <p class="viz-note" id="scdesc"></p>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul><li>In &ldquo;The (type, value) pair&rdquo; watch the type slot change when a Circle replaces the Rect.</li><li>In &ldquo;The nil interface gotcha&rdquo; compare the two interface boxes before the comparison. Which slot differs?</li><li>In &ldquo;Type assertions&rdquo; spot the difference between the comma-ok form and the form that panics.</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul><li>Returning a typed nil pointer as an interface (<code>var p *MyErr; return p</code>) makes a NON-nil interface. Return a literal <code>nil</code> instead.</li><li>Making interfaces too big. Small interfaces (one or two methods, like <code>io.Reader</code>) are easier to satisfy and to test.</li><li>Defining the interface next to the implementation. In Go it usually belongs with the code that <i>uses</i> it.</li><li>A bare <code>x.(T)</code> panics if x holds another type. Use <code>v, ok := x.(T)</code> when unsure.</li></ul>
+  </div>
+
+  <div class="pagenav"><a href="structs-and-methods.html">&larr; Structs and Methods</a><a href="goroutines-and-channels.html">Goroutines and Channels &rarr;</a></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+
+var E = Viz.el;
+/* ---- scenarios + dynamic inputs ---- */
+function multi(scenarios) {
+  var mount = Viz.$('#app'), sel = Viz.$('#sc'), inputsBox = Viz.$('#inputs'), err = Viz.$('#err'), desc = Viz.$('#scdesc');
+  var cur = 0, store = {}, pendingStep = null;
+  var hm = location.hash.match(/sc=(\d+)(?:&step=(\d+))?/);
+  if (hm && scenarios[+hm[1]]) { cur = +hm[1]; pendingStep = hm[2] ? +hm[2] : null; }
+  window.I = function (id) { var n = document.getElementById('in_' + id); return n ? n.value : ''; };
+  window.N = function (id, lo, hi) {
+    var raw = I(id).trim(); var v = Number(raw);
+    if (raw === '' || isNaN(v)) throw new Error('"' + id + '" must be a number.');
+    if (lo !== undefined && v < lo) throw new Error('"' + id + '" must be at least ' + lo + '.');
+    if (hi !== undefined && v > hi) throw new Error('"' + id + '" must be at most ' + hi + '.');
+    return Math.floor(v) === v ? v : Math.floor(v);
+  };
+  scenarios.forEach(function (sc, i) { sel.appendChild(E('option', { value: String(i), text: sc.name })); });
+  function buildInputs() {
+    inputsBox.innerHTML = '';
+    (scenarios[cur].inputs || []).forEach(function (inp) {
+      var key = cur + ':' + inp.id;
+      var val = store[key] !== undefined ? store[key] : inp.value;
+      var ctl;
+      if (inp.options) {
+        ctl = E('select', { id: 'in_' + inp.id }, inp.options.map(function (o) { return E('option', { value: o[0], text: o[1] }); }));
+        ctl.value = val;
+      } else {
+        ctl = E('input', { id: 'in_' + inp.id, value: val, size: inp.size || 10 });
+      }
+      ctl.addEventListener('change', function () { store[key] = ctl.value; show(); });
+      inputsBox.appendChild(E('label', { text: inp.label }, [ctl]));
+    });
+  }
+  function show() {
+    var sc = scenarios[cur];
+    err.textContent = '';
+    mount.innerHTML = '';
+    desc.textContent = sc.desc || '';
+    var steps;
+    try { steps = sc.steps(); } catch (e) { err.textContent = e.message; return; }
+    var st = Viz.stepper({ mount: mount, code: typeof sc.code === 'function' ? sc.code() : sc.code, render: sc.render });
+    st.load(steps);
+    if (pendingStep !== null) { st.go(pendingStep); pendingStep = null; }
+  }
+  sel.addEventListener('change', function () { cur = +sel.value; buildInputs(); show(); });
+  Viz.$('#run').addEventListener('click', function () { show(); });
+  sel.value = String(cur); buildInputs(); show();
+  if (location.hash === '#test') {
+    var log = [];
+    scenarios.forEach(function (sc, k) {
+      try {
+        cur = k; buildInputs();
+        var steps = sc.steps(), code = typeof sc.code === 'function' ? sc.code() : sc.code, tmp = document.createElement('div');
+        if (!steps.length) throw new Error('no steps');
+        steps.forEach(function (stp, j) {
+          tmp.innerHTML = ''; sc.render(stp, j, tmp);
+          if (!tmp.firstChild) throw new Error('empty render at step ' + j);
+          [].concat(stp.line === undefined ? [] : stp.line).forEach(function (ln) { if (!(ln >= 0 && ln < code.length)) throw new Error('bad line ' + ln + ' at step ' + j); });
+          if (!stp.text) throw new Error('no text at step ' + j);
+        });
+        log.push('OK   ' + sc.name + ' (' + steps.length + ' steps)');
+      } catch (e) { log.push('FAIL ' + sc.name + ': ' + e.message); }
+    });
+    cur = 0; sel.value = '0'; buildInputs(); show();
+    document.body.appendChild(E('pre', { id: 'testresult', text: log.join('\n') }));
+  }
+}
+
+/* ---- memory diagram: boxes + arrows (illustrative addresses) ---- */
+var _mid = 0;
+function mem(body, cells, arrows, o) {
+  o = o || {};
+  var W = 124, H = 70, G = 34, X0 = 12, Y0 = 12, n = Math.max(cells.length, 1), id = 'ah' + (++_mid);
+  var width = X0 * 2 + n * W + (n - 1) * G, hasA = arrows && arrows.length, height = Y0 + H + (hasA ? 92 : 14);
+  var kids = [Viz.s('defs', {}, [Viz.s('marker', { id: id, viewBox: '0 0 10 10', refX: '8', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto' }, [Viz.s('path', { d: 'M0,0L10,5L0,10z', class: 'ah' })])])];
+  cells.forEach(function (c, i) {
+    var x = X0 + i * (W + G);
+    kids.push(Viz.s('rect', { x: x, y: Y0, width: W, height: H, rx: 10, class: 'node ' + (c.cls || '') }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 17, 'text-anchor': 'middle', class: 'nm', text: c.name }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 42, 'text-anchor': 'middle', class: 'val' + (String(c.value).length > 8 ? ' small' : ''), text: String(c.value) }));
+    if (c.addr) kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 62, 'text-anchor': 'middle', class: 'ad', text: c.addr }));
+  });
+  (arrows || []).forEach(function (a) {
+    var x1 = X0 + a.from * (W + G) + W / 2, x2 = X0 + a.to * (W + G) + W / 2, y = Y0 + H, d;
+    if (a.from === a.to) { x1 -= 22; x2 += 22; d = 'M' + x1 + ',' + y + ' C' + (x1 - 10) + ',' + (y + 55) + ' ' + (x2 + 10) + ',' + (y + 55) + ' ' + x2 + ',' + (y + 3); }
+    else d = 'M' + x1 + ',' + y + ' C' + x1 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 4);
+    kids.push(Viz.s('path', { d: d, class: 'arrow ' + (a.cls || ''), 'marker-end': 'url(#' + id + ')' }));
+    if (a.label) kids.push(Viz.s('text', { x: (x1 + x2) / 2, y: y + 66, 'text-anchor': 'middle', class: 'lbl', text: a.label }));
+  });
+  var svgEl = Viz.svg(width, height, kids); svgEl.style.minWidth = Math.min(width, 600) + 'px';
+  body.appendChild(svgEl);
+  if (o.note !== false) body.appendChild(Viz.note('Addresses like 0xc000012000 are made up for illustration; real addresses differ on every run.'));
+}
+function out(body, lines) {
+  body.appendChild(E('div', { class: 'out', html: lines && lines.length ? lines.map(function (l) { return esc(l); }).join('<br>') : '<i>(program output appears here)</i>' }));
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function chips(items) { return E('div', { class: 'hdrs' }, items.map(function (c) { return E('span', { class: 'chip ' + (c.cls || ''), text: c.text }); })); }
+
+document.getElementById('legend').appendChild(Viz.legend([{cls:'hit',label:'just changed'},{cls:'found',label:'as expected'},{cls:'bad',label:'gotcha / panic'}]));
+
+function ifaceBox(name, type, value, cls) {
+  return E('div', { class: 'iface ' + (cls || '') }, [E('div', { class: 't', text: name }), E('div', { class: 't', text: 'type: ' + type }), E('div', { text: 'value: ' + value })]);
+}
+function render(st, i, body) {
+  body.appendChild(E('div', {}, st.items.map(function (it) {
+    return it.iface ? ifaceBox(it.name, it.type, it.value, it.cls) : Viz.varBox(it.name, it.value, { class: it.cls });
+  })));
+  if (st.out) out(body, st.out);
+}
+function IF(name, type, value, cls) { return { iface: true, name: name, type: type, value: value, cls: cls }; }
+function V(name, value, cls) { return { name: name, value: value, cls: cls }; }
+multi([
+ { name: 'The (type, value) pair', desc: 'The same variable s holds different concrete types over time. Calls are routed by the type slot.',
+   code: ['type Shape interface{ Area() float64 }', 'type Rect struct{ W, H float64 }', 'func (r Rect) Area() float64 { return r.W * r.H }', 'type Circle struct{ R float64 }', 'func (c Circle) Area() float64 { return 3.14 * c.R * c.R }', '', 'func main() {', '    var s Shape', '    s = Rect{2, 3}', '    fmt.Println(s.Area())', '    s = Circle{1}', '    fmt.Println(s.Area())', '}'],
+   render: render,
+   steps: function () {
+     return [
+      { line: 7, text: 'var s Shape: an empty interface box. Both slots are empty (nil).', items: [IF('s (Shape)', '<nil>', '<nil>', 'hit')], out: [] },
+      { line: 8, text: 's = Rect{2, 3}: Rect has an Area method, so it fits. The type slot says Rect, the value slot holds {2 3}.', items: [IF('s (Shape)', 'Rect', '{2 3}', 'hit')], out: [] },
+      { line: 9, text: 's.Area(): Go reads the type slot (Rect), finds Rect\'s Area and runs it on the stored value: 2 * 3.', items: [IF('s (Shape)', 'Rect', '{2 3}', 'found')], out: ['6'] },
+      { line: 10, text: 's = Circle{1}: the SAME variable now holds a different type. Both slots change.', items: [IF('s (Shape)', 'Circle', '{1}', 'hit')], out: ['6'] },
+      { line: 11, text: 's.Area() now routes to Circle\'s Area: 3.14 * 1 * 1. Same call, different behaviour: polymorphism.', items: [IF('s (Shape)', 'Circle', '{1}', 'found')], out: ['6', '3.14'] }
+     ];
+   } },
+ { name: 'The nil interface gotcha', desc: 'An interface holding a nil pointer is NOT a nil interface, because its type slot is filled.',
+   code: ['type MyErr struct{}', 'func (*MyErr) Error() string { return "bad" }', '', 'func mayFail() error {', '    var p *MyErr = nil', '    return p', '}', '', 'func main() {', '    var e1 error = nil', '    fmt.Println(e1 == nil)', '    e2 := mayFail()', '    fmt.Println(e2 == nil)', '}'],
+   render: render,
+   steps: function () {
+     return [
+      { line: 9, text: 'e1 is an interface with BOTH slots empty. That is a true nil interface.', items: [IF('e1 (error)', '<nil>', '<nil>', 'hit')], out: [] },
+      { line: 10, text: 'e1 == nil is true: an interface is nil only when type AND value are both nil.', items: [IF('e1 (error)', '<nil>', '<nil>', 'found')], out: ['true'] },
+      { line: 4, text: 'Inside mayFail, p is a nil POINTER of type *MyErr.', items: [V('p (*MyErr)', 'nil', 'hit')], out: ['true'] },
+      { line: 5, text: 'return p converts the pointer to the error interface. The type slot is filled with *MyErr; the value slot is nil.', items: [V('p (*MyErr)', 'nil'), IF('result (error)', '*MyErr', 'nil', 'bad')], out: ['true'] },
+      { line: 11, text: 'e2 now holds (type *MyErr, value nil).', items: [IF('e1 (error)', '<nil>', '<nil>'), IF('e2 (error)', '*MyErr', 'nil', 'bad')], out: ['true'] },
+      { line: 12, text: 'e2 == nil is FALSE: the type slot is not empty. Code that checks "if err != nil" will think there was an error. Fix: write "return nil" when there is no error.', items: [IF('e1 (error)', '<nil>', '<nil>'), IF('e2 (error)', '*MyErr', 'nil', 'bad')], out: ['true', 'false'] }
+     ];
+   } },
+ { name: 'Type assertions', desc: 'Getting the concrete value back out of an interface. The comma-ok form is safe; the bare form can panic.',
+   code: ['var x any = 42', 'n, ok := x.(int)        // ok = true', 's, ok2 := x.(string)    // ok2 = false, s = ""', 's2 := x.(string)         // PANIC'],
+   render: render,
+   steps: function () {
+     var x = IF('x (any)', 'int', '42');
+     return [
+      { line: 0, text: 'x is an empty interface (any) holding the type int and the value 42.', items: [IF('x (any)', 'int', '42', 'hit')], out: [] },
+      { line: 1, text: 'x.(int) asks "is the type slot int?" Yes, so n = 42 and ok = true.', items: [x, V('n', 42, 'found'), V('ok', 'true', 'found')], out: [] },
+      { line: 2, text: 'x.(string): the type slot says int, not string. With the comma-ok form there is no panic: s is "" and ok2 is false.', items: [x, V('s', '""', 'hit'), V('ok2', 'false', 'hit')], out: [] },
+      { line: 3, text: 'Without the second variable Go has nowhere to report failure, so it panics.', items: [IF('x (any)', 'int', '42', 'bad')], out: ['panic: interface conversion: interface {} is int, not string', 'exit status 2'] }
+     ];
+   } }
+]);
+
+})();
+</script>
+</body>
+</html>

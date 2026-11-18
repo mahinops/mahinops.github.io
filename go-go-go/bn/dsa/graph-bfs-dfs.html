@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="BFS আর DFS কীভাবে queue ও stack ব্যবহার করে একটি graph-এর সব node ঘুরে দেখে, তা step by step দেখুন।">
+<title>Graph: BFS and DFS</title>
+<link rel="stylesheet" href="../../assets/viz.css">
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">← সব visual</a> · <a href="../../dsa/graph-bfs-dfs.html">English</a></nav>
+  <h1>Graph: BFS and DFS</h1>
+  <p class="lead">একটি শুরুর বিন্দু থেকে যা যা reach করা যায়, সেগুলো ঘুরে দেখার দুটি উপায়।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা (শহরে গুজব ছড়ানো, বা maze)</h2>
+    <p><b>Graph</b> হলো কিছু বিন্দু (node) আর তাদের জোড়া লাগানো রেখা (edge): শহর আর রাস্তা, মানুষ আর বন্ধুত্ব। এটা explore করতে দুটো জিনিস লাগে: যে node গুলো এখনো দেখা বাকি তার একটি to-do list, আর যেগুলো দেখে ফেলেছেন তার একটি note (যাতে একই জায়গায় ঘুরপাক না খান)।</p>
+    <ul>
+      <li><b>BFS (breadth-first)</b> <b>queue</b> ব্যবহার করে: first in, first out। এটা গুজবের মতো ছড়ায়: এক ধাপ দূরের সবাই আগে জানে, তারপর দুই ধাপ দূরের সবাই। তাই এটা <b>shortest path</b> (সবচেয়ে কম edge) খুঁজে পায়।</li>
+      <li><b>DFS (depth-first)</b> <b>stack</b> ব্যবহার করে: last in, first out। এটা maze-এ হাঁটার মতো: একটা পথ ধরে যতদূর যাওয়া যায় যান, তারপর পিছিয়ে এসে পরের মোড়টা try করুন।</li>
+    </ul>
+    <p>Code প্রায় একই। শুধু to-do list (queue না stack) বদলালে order বদলায়।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+    <label>Edge (a-b মানে a আর b-র মধ্যে একটি রাস্তা)<input id="edges" value="0-1, 0-2, 1-3, 2-3, 3-4, 2-5" size="40"></label>
+    <label>Start node<input id="start" value="0" size="4"></label>
+    <label>Algorithm
+      <select id="mode"><option value="bfs">BFS (queue)</option><option value="dfs">DFS (stack)</option></select>
+    </label>
+    <button id="go">Run</button>
+  </div>
+  <div class="viz-note">Node গুলোর নম্বর 0, 1, 2, ... এভাবে, মাঝে কোনো ফাঁক ছাড়া (সর্বোচ্চ 10টি node, 15টি edge)। Neighbor গুলো ছোট থেকে বড় order-এ visit হয়।</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul>
+      <li>একই graph-এ BFS আর DFS run করুন। দুটির <b>visit order</b> তুলনা করুন।</li>
+      <li>BFS node 0 থেকে শুরু করুন এবং খেয়াল করুন node 4-এ কখন পৌঁছায়। সেই level-ই 0 থেকে তার shortest distance।</li>
+      <li>যুক্ত নয় এমন node রাখুন, যেমন start 0 দিয়ে <code>0-1, 2-3</code>। node 2 কি কখনো visit হয়?</li>
+      <li>একটা cycle বানান: <code>0-1, 1-2, 2-0</code>। দেখুন "already visited: skip" ধাপগুলো কীভাবে অসীম loop আটকায়।</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul>
+      <li><b>visited set না রাখা।</b> যেকোনো cycle-যুক্ত graph-এ আপনার program চিরকাল loop করবে।</li>
+      <li><b>BFS-এ visited mark করতে দেরি করা।</b> Node-কে queue-তে <i>add করার সময়ই</i> mark করুন, নাহলে একই node বহুবার queue-তে ঢুকতে পারে।</li>
+      <li><b>slice-কে সবসময় queue হিসেবে ব্যবহার করা।</b> practice-এর জন্য <code>queue = queue[1:]</code> ঠিক আছে। বিশাল input-এর ক্ষেত্রে মনে রাখুন এটা পুরনো backing array-কে memory-তে ধরে রাখে।</li>
+      <li><b>বিচ্ছিন্ন অংশ ভুলে যাওয়া।</b> একটি search শুধু একটি connected অংশে পৌঁছায়। পুরো graph cover করতে প্রতিটি unvisited node থেকে নতুন search শুরু করুন।</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, সহজ ভাষায়:</b> প্রতিটি node একবার handle হয় আর প্রতিটি edge নির্দিষ্ট সংখ্যক বার দেখা হয়, তাই কাজ বাড়ে node আর edge-এর যোগফলের সাথে (<code>O(V + E)</code>)। to-do list-এ সর্বোচ্চ সব node থাকতে পারে, তাই বাড়তি memory <code>O(V)</code>।
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var BFS_CODE = [
+  'func bfs(graph map[int][]int, start int) []int {',   // 0
+  '    visited := map[int]bool{start: true}',           // 1
+  '    queue := []int{start}',                          // 2
+  '    var order []int',                                // 3
+  '    for len(queue) > 0 {',                           // 4
+  '        node := queue[0]',                           // 5
+  '        queue = queue[1:]',                          // 6
+  '        order = append(order, node)',                // 7
+  '        for _, next := range graph[node] {',         // 8
+  '            if !visited[next] {',                    // 9
+  '                visited[next] = true',               // 10
+  '                queue = append(queue, next)',        // 11
+  '            }',                                      // 12
+  '        }',                                          // 13
+  '    }',                                              // 14
+  '    return order',                                   // 15
+  '}',                                                  // 16
+];
+var DFS_CODE = [
+  'func dfs(graph map[int][]int, start int) []int {',        // 0
+  '    visited := map[int]bool{}',                           // 1
+  '    stack := []int{start}',                               // 2
+  '    var order []int',                                     // 3
+  '    for len(stack) > 0 {',                                // 4
+  '        node := stack[len(stack)-1]',                     // 5
+  '        stack = stack[:len(stack)-1]',                    // 6
+  '        if visited[node] {',                              // 7
+  '            continue',                                    // 8
+  '        }',                                               // 9
+  '        visited[node] = true',                            // 10
+  '        order = append(order, node)',                     // 11
+  '        for i := len(graph[node]) - 1; i >= 0; i-- {',    // 12
+  '            next := graph[node][i]',                      // 13
+  '            if !visited[next] {',                         // 14
+  '                stack = append(stack, next)',             // 15
+  '            }',                                           // 16
+  '        }',                                               // 17
+  '    }',                                                   // 18
+  '    return order',                                        // 19
+  '}',                                                       // 20
+];
+
+function parseGraph(str) {
+  var parts = str.split(',').map(function (s) { return s.trim(); }).filter(Boolean), edges = [], seen = {}, m, maxId = -1, ids = {};
+  if (!parts.length) return { error: 'অন্তত একটি edge লিখুন, যেমন: 0-1, 1-2' };
+  if (parts.length > 15) return { error: 'সর্বোচ্চ 15টি edge ব্যবহার করুন।' };
+  for (var i = 0; i < parts.length; i++) {
+    m = /^(\d+)\s*-\s*(\d+)$/.exec(parts[i]);
+    if (!m) return { error: 'বুঝতে পারছি না: "' + parts[i] + '"। edge এভাবে লিখুন: 0-1।' };
+    var a = +m[1], b = +m[2];
+    if (a === b) return { error: 'Edge "' + parts[i] + '" একটি node-কে তার নিজের সাথেই জোড়া লাগিয়েছে। এটি সরিয়ে দিন।' };
+    if (a > 9 || b > 9) return { error: 'Node-এর নম্বর 0 থেকে 9-এর মধ্যে হতে হবে।' };
+    ids[a] = ids[b] = true; maxId = Math.max(maxId, a, b);
+    var key = Math.min(a, b) + '-' + Math.max(a, b);
+    if (!seen[key]) { seen[key] = true; edges.push([Math.min(a, b), Math.max(a, b)]); }
+  }
+  for (var k = 0; k <= maxId; k++) if (!ids[k]) return { error: 'Node ' + k + ' পাওয়া যাচ্ছে না। Node গুলোর নম্বর 0, 1, 2, ... এভাবে, ফাঁক ছাড়া হতে হবে।' };
+  var n = maxId + 1, adj = [];
+  for (var j = 0; j < n; j++) adj.push([]);
+  edges.forEach(function (e) { adj[e[0]].push(e[1]); adj[e[1]].push(e[0]); });
+  adj.forEach(function (l) { l.sort(function (x, y) { return x - y; }); });
+  return { n: n, adj: adj, edges: edges };
+}
+
+function genBFS(n, adj, start) {
+  var steps = [], visited = [], queue = [], order = [];
+  for (var i = 0; i < n; i++) visited.push(false);
+  function snap(text, line, cur, edge) {
+    steps.push({ text: text, line: line, cur: cur, edge: edge || null, visited: visited.slice(), frontier: queue.slice(), order: order.slice(), kind: 'queue' });
+  }
+  visited[start] = true; queue.push(start);
+  snap('Start node ' + start + ' visited হিসেবে mark করুন এবং queue-তে রাখুন।', [1, 2], null);
+  while (queue.length) {
+    var node = queue.shift(); order.push(node);
+    snap('Queue-র সামনে থেকে ' + node + ' নিন এবং visit order-এ যোগ করুন।', [5, 6, 7], node);
+    adj[node].forEach(function (nx) {
+      if (visited[nx]) snap('Neighbor ' + nx + ' আগেই visited: skip করুন।', [8, 9], node, [node, nx]);
+      else {
+        visited[nx] = true; queue.push(nx);
+        snap('Neighbor ' + nx + ' নতুন: visited mark করুন এবং queue-র পেছনে যোগ করুন।', [8, 9, 10, 11], node, [node, nx]);
+      }
+    });
+  }
+  snap('Queue খালি, তাই reach করা যায় এমন সবকিছু visit হয়ে গেছে। Order: ' + order.join(' → ') + '।', 15, null);
+  return { steps: steps, order: order };
+}
+
+function genDFS(n, adj, start) {
+  var steps = [], visited = [], stack = [start], order = [];
+  for (var i = 0; i < n; i++) visited.push(false);
+  function snap(text, line, cur, edge) {
+    steps.push({ text: text, line: line, cur: cur, edge: edge || null, visited: visited.slice(), frontier: stack.slice(), order: order.slice(), kind: 'stack' });
+  }
+  snap('Start node ' + start + ' stack-এ রাখুন।', 2, null);
+  while (stack.length) {
+    var node = stack.pop();
+    if (visited[node]) { snap('' + node + ' stack-এর উপর থেকে pop করুন: আগেই visited ছিল, তাই skip করুন।', [5, 6, 7, 8], node); continue; }
+    visited[node] = true; order.push(node);
+    snap('' + node + ' stack-এর উপর থেকে pop করুন। এটা নতুন: visited mark করুন এবং visit order-এ যোগ করুন।', [5, 6, 10, 11], node);
+    for (var k = adj[node].length - 1; k >= 0; k--) {
+      var nx = adj[node][k];
+      if (!visited[nx]) { stack.push(nx); snap('Neighbor ' + nx + ' stack-এ push করুন। (Neighbor গুলো উল্টো দিক থেকে ধরা হয়, যাতে সবচেয়ে ছোটটা উপরে থাকে এবং আগে explore হয়।)', [12, 13, 14, 15], node, [node, nx]); }
+      else snap('Neighbor ' + nx + ' আগেই visited: push করবেন না।', [12, 13, 14], node, [node, nx]);
+    }
+  }
+  snap('Stack খালি, তাই reach করা যায় এমন সবকিছু visit হয়ে গেছে। Order: ' + order.join(' → ') + '।', 19, null);
+  return { steps: steps, order: order };
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+  var G = null;
+
+  function graphSvg(st) {
+    var n = G.n, W = 400, H = 300, cx0 = 200, cy0 = 150, R = n === 1 ? 0 : 110, r = 20, parts = [];
+    function pos(i) { var ang = -Math.PI / 2 + (2 * Math.PI * i) / n; return { x: cx0 + R * Math.cos(ang), y: cy0 + R * Math.sin(ang) }; }
+    G.edges.forEach(function (e) {
+      var p = pos(e[0]), q = pos(e[1]);
+      var hl = st.edge && ((st.edge[0] === e[0] && st.edge[1] === e[1]) || (st.edge[0] === e[1] && st.edge[1] === e[0]));
+      parts.push(Viz.s('line', { class: 'edge' + (hl ? ' hit' : ''), x1: p.x, y1: p.y, x2: q.x, y2: q.y }));
+    });
+    for (var i = 0; i < n; i++) {
+      var p2 = pos(i), cls = 'node';
+      if (i === st.cur) cls += ' hit'; else if (st.order.indexOf(i) !== -1) cls += ' found'; else if (st.frontier.indexOf(i) !== -1) cls += ' range';
+      parts.push(Viz.s('circle', { class: cls, cx: p2.x, cy: p2.y, r: r }));
+      parts.push(Viz.s('text', { x: p2.x, y: p2.y + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, text: String(i) }));
+    }
+    return Viz.svg(W, H, parts);
+  }
+
+  function render(st, i, body) {
+    body.appendChild(graphSvg(st));
+    var marks = {};
+    if (st.frontier.length) marks[st.kind === 'queue' ? 0 : st.frontier.length - 1] = st.kind === 'queue' ? 'next out' : 'top';
+    var fcls = {}; if (st.frontier.length) fcls[st.kind === 'queue' ? 0 : st.frontier.length - 1] = 'hit';
+    body.appendChild(Viz.array(st.frontier, { title: st.kind === 'queue' ? 'queue (বাম দিক থেকে নেওয়া হয়, ডান দিকে যোগ হয়)' : 'stack (ডান প্রান্তে push ও pop হয়)', indexes: false, marks: marks, classes: fcls }));
+    if (!st.frontier.length) body.appendChild(Viz.note('(খালি)'));
+    var seen = [];
+    for (var k = 0; k < G.n; k++) if (st.kind === 'queue' ? st.visited[k] : st.order.indexOf(k) !== -1) seen.push(k);
+    body.appendChild(Viz.note('visited set: <b>{' + seen.join(', ') + '}</b>'));
+    var oc = {}; st.order.forEach(function (_, k) { oc[k] = 'found'; });
+    body.appendChild(Viz.array(st.order, { title: 'এ পর্যন্ত visit order', indexes: false, classes: oc }));
+    if (!st.order.length) body.appendChild(Viz.note('(এখনো কিছু visit হয়নি)'));
+  }
+
+  function run() {
+    errBox.textContent = '';
+    var g = parseGraph(document.getElementById('edges').value);
+    if (g.error) { errBox.textContent = g.error; return; }
+    var sv = document.getElementById('start').value.trim();
+    var start = Number(sv);
+    if (sv === '' || !/^\d+$/.test(sv) || start >= g.n) { errBox.textContent = 'Start node অবশ্যই 0 থেকে ' + (g.n - 1) + '-এর মধ্যে একটি integer হতে হবে।'; return; }
+    G = g;
+    var mode = document.getElementById('mode').value;
+    var res = mode === 'bfs' ? genBFS(g.n, g.adj, start) : genDFS(g.n, g.adj, start);
+    app.innerHTML = '';
+    var st = Viz.stepper({ mount: app, code: mode === 'bfs' ? BFS_CODE : DFS_CODE, render: render });
+    st.load(res.steps);
+  }
+
+  document.getElementById('legend').appendChild(Viz.legend([
+    { cls: 'hit', label: 'যে node process হচ্ছে' }, { cls: 'range', label: 'queue / stack-এ অপেক্ষায়' }, { cls: 'found', label: 'visited (order অনুযায়ী)' },
+  ]));
+  document.getElementById('go').addEventListener('click', run);
+  document.getElementById('mode').addEventListener('change', run);
+  run();
+})();
+</script>
+</body>
+</html>

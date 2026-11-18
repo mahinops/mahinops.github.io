@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Find the shortest paths from one node in a weighted graph with Dijkstra's algorithm, watching distances and the priority queue update.">
+<title>Dijkstra's Shortest Path - visual</title>
+<link rel="stylesheet" href="../assets/viz.css">
+<style>.viz-cell { width: auto; min-width: 46px; padding: 0 8px; } .viz-col { min-width: 46px; }</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/dijkstra.html">বাংলা</a></nav>
+  <h1>Dijkstra&rsquo;s Shortest Path</h1>
+  <p class="lead">The cheapest way from one place to every other place when roads have different lengths.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea (a GPS)</h2>
+    <p>BFS finds the path with the fewest roads, but real roads have different lengths. Dijkstra finds the path with the smallest <b>total length</b>. It keeps a notebook of the <b>best known distance</b> to every place, starting with &infin; (unknown) everywhere except the start (0).</p>
+    <ol>
+      <li>Pick the unfinished place with the <b>smallest</b> known distance. Nothing can beat it, because every other route to it would have to pass through a place that is already farther away. So its distance is <b>final</b>.</li>
+      <li>From it, try each road: is <i>distance so far + road length</i> smaller than what we have written for the neighbor? If yes, <b>relax</b> the edge: update the notebook.</li>
+      <li>Repeat until nothing is left.</li>
+    </ol>
+    <p>The &ldquo;pick the smallest&rdquo; step is a <b>priority queue</b> (a min-heap, see the heap page). It requires every road length to be <b>positive</b>.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Roads (a-b:length)<input id="edges" value="0-1:4, 0-2:1, 2-1:2, 1-3:1, 2-3:5, 3-4:3" size="44"></label>
+    <label>Start node<input id="start" value="0" size="4"></label>
+    <button id="go">Run</button>
+  </div>
+  <div class="viz-note">Roads work in both directions. Nodes are numbered 0, 1, 2, ... with no gaps (at most 10 nodes, 15 roads). Lengths are whole numbers from 1 to 99.</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul>
+      <li>Look at the default graph. The direct road 0&ndash;1 has length 4, but the answer for node 1 is 3. Which route wins?</li>
+      <li>Change <code>0-1:4</code> to <code>0-1:2</code> and run again. What changes?</li>
+      <li>Add a node with no roads to the rest, such as <code>0-1:1, 2-3:1</code> (start 0). What distance do 2 and 3 keep?</li>
+      <li>Watch for the &ldquo;stale entry&rdquo; step: the queue can hold an old, longer distance for a node that already got a better one.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul>
+      <li><b>Negative road lengths.</b> Dijkstra assumes a finished node can never be improved. A negative edge breaks that (use Bellman-Ford instead).</li>
+      <li><b>Forgetting the stale check.</b> Without <code>if cur.dist &gt; dist[cur.node] { continue }</code> you redo work for outdated queue entries.</li>
+      <li><b>Using a plain queue.</b> It must always hand back the <i>smallest</i> distance, not the oldest entry.</li>
+      <li><b>Using 0 as &ldquo;infinity&rdquo;.</b> Use a very large number (or a map with a presence check) for unknown distances.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, in plain English:</b> each road may add one entry to the priority queue, and each queue operation costs about log(entries). So the time is about <code>O((V + E) log V)</code>. It is fast even on big maps, but it still needs memory for the distances and the queue.
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var CODE = [
+  'func dijkstra(graph map[int][]Edge, start int) map[int]int {',   // 0
+  '    dist := map[int]int{start: 0}',                              // 1
+  '    pq := &PriorityQueue{{node: start, dist: 0}}',               // 2
+  '    for pq.Len() > 0 {',                                         // 3
+  '        cur := heap.Pop(pq).(Item)',                             // 4
+  '        if cur.dist > dist[cur.node] {',                         // 5
+  '            continue // stale entry',                            // 6
+  '        }',                                                      // 7
+  '        for _, e := range graph[cur.node] {',                    // 8
+  '            nd := cur.dist + e.weight',                          // 9
+  '            if d, ok := dist[e.to]; !ok || nd < d {',            // 10
+  '                dist[e.to] = nd',                                // 11
+  '                heap.Push(pq, Item{node: e.to, dist: nd})',      // 12
+  '            }',                                                  // 13
+  '        }',                                                      // 14
+  '    }',                                                          // 15
+  '    return dist',                                                // 16
+  '}',                                                              // 17
+];
+
+function parseWGraph(str) {
+  var parts = str.split(',').map(function (s) { return s.trim(); }).filter(Boolean), edges = [], seen = {}, ids = {}, maxId = -1, m;
+  if (!parts.length) return { error: 'Type at least one road, for example: 0-1:4' };
+  if (parts.length > 15) return { error: 'Please use at most 15 roads.' };
+  for (var i = 0; i < parts.length; i++) {
+    m = /^(\d+)\s*-\s*(\d+)\s*:\s*(\d+)$/.exec(parts[i]);
+    if (!m) return { error: 'I do not understand "' + parts[i] + '". Write roads like 0-1:4 (nodes 0 and 1, length 4).' };
+    var a = +m[1], b = +m[2], w = +m[3];
+    if (a === b) return { error: 'Road "' + parts[i] + '" joins a node to itself. Please remove it.' };
+    if (a > 9 || b > 9) return { error: 'Node numbers must be 0 to 9.' };
+    if (w < 1 || w > 99) return { error: 'Road lengths must be from 1 to 99 (Dijkstra needs positive lengths).' };
+    var key = Math.min(a, b) + '-' + Math.max(a, b);
+    if (seen[key]) return { error: 'The road ' + key + ' is listed twice. Keep just one.' };
+    seen[key] = true; ids[a] = ids[b] = true; maxId = Math.max(maxId, a, b);
+    edges.push({ a: a, b: b, w: w });
+  }
+  for (var k = 0; k <= maxId; k++) if (!ids[k]) return { error: 'Node ' + k + ' is missing. Nodes must be numbered 0, 1, 2, ... with no gaps.' };
+  var n = maxId + 1, adj = [];
+  for (var j = 0; j < n; j++) adj.push([]);
+  edges.forEach(function (e) { adj[e.a].push({ to: e.b, w: e.w }); adj[e.b].push({ to: e.a, w: e.w }); });
+  adj.forEach(function (l) { l.sort(function (x, y) { return x.to - y.to; }); });
+  return { n: n, adj: adj, edges: edges };
+}
+
+function genDijkstra(n, adj, start) {
+  var INF = Infinity, dist = [], fin = [], pq = [], steps = [], i;
+  for (i = 0; i < n; i++) { dist.push(INF); fin.push(false); }
+  function snap(text, line, cur, edge, changed) {
+    steps.push({ text: text, line: line, cur: cur === undefined ? null : cur, edge: edge || null, changed: changed === undefined ? -1 : changed, dist: dist.slice(), fin: fin.slice(), pq: pq.map(function (p) { return { d: p.d, node: p.node }; }) });
+  }
+  function pushPQ(d, node) {
+    pq.push({ d: d, node: node });
+    pq.sort(function (x, y) { return x.d - y.d || x.node - y.node; });
+  }
+  dist[start] = 0; pushPQ(0, start);
+  snap('Every distance starts as ∞ (unknown), except the start node ' + start + ', which is 0. Put (distance 0, node ' + start + ') in the priority queue.', [1, 2], start, null, start);
+  while (pq.length) {
+    var cur = pq.shift();
+    if (cur.d > dist[cur.node]) {
+      snap('Pop (' + cur.d + ', node ' + cur.node + ') from the priority queue. But node ' + cur.node + ' already has a better distance (' + dist[cur.node] + '), so this entry is stale. Skip it.', [4, 5, 6], cur.node);
+      continue;
+    }
+    fin[cur.node] = true;
+    snap('Pop the smallest entry: node ' + cur.node + ' at distance ' + cur.d + '. No other route can beat it, so ' + cur.d + ' is final for node ' + cur.node + '. Now try every road out of it.', 4, cur.node);
+    adj[cur.node].forEach(function (e) {
+      var nd = cur.d + e.w, old = dist[e.to];
+      var edge = [cur.node, e.to];
+      if (nd < old) {
+        dist[e.to] = nd; pushPQ(nd, e.to);
+        snap('Road ' + cur.node + '→' + e.to + ' (length ' + e.w + '): ' + cur.d + ' + ' + e.w + ' = ' + nd + (old === INF ? ', better than ∞' : ' is less than the current ' + old) + '. Update dist[' + e.to + '] = ' + nd + ' and add (' + nd + ', node ' + e.to + ') to the queue.', [8, 9, 10, 11, 12], cur.node, edge, e.to);
+      } else {
+        snap('Road ' + cur.node + '→' + e.to + ' (length ' + e.w + '): ' + cur.d + ' + ' + e.w + ' = ' + nd + ' is not better than the current ' + old + '. Keep ' + old + '.', [8, 9, 10], cur.node, edge);
+      }
+    });
+  }
+  snap('The queue is empty. The distances are final.' + (dist.some(function (d) { return d === INF; }) ? ' Nodes still at ∞ cannot be reached from the start.' : ''), 16, null);
+  return { steps: steps, dist: dist };
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+  var G = null;
+  function show(d) { return d === Infinity ? '∞' : String(d); }
+
+  function graphSvg(st) {
+    var n = G.n, W = 420, H = 330, cx0 = 210, cy0 = 165, R = n === 1 ? 0 : 115, r = 20, parts = [];
+    function pos(i) { var ang = -Math.PI / 2 + (2 * Math.PI * i) / n; return { x: cx0 + R * Math.cos(ang), y: cy0 + R * Math.sin(ang) }; }
+    G.edges.forEach(function (e) {
+      var p = pos(e.a), q = pos(e.b);
+      var hl = st.edge && ((st.edge[0] === e.a && st.edge[1] === e.b) || (st.edge[0] === e.b && st.edge[1] === e.a));
+      parts.push(Viz.s('line', { class: 'edge' + (hl ? ' hit' : ''), x1: p.x, y1: p.y, x2: q.x, y2: q.y }));
+    });
+    G.edges.forEach(function (e) {
+      var p = pos(e.a), q = pos(e.b), mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2;
+      var dx = q.x - p.x, dy = q.y - p.y, len = Math.sqrt(dx * dx + dy * dy) || 1;
+      parts.push(Viz.s('text', { x: mx - dy / len * 9, y: my + dx / len * 9 + 4, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 700, style: 'paint-order:stroke;stroke:var(--card);stroke-width:4px', text: String(e.w) }));
+    });
+    var inPQ = st.pq.map(function (x) { return x.node; });
+    for (var i = 0; i < n; i++) {
+      var p2 = pos(i), cls = 'node';
+      if (i === st.cur) cls += ' hit'; else if (st.fin[i]) cls += ' found'; else if (inPQ.indexOf(i) !== -1) cls += ' range';
+      parts.push(Viz.s('circle', { class: cls, cx: p2.x, cy: p2.y, r: r }));
+      parts.push(Viz.s('text', { x: p2.x, y: p2.y + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, text: String(i) }));
+      parts.push(Viz.s('text', { x: p2.x, y: p2.y + r + 15, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 700, style: 'paint-order:stroke;stroke:var(--card);stroke-width:4px', text: 'd=' + show(st.dist[i]) }));
+    }
+    return Viz.svg(W, H, parts);
+  }
+
+  function render(st, i, body) {
+    body.appendChild(graphSvg(st));
+    var cls = {};
+    st.dist.forEach(function (_, k) { if (st.fin[k]) cls[k] = 'found'; });
+    if (st.changed >= 0) cls[st.changed] = 'hit';
+    body.appendChild(Viz.array(st.dist.map(show), { title: 'dist[node]  (best known distance from the start)', classes: cls }));
+    var pqc = {}, pqm = {};
+    if (st.pq.length) { pqc[0] = 'hit'; pqm[0] = 'next out'; }
+    body.appendChild(Viz.array(st.pq.map(function (p) { return '(' + p.d + ',' + p.node + ')'; }), { title: 'priority queue  (distance, node) smallest first', indexes: false, classes: pqc, marks: pqm }));
+    if (!st.pq.length) body.appendChild(Viz.note('(queue is empty)'));
+  }
+
+  function run() {
+    errBox.textContent = '';
+    var g = parseWGraph(document.getElementById('edges').value);
+    if (g.error) { errBox.textContent = g.error; return; }
+    var sv = document.getElementById('start').value.trim();
+    if (!/^\d+$/.test(sv) || +sv >= g.n) { errBox.textContent = 'Start node must be a whole number from 0 to ' + (g.n - 1) + '.'; return; }
+    G = g;
+    app.innerHTML = '';
+    var st = Viz.stepper({ mount: app, code: CODE, render: render });
+    st.load(genDijkstra(g.n, g.adj, +sv).steps);
+  }
+
+  document.getElementById('legend').appendChild(Viz.legend([
+    { cls: 'hit', label: 'node being expanded / just updated' }, { cls: 'range', label: 'in the priority queue' }, { cls: 'found', label: 'distance is final' },
+  ]));
+  document.getElementById('go').addEventListener('click', run);
+  run();
+})();
+</script>
+</body>
+</html>

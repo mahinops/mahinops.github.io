@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Dynamic programming as a table you fill cell by cell: climbing stairs, longest common subsequence and 0/1 knapsack, with each cell's sources highlighted.">
+<title>Dynamic Programming Table - visual</title>
+<link rel="stylesheet" href="../assets/viz.css">
+<style>
+  .dp { border-collapse: separate; border-spacing: 3px; margin: 6px 0 10px; }
+  .dp th { font: 600 12px var(--mono); color: var(--muted); padding: 2px 6px; text-align: center; white-space: nowrap; }
+  .dp th.rowh { text-align: right; }
+  .dp th.hit { color: var(--hit-line); }
+  .dp td { width: 34px; height: 34px; text-align: center; font: 600 14px var(--mono); border: 2px solid var(--cell-line); border-radius: 8px; background: var(--cell); transition: background .25s, border-color .25s; }
+  .dp td.hit { background: var(--hit); border-color: var(--hit-line); }
+  .dp td.found { background: var(--found); border-color: var(--found-line); }
+  .dp td.empty { background: transparent; border-style: dashed; border-color: var(--line); color: transparent; }
+  .modehint { color: var(--muted); font-size: .9rem; margin: 2px 0 8px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/dp-table.html">বাংলা</a></nav>
+  <h1>Dynamic Programming: Fill the Table</h1>
+  <p class="lead">Solve a big problem by solving small versions first and writing the answers in a table.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea (do not redo your homework)</h2>
+    <p>Say you are asked, &ldquo;how many ways can I climb 30 stairs taking 1 or 2 steps at a time?&rdquo; Instead of re-counting from scratch, notice: to stand on stair 30 you came from stair 29 or stair 28. So <b>ways(30) = ways(29) + ways(28)</b>. If you write each answer in a table the first time you work it out, every later cell is just a quick look-up of cells you already have.</p>
+    <p>Every DP problem has the same recipe:</p>
+    <ol>
+      <li><b>State</b>: what does one cell mean? (e.g. &ldquo;dp[i] = ways to climb i stairs&rdquo;).</li>
+      <li><b>Base cases</b>: the cells you know without thinking.</li>
+      <li><b>Transition</b>: a formula that builds a cell from earlier cells. <b>The yellow cells in the picture are exactly the cells the formula reads.</b></li>
+      <li><b>Order</b>: fill so that the cells you need are always ready.</li>
+      <li><b>Answer</b>: usually the last cell.</li>
+    </ol>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Problem
+      <select id="mode">
+        <option value="climb">1D: Climbing stairs</option>
+        <option value="lcs">2D: Longest common subsequence</option>
+        <option value="knap">2D: 0/1 knapsack</option>
+      </select>
+    </label>
+    <span id="in-climb" class="inputs" style="margin:0"><label>Stairs n (1 to 15)<input id="n" value="7" size="4"></label></span>
+    <span id="in-lcs" class="inputs" style="margin:0"><label>String A<input id="sa" value="ABCDE" size="10"></label><label>String B<input id="sb" value="ACE" size="10"></label></span>
+    <span id="in-knap" class="inputs" style="margin:0"><label>Weights<input id="kw" value="1, 3, 4, 5" size="14"></label><label>Values<input id="kv" value="1, 4, 5, 7" size="14"></label><label>Capacity<input id="kc" value="7" size="4"></label></span>
+    <button id="go">Run</button>
+  </div>
+  <div class="modehint" id="hint"></div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul>
+      <li><b>Stairs:</b> try n = 10. The table is the Fibonacci sequence in disguise.</li>
+      <li><b>LCS:</b> compare <code>AGGTAB</code> with <code>GXTXAYB</code>. When two letters match, which neighbor does the cell read?</li>
+      <li><b>LCS:</b> try two strings with nothing in common. What does the table look like?</li>
+      <li><b>Knapsack:</b> raise the capacity and watch which row-above cells get used when an item fits (&ldquo;take it&rdquo;) versus when it does not.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul>
+      <li><b>Off-by-one in the table size.</b> Make it <code>n+1</code> by <code>m+1</code> so the &ldquo;empty&rdquo; row/column 0 exists, and remember <code>a[i-1]</code> is the letter for row <code>i</code>.</li>
+      <li><b>Wrong fill order.</b> A cell must only read cells that are already filled.</li>
+      <li><b>Mixing up &ldquo;take&rdquo; and &ldquo;skip&rdquo; in knapsack.</b> Taking item i reads the row above at <code>c - weight</code>, not the same row (that would allow using an item twice).</li>
+      <li><b>Using plain recursion for overlapping problems.</b> Without a table or memo, the same sub-problem is solved over and over, which can take exponential time.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, in plain English:</b> work equals the number of cells, each filled in constant time. Stairs: <code>O(n)</code>. LCS: <code>O(m &times; n)</code>. Knapsack: <code>O(items &times; capacity)</code>. The same recursion without a table could be exponentially slower.
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var CLIMB_CODE = [
+  'func climbStairs(n int) int {',          // 0
+  '    if n <= 2 {',                        // 1
+  '        return n',                       // 2
+  '    }',                                  // 3
+  '    dp := make([]int, n+1)',             // 4
+  '    dp[1], dp[2] = 1, 2',                // 5
+  '    for i := 3; i <= n; i++ {',          // 6
+  '        dp[i] = dp[i-1] + dp[i-2]',      // 7
+  '    }',                                  // 8
+  '    return dp[n]',                       // 9
+  '}',                                      // 10
+];
+var LCS_CODE = [
+  'func lcs(a, b string) int {',                                // 0
+  '    dp := make([][]int, len(a)+1)',                          // 1
+  '    for i := range dp {',                                    // 2
+  '        dp[i] = make([]int, len(b)+1)',                      // 3
+  '    }',                                                      // 4
+  '    for i := 1; i <= len(a); i++ {',                         // 5
+  '        for j := 1; j <= len(b); j++ {',                     // 6
+  '            if a[i-1] == b[j-1] {',                          // 7
+  '                dp[i][j] = dp[i-1][j-1] + 1',                // 8
+  '            } else {',                                       // 9
+  '                dp[i][j] = max(dp[i-1][j], dp[i][j-1])',     // 10
+  '            }',                                              // 11
+  '        }',                                                  // 12
+  '    }',                                                      // 13
+  '    return dp[len(a)][len(b)]',                              // 14
+  '}',                                                          // 15
+];
+var KNAP_CODE = [
+  'func knapsack(w, v []int, capacity int) int {',              // 0
+  '    n := len(w)',                                            // 1
+  '    dp := make([][]int, n+1)',                               // 2
+  '    for i := range dp {',                                    // 3
+  '        dp[i] = make([]int, capacity+1)',                    // 4
+  '    }',                                                      // 5
+  '    for i := 1; i <= n; i++ {',                              // 6
+  '        for c := 0; c <= capacity; c++ {',                   // 7
+  '            dp[i][c] = dp[i-1][c] // skip the item',         // 8
+  '            if w[i-1] <= c {',                               // 9
+  '                take := dp[i-1][c-w[i-1]] + v[i-1]',         // 10
+  '                dp[i][c] = max(dp[i][c], take)',             // 11
+  '            }',                                              // 12
+  '        }',                                                  // 13
+  '    }',                                                      // 14
+  '    return dp[n][capacity]',                                 // 15
+  '}',                                                          // 16
+];
+
+function genClimb(n) {
+  var steps = [], dp = [], i;
+  for (i = 0; i <= n; i++) dp.push(null);
+  function snap(text, line, src, tgt) { steps.push({ kind: '1d', dp: dp.slice(), src: src || [], tgt: tgt || [], text: text, line: line }); }
+  if (n <= 2) {
+    dp[n] = n;
+    snap('n is ' + n + ' (2 or less), so the answer is simply n = ' + n + ': 1 stair has 1 way, 2 stairs have 2 ways.', [1, 2], [], [n]);
+    return { steps: steps, result: n };
+  }
+  snap('Make the table dp with n+1 = ' + (n + 1) + ' slots. dp[i] will hold the number of ways to climb i stairs. Slot 0 is not used.', 4);
+  dp[1] = 1; dp[2] = 2;
+  snap('Base cases we know without thinking: 1 stair has 1 way; 2 stairs have 2 ways (1+1 or 2).', 5, [], [1, 2]);
+  for (i = 3; i <= n; i++) {
+    dp[i] = dp[i - 1] + dp[i - 2];
+    snap('dp[' + i + '] = dp[' + (i - 1) + '] + dp[' + (i - 2) + '] = ' + dp[i - 1] + ' + ' + dp[i - 2] + ' = ' + dp[i] + '. You reach stair ' + i + ' from stair ' + (i - 1) + ' (one step) or from stair ' + (i - 2) + ' (two steps).', [6, 7], [i - 1, i - 2], [i]);
+  }
+  snap('The answer is dp[' + n + '] = ' + dp[n] + ' ways.', 9, [], [n]);
+  return { steps: steps, result: dp[n] };
+}
+
+function genLCS(a, b) {
+  var m = a.length, nn = b.length, dp = [], steps = [], i, j;
+  for (i = 0; i <= m; i++) { dp.push([]); for (j = 0; j <= nn; j++) dp[i].push(i === 0 || j === 0 ? 0 : null); }
+  var rows = ['∅'].concat(a.split('')), cols = ['∅'].concat(b.split('')), CORNER = 'A \u2193  B \u2192';
+  function snap(text, line, src, tgt, rowHL, colHL) {
+    steps.push({ kind: '2d', corner: CORNER, dp: dp.map(function (r) { return r.slice(); }), rows: rows, cols: cols, src: src || [], tgt: tgt || null, rowHL: rowHL === undefined ? -1 : rowHL, colHL: colHL === undefined ? -1 : colHL, text: text, line: line });
+  }
+  snap('Make a table with ' + (m + 1) + ' rows and ' + (nn + 1) + ' columns. Row 0 and column 0 mean "one of the strings is empty", so their answer is 0. The other cells are still unknown. Cell (i, j) = LCS length of the first i letters of A and the first j letters of B.', [1, 2, 3, 4]);
+  for (i = 1; i <= m; i++) {
+    for (j = 1; j <= nn; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+        snap('A[' + (i - 1) + '] = "' + a[i - 1] + '" and B[' + (j - 1) + '] = "' + b[j - 1] + '" match! Extend the best answer for the shorter strings (diagonal cell): ' + dp[i - 1][j - 1] + ' + 1 = ' + dp[i][j] + '.', [7, 8], [[i - 1, j - 1]], [i, j], i, j);
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+        snap('A[' + (i - 1) + '] = "' + a[i - 1] + '" and B[' + (j - 1) + '] = "' + b[j - 1] + '" are different. Take the better of: drop a letter of A (cell above = ' + dp[i - 1][j] + ') or drop a letter of B (cell to the left = ' + dp[i][j - 1] + '). Best is ' + dp[i][j] + '.', [9, 10], [[i - 1, j], [i, j - 1]], [i, j], i, j);
+      }
+    }
+  }
+  var out = [];
+  i = m; j = nn;
+  while (i > 0 && j > 0) {
+    if (a[i - 1] === b[j - 1]) { out.push(a[i - 1]); i--; j--; }
+    else if (dp[i - 1][j] >= dp[i][j - 1]) i--; else j--;
+  }
+  var seq = out.reverse().join('');
+  snap('The answer is the last cell: dp[' + m + '][' + nn + '] = ' + dp[m][nn] + '. (Walking back through the table, which is not part of the code above, recovers one longest common subsequence: "' + seq + '".)', 14, [], [m, nn]);
+  return { steps: steps, result: dp[m][nn], seq: seq };
+}
+
+function genKnap(w, v, cap) {
+  var n = w.length, dp = [], steps = [], i, c;
+  for (i = 0; i <= n; i++) { dp.push([]); for (c = 0; c <= cap; c++) dp[i].push(i === 0 ? 0 : null); }
+  var cols = [], rows = ['no items'], CORNER = 'capacity \u2192';
+  for (c = 0; c <= cap; c++) cols.push(String(c));
+  for (i = 0; i < n; i++) rows.push('item ' + (i + 1) + ' (w' + w[i] + ',v' + v[i] + ')');
+  function snap(text, line, src, tgt, rowHL, colHL) {
+    steps.push({ kind: '2d', corner: CORNER, dp: dp.map(function (r) { return r.slice(); }), rows: rows, cols: cols, src: src || [], tgt: tgt || null, rowHL: rowHL === undefined ? -1 : rowHL, colHL: colHL === undefined ? -1 : colHL, text: text, line: line });
+  }
+  snap('Cell (i, c) = the best total value using only the first i items with a bag that holds weight c. Row 0 (no items) is all 0. The other cells are still unknown.', [1, 2, 3, 4, 5]);
+  for (i = 1; i <= n; i++) {
+    for (c = 0; c <= cap; c++) {
+      var skip = dp[i - 1][c];
+      dp[i][c] = skip;
+      if (w[i - 1] <= c) {
+        var take = dp[i - 1][c - w[i - 1]] + v[i - 1];
+        dp[i][c] = Math.max(skip, take);
+        snap('Item ' + i + ' (weight ' + w[i - 1] + ', value ' + v[i - 1] + ') fits in capacity ' + c + '. Skip it: ' + skip + ' (cell above). Take it: ' + dp[i - 1][c - w[i - 1]] + ' (best with the leftover room ' + (c - w[i - 1]) + ') + ' + v[i - 1] + ' = ' + take + '. Best is ' + dp[i][c] + '.', [8, 9, 10, 11], [[i - 1, c], [i - 1, c - w[i - 1]]], [i, c], i, c);
+      } else {
+        snap('Item ' + i + ' (weight ' + w[i - 1] + ') is too heavy for capacity ' + c + ', so we cannot take it. Copy the cell above: ' + skip + '.', [8, 9], [[i - 1, c]], [i, c], i, c);
+      }
+    }
+  }
+  snap('The answer is the last cell: dp[' + n + '][' + cap + '] = ' + dp[n][cap] + ' (the best value that fits in the bag).', 15, [], [n, cap]);
+  return { steps: steps, result: dp[n][cap] };
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+  var $ = function (id) { return document.getElementById(id); };
+  var HINTS = {
+    climb: 'State: dp[i] = number of ways to climb i stairs. Transition: dp[i] = dp[i-1] + dp[i-2].',
+    lcs: 'State: cell (i, j) = length of the longest common subsequence of the first i letters of A and the first j letters of B.',
+    knap: 'State: cell (i, c) = best value using the first i items in a bag of capacity c. Each item is taken at most once.',
+  };
+
+  function render(st, i, body) {
+    if (st.kind === '1d') {
+      var cls = {};
+      st.dp.forEach(function (v, k) { if (v === null) cls[k] = 'dim'; });
+      st.src.forEach(function (k) { cls[k] = 'hit'; });
+      st.tgt.forEach(function (k) { cls[k] = 'found'; });
+      body.appendChild(Viz.array(st.dp, { title: 'dp  (index = number of stairs)', classes: cls }));
+      return;
+    }
+    var table = Viz.el('table', { class: 'dp' });
+    var head = Viz.el('tr', null, [Viz.el('th', { class: 'rowh', text: st.corner || '' })]);
+    st.cols.forEach(function (c, j) { head.appendChild(Viz.el('th', { class: j === st.colHL ? 'hit' : '', text: c })); });
+    table.appendChild(head);
+    st.dp.forEach(function (row, r) {
+      var tr = Viz.el('tr', null, [Viz.el('th', { class: 'rowh' + (r === st.rowHL ? ' hit' : ''), text: st.rows[r] })]);
+      row.forEach(function (v, c) {
+        var cls2 = v === null ? 'empty' : '';
+        if (st.src.some(function (s) { return s[0] === r && s[1] === c; })) cls2 = 'hit';
+        if (st.tgt && st.tgt[0] === r && st.tgt[1] === c) cls2 = 'found';
+        tr.appendChild(Viz.el('td', { class: cls2, text: v === null ? '' : String(v) }));
+      });
+      table.appendChild(tr);
+    });
+    var wrap = Viz.el('div', { style: { overflowX: 'auto' } }, [table]);
+    body.appendChild(wrap);
+  }
+
+  function listInts(str, lo, hi) {
+    var parts = str.split(/[\s,]+/).filter(Boolean), out = [];
+    for (var i = 0; i < parts.length; i++) {
+      if (!/^\d+$/.test(parts[i]) || +parts[i] < lo || +parts[i] > hi) return null;
+      out.push(+parts[i]);
+    }
+    return out;
+  }
+
+  function run() {
+    errBox.textContent = '';
+    var mode = $('mode').value, steps, code;
+    ['climb', 'lcs', 'knap'].forEach(function (m) { $('in-' + m).style.display = m === mode ? '' : 'none'; });
+    $('hint').textContent = HINTS[mode];
+    if (mode === 'climb') {
+      var nStr = $('n').value.trim();
+      if (!/^\d+$/.test(nStr) || +nStr < 1 || +nStr > 15) { errBox.textContent = 'n must be a whole number from 1 to 15.'; return; }
+      steps = genClimb(+nStr).steps; code = CLIMB_CODE;
+    } else if (mode === 'lcs') {
+      var a = $('sa').value.trim(), b = $('sb').value.trim();
+      if (!/^[A-Za-z0-9]{1,7}$/.test(a) || !/^[A-Za-z0-9]{1,7}$/.test(b)) { errBox.textContent = 'Each string must be 1 to 7 letters or digits, with no spaces.'; return; }
+      steps = genLCS(a, b).steps; code = LCS_CODE;
+    } else {
+      var w = listInts($('kw').value, 1, 10), v = listInts($('kv').value, 0, 99), cs = $('kc').value.trim();
+      if (!w || !v || w.length < 1 || w.length > 5 || w.length !== v.length) { errBox.textContent = 'Give 1 to 5 weights (1 to 10) and the same number of values (0 to 99).'; return; }
+      if (!/^\d+$/.test(cs) || +cs < 1 || +cs > 10) { errBox.textContent = 'Capacity must be a whole number from 1 to 10.'; return; }
+      steps = genKnap(w, v, +cs).steps; code = KNAP_CODE;
+    }
+    app.innerHTML = '';
+    var st = Viz.stepper({ mount: app, code: code, render: render });
+    st.load(steps);
+  }
+
+  $('legend').appendChild(Viz.legend([
+    { cls: 'hit', label: 'cells the formula reads' }, { cls: 'found', label: 'the cell being filled' }, { cls: 'dim', label: 'not computed yet' },
+  ]));
+  $('go').addEventListener('click', run);
+  $('mode').addEventListener('change', run);
+  run();
+})();
+</script>
+</body>
+</html>

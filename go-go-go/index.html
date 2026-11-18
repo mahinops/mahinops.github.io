@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visual Learning Index</title><meta name="description" content="Animated, step-by-step pages for Go concepts and data structures and algorithms.">
+<link rel="stylesheet" href="assets/viz.css"></head><body><div class="page">
+<nav class="topnav"><a href="bn/index.html">বাংলা</a></nav>
+<h1>Visual Learning Index</h1>
+<p class="lead">Every page is an animation you can play, step through and edit. Read in order: each page assumes the ones before it. Open this folder's pages by double-clicking them; no internet needed.</p>
+<h2>Part 1: Go, concept by concept</h2>
+<div class="grid">
+<a class="tile" href="go/variables-and-memory.html"><b>1. Variables and Memory</b><span>See a Go variable as a named box in memory: declare, assign, copy, zero values and shadowing.</span></a>
+<a class="tile" href="go/pointers.html"><b>2. Pointers</b><span>Understand Go pointers with boxes and arrows: address-of, dereference, pass by value vs pointer, structs, nil and panics.</span></a>
+<a class="tile" href="go/arrays-vs-slices.html"><b>3. Arrays vs Slices</b><span>See a slice as a small header (pointer, length, capacity) over a backing array: append, growth, aliasing and the 3-index slice.</span></a>
+<a class="tile" href="go/maps.html"><b>4. Maps</b><span>See a Go map as a phone book: set, overwrite, look up with comma-ok, delete, nil map panic and random iteration order.</span></a>
+<a class="tile" href="go/functions-and-call-stack.html"><b>5. Functions and the Call Stack</b><span>Watch stack frames pushed and popped as functions are called, return multiple values and recurse.</span></a>
+<a class="tile" href="go/closures.html"><b>6. Closures</b><span>See how a Go closure carries its own captured variables, and how the Go 1.22 loop variable change fixed a classic bug.</span></a>
+<a class="tile" href="go/defer-panic-recover.html"><b>7. Defer, Panic and Recover</b><span>Watch the defer stack run last-in-first-out, a panic unwind the stack, and recover catch it.</span></a>
+<a class="tile" href="go/strings-bytes-runes.html"><b>8. Strings, Bytes and Runes</b><span>See how a Go string is a row of UTF-8 bytes, why len counts bytes, and how runes and range give you characters.</span></a>
+<a class="tile" href="go/structs-and-methods.html"><b>9. Structs and Methods</b><span>See why a value receiver changes a copy while a pointer receiver changes the original, and why range copies struct elements.</span></a>
+<a class="tile" href="go/interfaces.html"><b>10. Interfaces</b><span>See an interface value as a (type, value) pair, how method calls pick the right code, and the nil-interface gotcha.</span></a>
+<a class="tile" href="go/goroutines-and-channels.html"><b>11. Goroutines and Channels</b><span>Watch goroutines hand values through unbuffered and buffered channels, including blocking and close.</span></a>
+<a class="tile" href="go/select-and-timeouts.html"><b>12. Select and Timeouts</b><span>Watch select wait on several channels and run whichever is ready first, with a timeout and a default case.</span></a>
+<a class="tile" href="go/mutex-and-data-race.html"><b>13. Mutex and Data Race</b><span>Step through two goroutines doing counter++ at the same time, see an update get lost, then fix it with a mutex.</span></a>
+<a class="tile" href="go/waitgroup-and-worker-pool.html"><b>14. WaitGroup and Worker Pool</b><span>Watch a fixed set of workers pull jobs from a channel while a WaitGroup counts outstanding work.</span></a>
+<a class="tile" href="go/context-cancellation.html"><b>15. Context and Cancellation</b><span>See how a context carries a cancel signal and deadline down to the goroutines doing work, and how cancelling a parent cancels its children.</span></a>
+</div>
+<h2>Part 2: Data structures and algorithms</h2>
+<div class="grid">
+<a class="tile" href="dsa/binary-search.html"><b>1. Binary Search</b><span>Find a value in a sorted list by repeatedly checking the middle and throwing away the half that cannot contain it.</span></a>
+<a class="tile" href="dsa/two-pointers.html"><b>2. Two Pointers</b><span>Walk two markers through a list, from both ends or side by side, to solve pair and in-place problems without nested loops.</span></a>
+<a class="tile" href="dsa/sliding-window.html"><b>3. Sliding Window</b><span>Slide a window across a list, adding the new item and dropping the old one, instead of recomputing from scratch.</span></a>
+<a class="tile" href="dsa/hash-map-two-sum.html"><b>4. Hash Map: Two Sum</b><span>Remember what you have seen in a map so each lookup is instant, turning a nested loop into one pass.</span></a>
+<a class="tile" href="dsa/prefix-sum.html"><b>5. Prefix Sum</b><span>Pre-compute running totals once so the sum of any range can be answered instantly.</span></a>
+<a class="tile" href="dsa/stack-valid-parentheses.html"><b>6. Stack: Valid Parentheses</b><span>Use a last-in-first-out stack to check that every bracket is closed in the right order.</span></a>
+<a class="tile" href="dsa/queue-and-monotonic-stack.html"><b>7. Queue &amp; Monotonic Stack</b><span>See first-in-first-out queues, and a stack kept in order that finds the next greater element in one pass.</span></a>
+<a class="tile" href="dsa/linked-list.html"><b>8. Linked List</b><span>See how list nodes point to each other, how reversing flips the arrows, and how fast and slow pointers detect a cycle.</span></a>
+<a class="tile" href="dsa/sorting.html"><b>9. Sorting</b><span>Watch bubble, insertion, merge and quick sort compare and move items step by step.</span></a>
+<a class="tile" href="dsa/recursion-call-tree.html"><b>10. Recursion Call Tree</b><span>Watch every function call of fibonacci appear in a tree, then see memoization cut the repeated work.</span></a>
+<a class="tile" href="dsa/backtracking.html"><b>11. Backtracking</b><span>Explore choices, undo the last one when stuck, and try the next, shown as a decision tree and an N-Queens board.</span></a>
+<a class="tile" href="dsa/tree-traversals.html"><b>12. Tree Traversals</b><span>Watch preorder, inorder, postorder (with a live call stack) and level-order (with a queue) walk a binary tree.</span></a>
+<a class="tile" href="dsa/bst-insert-search.html"><b>13. BST Insert and Search</b><span>Build a binary search tree one value at a time, then search it, and see how left/right choices narrow the search like binary search.</span></a>
+<a class="tile" href="dsa/trie.html"><b>14. Trie (Prefix Tree)</b><span>Build a trie (prefix tree) letter by letter, then search for whole words and prefixes while watching shared prefixes get reused.</span></a>
+<a class="tile" href="dsa/heap-priority-queue.html"><b>15. Heap / Priority Queue</b><span>See a min-heap as both an array and a tree: push (sift up), pop (sift down) and heapify, one swap at a time.</span></a>
+<a class="tile" href="dsa/graph-bfs-dfs.html"><b>16. Graph BFS / DFS</b><span>Explore a graph with breadth-first search (a queue) and depth-first search (a stack), and watch the visited set and visit order build up.</span></a>
+<a class="tile" href="dsa/topological-sort.html"><b>17. Topological Sort</b><span>Order tasks so every prerequisite comes first using Kahn&#x27;s algorithm, and see how a cycle gets detected.</span></a>
+<a class="tile" href="dsa/dijkstra.html"><b>18. Dijkstra&#x27;s Shortest Path</b><span>Find the shortest paths from one node in a weighted graph with Dijkstra&#x27;s algorithm, watching distances and the priority queue update.</span></a>
+<a class="tile" href="dsa/union-find.html"><b>19. Union-Find</b><span>Watch union-find (disjoint sets) merge groups as a forest, with union by size and path compression shortening the trees.</span></a>
+<a class="tile" href="dsa/dp-table.html"><b>20. Dynamic Programming Table</b><span>Dynamic programming as a table you fill cell by cell: climbing stairs, longest common subsequence and 0/1 knapsack, with each cell&#x27;s sources highlighted.</span></a>
+<a class="tile" href="dsa/intervals-merge.html"><b>21. Merge Intervals</b><span>Merge overlapping intervals on a number line: sort by start, then sweep and extend or start a new interval.</span></a>
+<a class="tile" href="dsa/bit-manipulation.html"><b>22. Bit Manipulation</b><span>See numbers as rows of bits and watch AND, OR, XOR, shifts, n&amp;(n-1), counting set bits and the XOR single-number trick work column by column.</span></a>
+</div>
+</div></body></html>

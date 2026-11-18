@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="See a min-heap as both an array and a tree: push (sift up), pop (sift down) and heapify, one swap at a time.">
+<title>Heap / Priority Queue - visual</title>
+<link rel="stylesheet" href="../assets/viz.css">
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/heap-priority-queue.html">বাংলা</a></nav>
+  <h1>Heap / Priority Queue</h1>
+  <p class="lead">A pile where the smallest item is always on top, and adding or removing stays fast.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea (a hospital waiting room)</h2>
+    <p>In an emergency room the most urgent patient is seen first, no matter who arrived first. A <b>priority queue</b> does that. A <b>min-heap</b> is a clever way to build one: a tree where <b>every parent is smaller than or equal to its children</b>. So the smallest value always sits at the very top (the root), and you can grab it instantly.</p>
+    <p>The trick is that the tree is stored in a plain array, with no pointers. For the item at index <code>i</code>: its <b>children</b> are at <code>2i+1</code> and <code>2i+2</code>, and its <b>parent</b> is at <code>(i-1)/2</code>. The two views below are the same data.</p>
+    <ul>
+      <li><b>Push</b>: put the new item at the end, then <b>sift up</b>: swap with its parent while it is smaller.</li>
+      <li><b>Pop</b>: take the root, move the last item to the root, then <b>sift down</b>: swap with the smaller child while it is bigger.</li>
+      <li><b>Heapify</b>: turn an unordered array into a heap by sifting down from the last parent back to the root.</li>
+    </ul>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Operations (separated by commas)<input id="ops" value="push 5, push 3, push 8, push 1, pop, pop" size="48"></label>
+    <button id="go">Run</button>
+  </div>
+  <div class="viz-note">Allowed: <b>push N</b>, <b>pop</b>, <b>heapify N N N ...</b> (heapify replaces the heap with that array). At most 20 operations and 15 items.</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul>
+      <li>Push <code>9, 7, 5, 3, 1</code> (biggest first). Each new item travels all the way to the top. Why?</li>
+      <li>Push <code>1, 2, 3, 4, 5</code> (smallest first). How many swaps now?</li>
+      <li>Run <code>heapify 9 8 7 6 5 4 3 2 1</code> and watch it fix the tree from the bottom up.</li>
+      <li>Pop repeatedly: the values come out in sorted order. That is heap sort.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul>
+      <li><b>Thinking the array is sorted.</b> Only parent &le; child holds. Siblings and cousins can be in any order.</li>
+      <li><b>Popping an empty heap.</b> <code>h.a[0]</code> panics with &ldquo;index out of range&rdquo;. Check the length first.</li>
+      <li><b>Wrong index math.</b> Children are <code>2i+1</code> and <code>2i+2</code> for a 0-based array (they are <code>2i</code> and <code>2i+1</code> in 1-based books).</li>
+      <li><b>In real Go code</b> you usually use <code>container/heap</code>, which gives you Push/Pop with the same sift logic. This page shows what happens inside.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, in plain English:</b> reading the smallest is instant (<code>O(1)</code>). Push and pop move along one root-to-leaf path, so they take about log&#8322;(n) steps (<code>O(log n)</code>): 1,000,000 items need only about 20 swaps. Heapify of a whole array takes only <code>O(n)</code>.
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var CODE = [
+  'func (h *MinHeap) Push(x int) {',                    // 0
+  '    h.a = append(h.a, x)',                           // 1
+  '    i := len(h.a) - 1',                              // 2
+  '    for i > 0 {',                                    // 3
+  '        p := (i - 1) / 2',                           // 4
+  '        if h.a[p] <= h.a[i] {',                      // 5
+  '            break',                                  // 6
+  '        }',                                          // 7
+  '        h.a[p], h.a[i] = h.a[i], h.a[p]',            // 8
+  '        i = p',                                      // 9
+  '    }',                                              // 10
+  '}',                                                  // 11
+  '',                                                   // 12
+  'func (h *MinHeap) Pop() int {',                      // 13
+  '    top := h.a[0]',                                  // 14
+  '    last := len(h.a) - 1',                           // 15
+  '    h.a[0] = h.a[last]',                             // 16
+  '    h.a = h.a[:last]',                               // 17
+  '    h.siftDown(0)',                                  // 18
+  '    return top',                                     // 19
+  '}',                                                  // 20
+  '',                                                   // 21
+  'func (h *MinHeap) siftDown(i int) {',                // 22
+  '    n := len(h.a)',                                  // 23
+  '    for {',                                          // 24
+  '        l, r, small := 2*i+1, 2*i+2, i',             // 25
+  '        if l < n && h.a[l] < h.a[small] {',          // 26
+  '            small = l',                              // 27
+  '        }',                                          // 28
+  '        if r < n && h.a[r] < h.a[small] {',          // 29
+  '            small = r',                              // 30
+  '        }',                                          // 31
+  '        if small == i {',                            // 32
+  '            return',                                 // 33
+  '        }',                                          // 34
+  '        h.a[i], h.a[small] = h.a[small], h.a[i]',    // 35
+  '        i = small',                                  // 36
+  '    }',                                              // 37
+  '}',                                                  // 38
+  '',                                                   // 39
+  'func Heapify(a []int) *MinHeap {',                   // 40
+  '    h := &MinHeap{a: a}',                            // 41
+  '    for i := len(a)/2 - 1; i >= 0; i-- {',           // 42
+  '        h.siftDown(i)',                              // 43
+  '    }',                                              // 44
+  '    return h',                                       // 45
+  '}',                                                  // 46
+];
+
+/* ops: [{type:'push', v}, {type:'pop'}, {type:'heapify', arr}] -> {steps, popped, arr} */
+function gen(ops) {
+  var a = [], steps = [], popped = [], opLabel = '';
+  function snap(text, line, cls, marks) {
+    steps.push({ a: a.slice(), cls: cls || {}, marks: marks || {}, text: text, line: line, op: opLabel, popped: popped.slice() });
+  }
+  function one(i, c) { var o = {}; o[i] = c; return o; }
+  function allFound() { var o = {}; a.forEach(function (_, i) { o[i] = 'found'; }); return o; }
+
+  function siftDown(i) {
+    var n = a.length;
+    while (true) {
+      var l = 2 * i + 1, r = 2 * i + 2, small = i;
+      var cls = {}, marks = {};
+      cls[i] = 'hit'; marks[i] = 'i';
+      if (l < n) { cls[l] = 'range'; marks[l] = 'left'; }
+      if (r < n) { cls[r] = 'range'; marks[r] = 'right'; }
+      if (l < n && a[l] < a[small]) small = l;
+      if (r < n && a[r] < a[small]) small = r;
+      var txt;
+      if (l >= n) txt = 'Index ' + i + ' (value ' + a[i] + ') has no children, so it is already in place.';
+      else txt = 'Compare a[' + i + ']=' + a[i] + ' with its children a[' + l + ']=' + a[l] + (r < n ? ' and a[' + r + ']=' + a[r] : '') + '. The smallest of the three is ' + a[small] + '.';
+      snap(txt, [25, 26, 29], cls, marks);
+      if (small === i) {
+        snap('No child is smaller than ' + a[i] + ': the heap rule holds. Stop.', [32, 33], one(i, 'found'));
+        return;
+      }
+      var t = a[i]; a[i] = a[small]; a[small] = t;
+      var c2 = {}; c2[i] = 'found'; c2[small] = 'hit';
+      snap('Swap a[' + i + '] and a[' + small + ']: the smaller value moves up, the bigger one moves down.', [35, 36], c2, one(small, 'i'));
+      i = small;
+    }
+  }
+
+  function push(x) {
+    a.push(x);
+    var i = a.length - 1;
+    snap('Push ' + x + ': put it in the next free slot, at the end (index ' + i + ').', [1, 2], one(i, 'hit'), one(i, 'new'));
+    while (i > 0) {
+      var p = (i - 1) >> 1;
+      var c = {}, m = {};
+      c[p] = 'range'; c[i] = 'hit'; m[p] = 'parent'; m[i] = 'i';
+      snap('The parent of index ' + i + ' is index ' + p + ' (that is (i-1)/2). Compare a[' + p + ']=' + a[p] + ' with a[' + i + ']=' + a[i] + '.', [3, 4, 5], c, m);
+      if (a[p] <= a[i]) {
+        var f = {}; f[p] = 'found'; f[i] = 'found';
+        snap('The parent ' + a[p] + ' is <= ' + a[i] + ': the heap rule holds. Stop.', [5, 6], f);
+        return;
+      }
+      var t = a[p]; a[p] = a[i]; a[i] = t;
+      i = p;
+      snap('The child was smaller than its parent, so swap them. The new item moves up to index ' + i + '.', [8, 9], one(i, 'hit'), one(i, 'i'));
+    }
+    snap('The new item reached the root (index 0): nothing is above it. Stop.', 3, one(0, 'found'));
+  }
+
+  function pop() {
+    if (!a.length) { snap('Pop on an empty heap: in Go, h.a[0] would panic with "index out of range". Nothing happens here.', 14); return; }
+    var top = a[0];
+    snap('The smallest value is always at the root: top = a[0] = ' + top + '.', 14, one(0, 'hit'), one(0, 'top'));
+    var last = a.length - 1, lv = a[last];
+    a[0] = lv; a.length = last;
+    if (!a.length) snap('That was the only item, so the heap is now empty.', [15, 16, 17]);
+    else {
+      snap('Move the last item (' + lv + ') to the root and shrink the array by one. The heap rule may now be broken at the root.', [15, 16, 17], one(0, 'hit'), one(0, 'i'));
+      snap('Call siftDown(0) to push it down to where it belongs.', 18, one(0, 'hit'), one(0, 'i'));
+      siftDown(0);
+    }
+    popped.push(top);
+    snap('Pop returns ' + top + '. Popped so far: [' + popped.join(', ') + '].', 19, allFound());
+  }
+
+  function heapify(arr) {
+    a = arr.slice();
+    snap('Start from an unordered array. Think of it as a tree, but the heap rule is not true yet.', [40, 41]);
+    for (var i = Math.floor(a.length / 2) - 1; i >= 0; i--) {
+      snap('Fix the subtree rooted at index ' + i + '. We start at the last parent and walk back to the root; leaves are already fine on their own.', [42, 43], one(i, 'hit'), one(i, 'i'));
+      siftDown(i);
+    }
+    snap('Heapify finished: every parent is <= its children.', 45, allFound());
+  }
+
+  ops.forEach(function (op, k) {
+    opLabel = 'Operation ' + (k + 1) + ' of ' + ops.length + ': ' + (op.type === 'push' ? 'push ' + op.v : op.type === 'pop' ? 'pop' : 'heapify [' + op.arr.join(', ') + ']');
+    if (op.type === 'push') push(op.v);
+    else if (op.type === 'pop') pop();
+    else heapify(op.arr);
+  });
+  return { steps: steps, popped: popped, arr: a };
+}
+
+function parseOps(str) {
+  var parts = str.split(',').map(function (s) { return s.trim(); }).filter(Boolean), ops = [], m;
+  if (!parts.length) return { error: 'Type at least one operation, for example: push 5, pop' };
+  if (parts.length > 20) return { error: 'Please use at most 20 operations.' };
+  for (var i = 0; i < parts.length; i++) {
+    if ((m = /^push\s+(-?\d+)$/i.exec(parts[i]))) ops.push({ type: 'push', v: parseInt(m[1], 10) });
+    else if (/^pop$/i.test(parts[i])) ops.push({ type: 'pop' });
+    else if ((m = /^heapify\s+((?:-?\d+\s*)+)$/i.exec(parts[i]))) ops.push({ type: 'heapify', arr: m[1].trim().split(/\s+/).map(Number) });
+    else return { error: 'I do not understand "' + parts[i] + '". Use push N, pop, or heapify N N N.' };
+  }
+  return { ops: ops };
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+
+  function treeSvg(st) {
+    var n = st.a.length;
+    if (!n) return Viz.note('(the heap is empty)');
+    var levels = Math.floor(Math.log2(n)) + 1;
+    var slots = Math.pow(2, levels - 1);
+    var unit = 46, r = 18, dy = 58, pad = 10;
+    var W = Math.max(slots * unit + pad * 2, 140), H = levels * dy + pad;
+    var parts = [];
+    function px(i) { var d = Math.floor(Math.log2(i + 1)); var idxInLevel = i - (Math.pow(2, d) - 1); var span = (W - pad * 2) / Math.pow(2, d); return pad + (idxInLevel + 0.5) * span; }
+    function py(i) { return pad + Math.floor(Math.log2(i + 1)) * dy + r; }
+    for (var i = 1; i < n; i++) {
+      var p = (i - 1) >> 1;
+      parts.push(Viz.s('line', { class: 'edge', x1: px(p), y1: py(p), x2: px(i), y2: py(i) }));
+    }
+    for (var j = 0; j < n; j++) {
+      var cls = 'node' + (st.cls[j] ? ' ' + st.cls[j] : '');
+      parts.push(Viz.s('circle', { class: cls, cx: px(j), cy: py(j), r: r }));
+      parts.push(Viz.s('text', { x: px(j), y: py(j) + 5, 'text-anchor': 'middle', 'font-size': 14, 'font-weight': 700, text: String(st.a[j]) }));
+    }
+    return Viz.svg(W, H, parts);
+  }
+
+  function render(st, i, body) {
+    body.appendChild(Viz.note('<b>' + st.op + '</b>'));
+    if (st.a.length) body.appendChild(Viz.array(st.a, { title: 'array  (children of i are 2i+1 and 2i+2)', classes: st.cls, marks: st.marks }));
+    else body.appendChild(Viz.note('array: [ ]  (empty)'));
+    body.appendChild(Viz.note('The same data drawn as a tree:'));
+    body.appendChild(treeSvg(st));
+    if (st.popped.length) body.appendChild(Viz.note('popped so far: <b>[' + st.popped.join(', ') + ']</b>'));
+  }
+
+  function run() {
+    errBox.textContent = '';
+    var p = parseOps(document.getElementById('ops').value);
+    if (p.error) { errBox.textContent = p.error; return; }
+    var g = gen(p.ops);
+    var maxLen = Math.max.apply(null, g.steps.map(function (s) { return s.a.length; }));
+    if (maxLen > 15) { errBox.textContent = 'The heap would grow to ' + maxLen + ' items. Please keep it to 15 or fewer.'; return; }
+    app.innerHTML = '';
+    var st = Viz.stepper({ mount: app, code: CODE, render: render });
+    st.load(g.steps);
+  }
+
+  document.getElementById('legend').appendChild(Viz.legend([
+    { cls: 'hit', label: 'item being moved / checked' }, { cls: 'range', label: 'parent or child it is compared with' }, { cls: 'found', label: 'in its final place for now' },
+  ]));
+  document.getElementById('go').addEventListener('click', run);
+  run();
+})();
+</script>
+</body>
+</html>

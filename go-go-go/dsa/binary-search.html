@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Binary Search - visual</title>
+<meta name="description" content="Find a value in a sorted list by repeatedly checking the middle and throwing away the half that cannot contain it.">
+<link rel="stylesheet" href="../assets/viz.css">
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/binary-search.html">বাংলা</a></nav>
+  <h1>Binary Search</h1>
+  <p class="lead">Find a value in a <b>sorted</b> list by repeatedly throwing away half of it.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea (like guessing a number)</h2>
+    <p>I think of a number from 1 to 100. You guess 50. I say &ldquo;higher&rdquo;. Now you know it is in 51&ndash;100, so half the numbers are gone with one guess. Guess 75, &ldquo;lower&rdquo;&hellip; In about 7 guesses you always win. That is binary search: <b>look at the middle, then discard the half that cannot contain the answer.</b></p>
+    <p>It only works if the list is <b>sorted</b>. Doubling the list size adds just <b>one</b> more step: 1,000,000 items need about 20 steps.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Sorted numbers<input id="arr" size="38" value="2, 5, 8, 12, 16, 23, 38, 45, 56, 72, 91"></label>
+    <label>Target<input id="target" value="23" size="6"></label>
+    <button id="go">Run</button>
+  </div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul>
+      <li>Search for <code>91</code> (the last item) and for <code>2</code> (the first). How many steps each?</li>
+      <li>Search for <code>40</code>, which is not in the list. What do <code>lo</code> and <code>hi</code> look like at the end?</li>
+      <li>Add 10 more numbers (keep them sorted). How many extra steps does it need?</li>
+      <li>Type an <i>unsorted</i> list. Why does it fail?</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul>
+      <li><b>Off-by-one:</b> after checking <code>mid</code>, move to <code>mid+1</code> or <code>mid-1</code>, not <code>mid</code>, or you can loop forever.</li>
+      <li><b>Overflow:</b> write <code>mid := lo + (hi-lo)/2</code>, not <code>(lo+hi)/2</code>, which can overflow with huge indexes.</li>
+      <li><b>Unsorted input:</b> the answer is silently wrong.</li>
+    </ul>
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+  var CODE = [
+    'func binarySearch(nums []int, target int) int {',
+    '    lo, hi := 0, len(nums)-1',
+    '    for lo <= hi {',
+    '        mid := lo + (hi-lo)/2',
+    '        if nums[mid] == target {',
+    '            return mid',
+    '        } else if nums[mid] < target {',
+    '            lo = mid + 1',
+    '        } else {',
+    '            hi = mid - 1',
+    '        }',
+    '    }',
+    '    return -1',
+    '}',
+  ];
+
+  function buildSteps(nums, target) {
+    var steps = [];
+    var lo = 0, hi = nums.length - 1;
+    steps.push({ nums: nums, lo: lo, hi: hi, mid: null, line: 1, text: 'Start: lo is the first index (0), hi is the last index (' + hi + '). The whole list is still possible.' });
+    while (lo <= hi) {
+      var mid = lo + Math.floor((hi - lo) / 2);
+      steps.push({ nums: nums, lo: lo, hi: hi, mid: mid, line: 3, text: 'mid = ' + lo + ' + (' + hi + ' - ' + lo + ') / 2 = ' + mid + '. Look at the middle value: ' + nums[mid] + '.' });
+      if (nums[mid] === target) {
+        steps.push({ nums: nums, lo: lo, hi: hi, mid: mid, found: mid, line: [4, 5], text: nums[mid] + ' equals the target ' + target + '. Found at index ' + mid + '!' });
+        return steps;
+      } else if (nums[mid] < target) {
+        steps.push({ nums: nums, lo: lo, hi: hi, mid: mid, line: [6, 7], text: nums[mid] + ' < ' + target + ', so the target must be to the right. Throw away the left half: lo = mid + 1 = ' + (mid + 1) + '.' });
+        lo = mid + 1;
+      } else {
+        steps.push({ nums: nums, lo: lo, hi: hi, mid: mid, line: [8, 9], text: nums[mid] + ' > ' + target + ', so the target must be to the left. Throw away the right half: hi = mid - 1 = ' + (mid - 1) + '.' });
+        hi = mid - 1;
+      }
+    }
+    steps.push({ nums: nums, lo: lo, hi: hi, mid: null, notFound: true, line: 12, text: 'lo (' + lo + ') is now greater than hi (' + hi + '): nothing is left to check. ' + target + ' is not in the list, so return -1.' });
+    return steps;
+  }
+
+  var s = Viz.stepper({
+    mount: '#app',
+    code: CODE,
+    render: function (st, i, body) {
+      var marks = {}, classes = {};
+      function mark(ix, label) { if (ix >= 0 && ix < st.nums.length) marks[ix] = (marks[ix] || []).concat(label); }
+      st.nums.forEach(function (_, ix) { classes[ix] = (ix >= st.lo && ix <= st.hi) ? 'range' : 'dim'; });
+      mark(st.lo, 'lo'); mark(st.hi, 'hi');
+      if (st.mid !== null) { classes[st.mid] = 'hit'; mark(st.mid, 'mid'); }
+      if (st.found !== undefined) classes[st.found] = 'found';
+      body.appendChild(Viz.array(st.nums, { marks: marks, classes: classes, title: 'nums' }));
+      if (st.notFound) body.appendChild(Viz.note('<b>Result: -1 (not found)</b>'));
+      if (st.found !== undefined) body.appendChild(Viz.note('<b>Result: index ' + st.found + '</b>'));
+    },
+  });
+  document.getElementById('legend').appendChild(Viz.legend([
+    { cls: 'range', label: 'still possible' }, { cls: 'hit', label: 'middle being checked' },
+    { cls: 'dim', label: 'thrown away' }, { cls: 'found', label: 'found' },
+  ]));
+
+  function run() {
+    var nums = Viz.parseNums(document.getElementById('arr').value);
+    var target = Number(document.getElementById('target').value);
+    var err = document.getElementById('err');
+    err.textContent = '';
+    if (!nums.length || nums.length > 20) { err.textContent = 'Enter between 1 and 20 numbers.'; return; }
+    if (document.getElementById('target').value.trim() === '' || Number.isNaN(target)) { err.textContent = 'Target must be a number.'; return; }
+    s.load(buildSteps(nums, target));
+  }
+  document.getElementById('go').addEventListener('click', run);
+  run();
+})();
+</script>
+</body>
+</html>

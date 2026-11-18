@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stack: Valid Parentheses - visual</title>
+<meta name="description" content="Use a last-in-first-out stack to check that every bracket is closed in the right order.">
+<link rel="stylesheet" href="../assets/viz.css">
+<style>.pile{display:flex;flex-direction:column-reverse;align-items:center;gap:4px;min-height:60px;margin:6px 0}.plate{width:70px;text-align:center;font:700 18px var(--mono);border:2px solid var(--cell-line);border-radius:8px;padding:4px;background:var(--cell)}.plate.top{background:var(--hit);border-color:var(--hit-line)}.plate.gone{background:var(--found);border-color:var(--found-line);width:auto;white-space:nowrap;padding:4px 10px;font-size:14px}.pilebox{display:flex;gap:18px;align-items:flex-end}.pilebase{border-top:4px solid var(--cell-line);width:100px}.pilewrap{display:flex;flex-direction:column;align-items:center}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/stack-valid-parentheses.html">বাংলা</a></nav>
+  <h1>Stack: Valid Parentheses</h1>
+  <p class="lead">A stack remembers what is still open, and the most recent one must close first.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea</h2>
+    <p>A stack is like a <b>pile of plates</b>: you can only add to the top and only take from the top (last in, first out). To check brackets, walk through the text. Each <b>opening</b> bracket goes on the pile. Each <b>closing</b> bracket must match the plate on <i>top</i>, and then that plate is removed. If the closer does not match (or the pile is empty), the text is invalid. At the end the pile must be empty.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+  <label>Brackets ( ) [ ] { }<input id="str" value="{[()]}" size="18"></label>
+  <button id="go">Run</button>
+</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul><li>Run <code>{[()]}</code>, then <code>{[(])}</code>. Where exactly does the second one fail?</li><li>Try <code>(((</code>. Every char is fine, so why is it invalid? Look at the stack at the end.</li><li>Try <code>)</code> alone. What does the code check before looking at the top?</li><li>Try an empty-looking nest like <code>()[]{}</code>. How tall does the stack ever get?</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul><li><b>Not checking for an empty stack</b> before reading the top: that is a crash (index out of range) in Go.</li><li><b>Returning true without checking leftovers:</b> <code>(((</code> never fails inside the loop. The final <code>len(stack) == 0</code> check matters.</li><li><b>Counting brackets instead of using a stack:</b> a counter cannot tell <code>[(])</code> from <code>[()]</code>.</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">How fast is it?</h2>
+    <p><b>Time: O(n)</b> &ndash; each character is pushed or popped once. <b>Space: O(n)</b> in the worst case (all opening brackets).</p>
+  </div>
+
+  <div class="pagenav"><a href="prefix-sum.html">&larr; Prefix Sum</a><a href="queue-and-monotonic-stack.html">Queue & Monotonic Stack &rarr;</a></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script id="algo">
+
+function parenSteps(s) {
+  var steps = [], stack = [], pairs = { ')': '(', ']': '[', '}': '{' }, chars = s.split('');
+  function snap(line, text, extra) { steps.push(Object.assign({ chars: chars, stack: stack.slice(), line: line, text: text }, extra || {})); }
+  snap(2, 'Start with an empty stack.', { i: -1 });
+  for (var i = 0; i < chars.length; i++) {
+    var c = chars[i];
+    if (!(c in pairs)) {
+      stack.push(c);
+      snap(5, '"' + c + '" is an opening bracket. Push it on the stack.', { i: i, pushed: true });
+    } else {
+      var open = pairs[c];
+      if (stack.length === 0) {
+        snap([7, 8], '"' + c + '" needs a "' + open + '" before it, but the stack is empty. Invalid!', { i: i, fail: true, result: false });
+        return steps;
+      }
+      var top = stack[stack.length - 1];
+      if (top !== open) {
+        snap([7, 8], '"' + c + '" needs a "' + open + '" on top, but the top is "' + top + '". Wrong order: invalid!', { i: i, fail: true, result: false });
+        return steps;
+      }
+      stack.pop();
+      snap(10, '"' + c + '" matches the top "' + top + '". Pop it off the stack.', { i: i, popped: top });
+    }
+  }
+  if (stack.length === 0) snap(13, 'All characters used and the stack is empty: every bracket was matched. Valid!', { i: chars.length - 1, done: true, result: true });
+  else snap(13, 'All characters used, but ' + stack.length + ' opening bracket(s) are still waiting on the stack. Invalid!', { i: chars.length - 1, fail: true, result: false });
+  return steps;
+}
+
+</script>
+<script id="ui">
+
+function $id(x) { return document.getElementById(x); }
+function showErr(m) { $id('err').textContent = m || ''; }
+var current = null;
+function mountStepper(opts) {
+  if (current) current.pause();
+  var app = $id('app'); app.innerHTML = ''; app.className = '';
+  current = Viz.stepper(Object.assign({ mount: '#app' }, opts));
+  return current;
+}
+function setLegend(items) { var l = $id('legend'); l.innerHTML = ''; l.appendChild(Viz.legend(items)); }
+function mark(marks, ix, label) { marks[ix] = (marks[ix] || []).concat(label); }
+
+
+var CODE = ['func isValid(s string) bool {',
+"    pairs := map[rune]rune{')': '(', ']': '[', '}': '{'}",
+'    stack := []rune{}',
+'    for _, c := range s {',
+'        if open, ok := pairs[c]; !ok {',
+'            stack = append(stack, c)',
+'        } else {',
+'            if len(stack) == 0 || stack[len(stack)-1] != open {',
+'                return false',
+'            }',
+'            stack = stack[:len(stack)-1]',
+'        }',
+'    }',
+'    return len(stack) == 0',
+'}'];
+function render(st, i, body) {
+  var cls = {}, marks = {};
+  st.chars.forEach(function (_, ix) { cls[ix] = ix < st.i ? 'dim' : 'range'; });
+  if (st.i >= 0) { cls[st.i] = st.fail ? 'bad' : 'hit'; mark(marks, st.i, 'now'); }
+  if (st.done) st.chars.forEach(function (_, ix) { cls[ix] = 'found'; });
+  body.appendChild(Viz.array(st.chars, { marks: marks, classes: cls, title: 'text' }));
+  var pile = Viz.el('div', { class: 'pile' }, st.stack.map(function (c, ix) {
+    return Viz.el('div', { class: 'plate' + (ix === st.stack.length - 1 ? ' top' : ''), text: c });
+  }));
+  var side = [];
+  if (st.popped) side.push(Viz.el('div', { class: 'plate gone', text: st.popped + ' ← removed' }));
+  body.appendChild(Viz.el('div', { class: 'viz-array-title', text: 'stack (top is highlighted)' }));
+  body.appendChild(Viz.el('div', { class: 'pilebox' }, [Viz.el('div', { class: 'pilewrap' }, [pile, Viz.el('div', { class: 'pilebase' })])].concat(side)));
+  if (st.result !== undefined) body.appendChild(Viz.note('<b>Result: ' + st.result + '</b>'));
+}
+function run() {
+  showErr('');
+  var s = $id('str').value.replace(/\s+/g, '');
+  if (!s.length || s.length > 16) { showErr('Enter 1 to 16 bracket characters.'); return; }
+  if (/[^()\[\]{}]/.test(s)) { showErr('Only these characters are allowed: ( ) [ ] { }'); return; }
+  setLegend([{ cls: 'hit', label: 'character being read' }, { cls: 'range', label: 'still to read' }, { cls: 'dim', label: 'already read' }, { cls: 'bad', label: 'the mismatch' }, { cls: 'found', label: 'valid' }]);
+  mountStepper({ code: CODE, render: render }).load(parenSteps(s));
+}
+$id('go').addEventListener('click', run);
+run();
+
+</script>
+</body>
+</html>

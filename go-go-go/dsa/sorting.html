@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sorting - visual</title>
+<meta name="description" content="Watch bubble, insertion, merge and quick sort compare and move items step by step.">
+<link rel="stylesheet" href="../assets/viz.css">
+<style>.stat{font:14px var(--mono);margin:4px 0}.bars{display:flex;gap:6px;align-items:flex-end;height:100px;margin:2px 0 10px}.bar{width:46px;border-radius:6px 6px 0 0;background:var(--cell-line);transition:height .25s,background .25s}.bar.hit{background:var(--hit-line)}.bar.found{background:var(--found-line)}.bar.range{background:var(--range-line)}.bar.dim{background:var(--dim-ink);opacity:.5}.bar.bad{background:var(--bad-line)}.bar.pivot{background:#7048e8}.viz-cell.pivot{background:#7048e8;color:#fff;border-color:#b197fc}.viz-swatch.pivot{background:#7048e8;border-color:#b197fc}.viz-mark-pivot{color:#9775fa}.vars{display:flex;flex-wrap:wrap}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/sorting.html">বাংলা</a></nav>
+  <h1>Sorting</h1>
+  <p class="lead">Four classic ways to put a list in order, side by side.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea</h2>
+    <p>Sorting a hand of playing cards shows the big ideas:</p>
+<ul>
+<li><b>Bubble sort:</b> repeatedly compare neighbours and swap if out of order. The biggest card &ldquo;bubbles&rdquo; to the end each pass. Easy, but slow.</li>
+<li><b>Insertion sort:</b> pick up cards one at a time and slide each into the right place among the cards you already hold.</li>
+<li><b>Merge sort:</b> split the pile in half, sort each half (the same way), then merge two sorted piles by always taking the smaller top card. Divide and conquer.</li>
+<li><b>Quick sort:</b> pick a pivot card; put smaller cards on its left and bigger ones on its right. The pivot is now in its final place; repeat on both sides.</li>
+</ul>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+  <label>Algorithm<select id="algo"><option value="bubble">Bubble sort</option><option value="insertion">Insertion sort</option><option value="merge">Merge sort</option><option value="quick">Quick sort</option></select></label>
+  <label>Numbers<input id="arr" value="5, 2, 9, 1, 6, 3, 8"></label>
+  <button id="go">Run</button>
+</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul><li>Run each algorithm on the same numbers and compare the <b>comparisons</b> counts shown under the boxes.</li><li>Give bubble and insertion an already-sorted list. Which finishes with fewer swaps/shifts?</li><li>Give them a reverse-sorted list (<code>9, 8, 7, 6, 5, 4</code>). Which one suffers most?</li><li>Quick sort: use a sorted list. The last-item pivot is a bad choice there. What happens to the number of steps?</li><li>Add duplicate values like <code>3, 3, 3, 1</code> and watch how each algorithm treats equal items.</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul><li><b>Off-by-one in bubble sort's inner loop:</b> compare <code>a[j]</code> with <code>a[j+1]</code>, so <code>j</code> must stop one before the unsorted end.</li><li><b>Merge sort: forgetting the leftovers</b> after one half runs out.</li><li><b>Quick sort with a bad pivot</b> (always smallest/largest) degrades to O(n&sup2;). Real implementations pick a random or median pivot.</li><li><b>Writing your own sort in real Go code:</b> use <code>slices.Sort</code> or <code>sort.Slice</code>; they are faster and tested.</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">How fast is it?</h2>
+    <p>Bubble &amp; insertion: <b>O(n&sup2;)</b> time (insertion is O(n) on nearly sorted data), O(1) space. Merge sort: <b>O(n log n)</b> always, O(n) extra space. Quick sort: <b>O(n log n)</b> on average, O(n&sup2;) worst case, O(log n) stack space.</p>
+  </div>
+
+  <div class="pagenav"><a href="linked-list.html">&larr; Linked List</a><a href="recursion-call-tree.html">Recursion Call Tree &rarr;</a></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script id="algo">
+
+function makeSnap(input, steps, st) {
+  return function (line, text, cls, marks, extra) {
+    var c = {};
+    for (var ix = 0; ix < st.a.length; ix++) c[ix] = st.base ? st.base(ix) : 'range';
+    st.done.forEach(function (d) { c[d] = 'found'; });
+    Object.keys(cls || {}).forEach(function (k) { c[k] = cls[k]; });
+    steps.push(Object.assign({ arr: st.a.slice(), cls: c, marks: marks || {}, stats: st.stats(), line: line, text: text }, extra || {}));
+  };
+}
+function bubbleSteps(input) {
+  var a = input.slice(), n = a.length, steps = [], cmp = 0, sw = 0, st = { a: a, done: [], stats: function () { return 'comparisons: ' + cmp + ' · swaps: ' + sw; } };
+  var snap = makeSnap(input, steps, st);
+  snap(1, 'Start. Each pass compares neighbours and bubbles the biggest remaining item to the right end.');
+  for (var i = 0; i < n - 1; i++) {
+    for (var j = 0; j < n - 1 - i; j++) {
+      cmp++;
+      var bigger = a[j] > a[j + 1];
+      var m = {}; m[j] = 'j'; m[j + 1] = 'j+1';
+      var c = {}; c[j] = 'hit'; c[j + 1] = 'hit';
+      snap(3, 'Compare a[' + j + '] = ' + a[j] + ' with a[' + (j + 1) + '] = ' + a[j + 1] + ': ' + (bigger ? 'left is bigger, so they are out of order.' : 'already in order, leave them.'), c, m);
+      if (bigger) {
+        var t = a[j]; a[j] = a[j + 1]; a[j + 1] = t; sw++;
+        var c2 = {}; c2[j] = 'bad'; c2[j + 1] = 'bad';
+        snap(4, 'Swap them. ' + a[j + 1] + ' moves one step right.', c2, m);
+      }
+    }
+    st.done.push(n - 1 - i);
+    snap(6, 'End of pass ' + (i + 1) + ': ' + a[n - 1 - i] + ' has reached its final place at the right end.');
+  }
+  for (var q = 0; q < n; q++) if (st.done.indexOf(q) === -1) st.done.push(q);
+  snap(8, 'No more passes needed. The list is sorted!', {}, {}, { finished: true });
+  return steps;
+}
+function insertionSteps(input) {
+  var a = input.slice(), n = a.length, steps = [], cmp = 0, sw = 0, cur = 0, st = { a: a, done: [], stats: function () { return 'comparisons: ' + cmp + ' · shifts: ' + sw; }, base: function (ix) { return ix <= cur ? 'range' : 'dim'; } };
+  var snap = makeSnap(input, steps, st);
+  snap(1, 'The first item on its own is a sorted prefix. We grow the prefix one item at a time.');
+  for (var i = 1; i < n; i++) {
+    cur = i;
+    var key = a[i], c = {}; c[i] = 'hit';
+    snap(2, 'Pick up key = a[' + i + '] = ' + key + '. We will slide it left into the sorted part a[0..' + (i - 1) + '].', c, { [i]: 'key' }, { key: key });
+    var j = i - 1;
+    while (true) {
+      if (j < 0) { snap(4, 'j < 0: we reached the front. The key goes at index 0.', {}, {}, { key: key }); break; }
+      cmp++;
+      if (a[j] > key) {
+        var c1 = {}; c1[j] = 'hit';
+        snap(4, 'a[' + j + '] = ' + a[j] + ' is bigger than the key ' + key + ', so it must move one slot right.', c1, { [j]: 'j' }, { key: key });
+        a[j + 1] = a[j]; sw++;
+        var c3 = {}; c3[j + 1] = 'bad';
+        snap(5, 'Shift: a[' + (j + 1) + '] = a[' + j + '] (' + a[j] + '). Now index ' + j + ' is a free slot for the key (its old copy is still visible).', c3, { [j]: 'j' }, { key: key });
+        j--;
+      } else {
+        var c4 = {}; c4[j] = 'found';
+        snap(4, 'a[' + j + '] = ' + a[j] + ' is not bigger than ' + key + '. Stop: the key belongs right after it.', c4, { [j]: 'j' }, { key: key });
+        break;
+      }
+    }
+    a[j + 1] = key;
+    var c5 = {}; c5[j + 1] = 'found';
+    snap(8, 'Put the key ' + key + ' into a[' + (j + 1) + ']. The sorted prefix is now a[0..' + i + '].', c5, {}, { key: key });
+  }
+  cur = n; for (var q = 0; q < n; q++) st.done.push(q);
+  snap(10, 'Every item has been inserted. The list is sorted!', {}, {}, { finished: true });
+  return steps;
+}
+function mergeSteps(input) {
+  var a = input.slice(), n = a.length, steps = [], cmp = 0, lo0 = 0, hi0 = n, st = { a: a, done: [], stats: function () { return 'comparisons: ' + cmp; }, base: function (ix) { return ix >= lo0 && ix < hi0 ? 'range' : 'dim'; } };
+  var snap = makeSnap(input, steps, st);
+  function range(lo, hi, cls) { var c = {}; for (var ix = lo; ix < hi; ix++) c[ix] = cls; return c; }
+  function rows(L, R, out, i, j) {
+    function mk(arr, m) { return { arr: arr, marks: m || {}, cls: {} }; }
+    var rl = mk(L, i < L.length ? { [i]: 'i' } : {}), rr = mk(R, j < R.length ? { [j]: 'j' } : {}), ro = mk(out);
+    if (i < L.length) rl.cls[i] = 'hit'; if (j < R.length) rr.cls[j] = 'hit';
+    rl.title = 'left (sorted)'; rr.title = 'right (sorted)'; ro.title = 'out (merged so far)';
+    return [rl, rr, ro];
+  }
+  function ms(lo, hi) {
+    lo0 = lo; hi0 = hi;
+    if (hi - lo <= 1) { snap(1, 'Segment a[' + lo + '..' + (hi - 1) + '] has ' + (hi - lo) + ' item: a single item is already sorted. Return.'); return; }
+    var mid = lo + Math.floor((hi - lo) / 2), c = range(lo, mid, 'range'); Object.assign(c, range(mid, hi, 'pivot'));
+    snap([2, 3, 4], 'Split a[' + lo + '..' + (hi - 1) + '] into a left half [' + a.slice(lo, mid).join(', ') + '] and a right half [' + a.slice(mid, hi).join(', ') + '], then sort each half the same way.', c);
+    ms(lo, mid); ms(mid, hi);
+    lo0 = lo; hi0 = hi;
+    var L = a.slice(lo, mid), R = a.slice(mid, hi), out = [], i = 0, j = 0;
+    snap(5, 'Both halves are sorted. Now merge them: keep taking the smaller of the two front items.', {}, {}, { rows: rows(L, R, out, i, j) });
+    while (i < L.length && j < R.length) {
+      cmp++;
+      var takeL = L[i] <= R[j];
+      snap(11, 'Compare left ' + L[i] + ' with right ' + R[j] + ': ' + (takeL ? L[i] + ' is smaller or equal, take it from the left.' : R[j] + ' is smaller, take it from the right.'), {}, {}, { rows: rows(L, R, out, i, j) });
+      if (takeL) { out.push(L[i]); i++; } else { out.push(R[j]); j++; }
+      snap(takeL ? 12 : 14, 'Append it to out and advance that side.', {}, {}, { rows: rows(L, R, out, i, j) });
+    }
+    if (i < L.length) { out = out.concat(L.slice(i)); i = L.length; snap(17, 'The right side is empty, so append everything left over from the left side.', {}, {}, { rows: rows(L, R, out, i, j) }); }
+    if (j < R.length) { out = out.concat(R.slice(j)); j = R.length; snap(18, 'The left side is empty, so append everything left over from the right side.', {}, {}, { rows: rows(L, R, out, i, j) }); }
+    for (var k = 0; k < out.length; k++) a[lo + k] = out[k];
+    snap(19, 'Return out: a[' + lo + '..' + (hi - 1) + '] is now sorted: [' + out.join(', ') + '].', range(lo, hi, 'found'));
+  }
+  snap(0, 'Merge sort: split in halves until single items remain, then merge sorted halves back together.');
+  ms(0, n);
+  lo0 = 0; hi0 = n; for (var q = 0; q < n; q++) st.done.push(q);
+  snap(19, 'All merges are done. The list is sorted!', {}, {}, { finished: true });
+  return steps;
+}
+function quickSteps(input) {
+  var a = input.slice(), n = a.length, steps = [], cmp = 0, sw = 0, lo0 = 0, hi0 = n - 1, st = { a: a, done: [], stats: function () { return 'comparisons: ' + cmp + ' · swaps: ' + sw; }, base: function (ix) { return ix >= lo0 && ix <= hi0 ? 'range' : 'dim'; } };
+  var snap = makeSnap(input, steps, st);
+  function qs(lo, hi) {
+    if (lo > hi) return;
+    lo0 = lo; hi0 = hi;
+    if (lo === hi) { st.done.push(lo); snap(1, 'Only one item (index ' + lo + ') is left in this part. It is already in its final place.'); return; }
+    var pivot = a[hi], i = lo;
+    snap(7, 'Sort a[' + lo + '..' + hi + ']. Choose the last item as the pivot: ' + pivot + '. Goal: smaller items on its left, bigger on its right.', { [hi]: 'pivot' }, { [hi]: 'pivot' });
+    for (var j = lo; j < hi; j++) {
+      cmp++;
+      var small = a[j] < pivot, m = { [hi]: 'pivot' }; m[i] = (m[i] ? [m[i]] : []).concat('i'); m[j] = (m[j] ? [].concat(m[j]) : []).concat('j');
+      snap(10, 'Is a[' + j + '] = ' + a[j] + ' smaller than the pivot ' + pivot + '? ' + (small ? 'Yes: it belongs on the left side.' : 'No: leave it where it is.'), { [hi]: 'pivot', [j]: 'hit' }, m);
+      if (small) {
+        var same = i === j, t = a[i]; a[i] = a[j]; a[j] = t; if (!same) sw++;
+        var c = { [hi]: 'pivot' }; c[i] = 'bad'; c[j] = 'bad';
+        snap([11, 12], same ? 'i and j are the same slot, so the swap changes nothing. Then i++ so the left side grows.' : 'Swap a[' + i + '] and a[' + j + '] to collect small items on the left. Then i++.', c, { [hi]: 'pivot' });
+        i++;
+      }
+    }
+    var t2 = a[i]; a[i] = a[hi]; a[hi] = t2; if (i !== hi) sw++;
+    st.done.push(i);
+    snap(15, 'Swap the pivot into index ' + i + '. Everything left of it is smaller, everything right is bigger, so ' + a[i] + ' is in its FINAL place.', {});
+    qs(lo, i - 1); qs(i + 1, hi);
+  }
+  snap(0, 'Quick sort: choose a pivot, partition around it, then repeat on the two sides.');
+  qs(0, n - 1);
+  lo0 = 0; hi0 = n - 1; for (var q = 0; q < n; q++) if (st.done.indexOf(q) === -1) st.done.push(q);
+  snap(5, 'Both sides are sorted everywhere. The list is sorted!', {}, {}, { finished: true });
+  return steps;
+}
+
+</script>
+<script id="ui">
+
+function $id(x) { return document.getElementById(x); }
+function showErr(m) { $id('err').textContent = m || ''; }
+var current = null;
+function mountStepper(opts) {
+  if (current) current.pause();
+  var app = $id('app'); app.innerHTML = ''; app.className = '';
+  current = Viz.stepper(Object.assign({ mount: '#app' }, opts));
+  return current;
+}
+function setLegend(items) { var l = $id('legend'); l.innerHTML = ''; l.appendChild(Viz.legend(items)); }
+function mark(marks, ix, label) { marks[ix] = (marks[ix] || []).concat(label); }
+
+
+var CODES = {
+bubble: ['func bubbleSort(a []int) {',
+'    for i := 0; i < len(a)-1; i++ {',
+'        for j := 0; j < len(a)-1-i; j++ {',
+'            if a[j] > a[j+1] {',
+'                a[j], a[j+1] = a[j+1], a[j]',
+'            }',
+'        }',
+'    }',
+'}'],
+insertion: ['func insertionSort(a []int) {',
+'    for i := 1; i < len(a); i++ {',
+'        key := a[i]',
+'        j := i - 1',
+'        for j >= 0 && a[j] > key {',
+'            a[j+1] = a[j]',
+'            j--',
+'        }',
+'        a[j+1] = key',
+'    }',
+'}'],
+merge: ['func mergeSort(a []int) []int {',
+'    if len(a) <= 1 { return a }',
+'    mid := len(a) / 2',
+'    left := mergeSort(a[:mid])',
+'    right := mergeSort(a[mid:])',
+'    return merge(left, right)',
+'}',
+'func merge(l, r []int) []int {',
+'    out := make([]int, 0, len(l)+len(r))',
+'    i, j := 0, 0',
+'    for i < len(l) && j < len(r) {',
+'        if l[i] <= r[j] {',
+'            out = append(out, l[i]); i++',
+'        } else {',
+'            out = append(out, r[j]); j++',
+'        }',
+'    }',
+'    out = append(out, l[i:]...)',
+'    out = append(out, r[j:]...)',
+'    return out',
+'}'],
+quick: ['func quickSort(a []int, lo, hi int) {',
+'    if lo >= hi { return }',
+'    p := partition(a, lo, hi)',
+'    quickSort(a, lo, p-1)',
+'    quickSort(a, p+1, hi)',
+'}',
+'func partition(a []int, lo, hi int) int {',
+'    pivot := a[hi]',
+'    i := lo',
+'    for j := lo; j < hi; j++ {',
+'        if a[j] < pivot {',
+'            a[i], a[j] = a[j], a[i]',
+'            i++',
+'        }',
+'    }',
+'    a[i], a[hi] = a[hi], a[i]',
+'    return i',
+'}']
+};
+function miniRow(body, r) {
+  var cls = Object.assign({}, r.cls);
+  body.appendChild(Viz.array(r.arr, { classes: cls, marks: r.marks, title: r.title, indexes: false }));
+}
+function render(st, i, body) {
+  body.appendChild(Viz.array(st.arr, { classes: st.cls, marks: st.marks, title: 'array' }));
+  var mx = Math.max.apply(null, st.arr), mn = Math.min.apply(null, st.arr), span = Math.max(1, mx - mn);
+  body.appendChild(Viz.el('div', { class: 'bars' }, st.arr.map(function (v, ix) {
+    return Viz.el('div', { class: 'bar ' + (st.cls[ix] || ''), style: { height: (20 + Math.round((v - mn) / span * 75)) + 'px' } });
+  })));
+  if (st.rows) st.rows.forEach(function (r) { miniRow(body, r); });
+  if (st.key !== undefined) body.appendChild(Viz.el('div', { class: 'vars' }, [Viz.varBox('key', st.key, { class: 'hit' })]));
+  body.appendChild(Viz.el('div', { class: 'stat', text: st.stats }));
+}
+function run() {
+  showErr('');
+  var nums = Viz.parseNums($id('arr').value), algo = $id('algo').value;
+  if (nums.length < 2 || nums.length > 10) { showErr('Enter between 2 and 10 numbers.'); return; }
+  var gens = { bubble: bubbleSteps, insertion: insertionSteps, merge: mergeSteps, quick: quickSteps };
+  var leg = [{ cls: 'range', label: 'part being worked on' }, { cls: 'hit', label: 'being compared' }, { cls: 'bad', label: 'just moved/swapped' }, { cls: 'found', label: 'final place' }, { cls: 'dim', label: 'not involved' }];
+  if (algo === 'quick' || algo === 'merge') leg.push({ cls: 'pivot', label: algo === 'quick' ? 'pivot' : 'right half' });
+  setLegend(leg);
+  mountStepper({ code: CODES[algo], render: render }).load(gens[algo](nums));
+}
+$id('algo').addEventListener('change', run);
+$id('go').addEventListener('click', run);
+run();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Watch union-find (disjoint sets) merge groups as a forest, with union by size and path compression shortening the trees.">
+<title>Union-Find - visual</title>
+<link rel="stylesheet" href="../assets/viz.css">
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/union-find.html">বাংলা</a></nav>
+  <h1>Union-Find (Disjoint Sets)</h1>
+  <p class="lead">Keep track of which items belong to the same group, and merge groups quickly.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea (friend groups)</h2>
+    <p>Imagine a party where people slowly become friends. You want to answer &ldquo;are Ana and Raj in the same friend group?&rdquo; and to merge two groups when their members meet. Union-find does both in almost constant time.</p>
+    <p>Every group is a <b>tree</b>, and the person at the top is the group&rsquo;s <b>root</b> (its leader). The array <code>parent[i]</code> says who each person points to; a leader points to themselves.</p>
+    <ul>
+      <li><b>Find(x)</b>: follow parents upward until you reach a root. Two people are in the same group if their roots are the same.</li>
+      <li><b>Union(a, b)</b>: find both roots; if they differ, hang the <b>smaller</b> tree under the bigger tree&rsquo;s root (<i>union by size</i>), so trees stay short.</li>
+      <li><b>Path compression</b>: while walking up in Find, re-point everyone you passed straight at the root. The next Find is almost instant.</li>
+    </ul>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Number of items (2 to 10)<input id="n" value="6" size="4"></label>
+    <label>Operations (commas between)<input id="ops" value="union 0 1, union 2 3, union 0 2, find 3, union 4 5, union 3 5" size="52"></label>
+    <button id="go">Run</button>
+  </div>
+  <div class="viz-note">Allowed: <b>union A B</b> and <b>find A</b> (items are numbered from 0). At most 15 operations.</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul>
+      <li>Run the default operations and watch <code>find 3</code>: node 3 jumps straight to the root. That is path compression.</li>
+      <li>Do <code>union 0 1, union 1 2, union 2 3, union 3 4</code>. Does the tree become a long chain? Why not?</li>
+      <li>Call <code>union 0 1</code> twice. What does the second call say?</li>
+      <li>Merge everything into one group, then <code>find</code> any item.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul>
+      <li><b>Comparing parents instead of roots.</b> <code>parent[a] == parent[b]</code> is wrong unless both are roots. Always compare <code>Find(a) == Find(b)</code>.</li>
+      <li><b>Forgetting to initialize.</b> Every item must start as its own parent: <code>parent[i] = i</code>, <code>size[i] = 1</code>.</li>
+      <li><b>Merging without checking the roots.</b> Linking two items in the same group can create a cycle.</li>
+      <li><b>Updating size of the wrong root.</b> Add to the size of the root that stays on top.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, in plain English:</b> with union by size and path compression each operation is almost constant time (<code>O(&alpha;(n))</code>, where &alpha; grows so slowly it is below 5 for any input you will ever see). Memory is two small arrays.
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var CODE = [
+  'type DSU struct {',                                 // 0
+  '    parent, size []int',                            // 1
+  '}',                                                 // 2
+  '',                                                  // 3
+  'func (d *DSU) Find(x int) int {',                   // 4
+  '    if d.parent[x] != x {',                         // 5
+  '        d.parent[x] = d.Find(d.parent[x])',         // 6
+  '    }',                                             // 7
+  '    return d.parent[x]',                            // 8
+  '}',                                                 // 9
+  '',                                                  // 10
+  'func (d *DSU) Union(a, b int) bool {',              // 11
+  '    ra, rb := d.Find(a), d.Find(b)',                // 12
+  '    if ra == rb {',                                 // 13
+  '        return false',                              // 14
+  '    }',                                             // 15
+  '    if d.size[ra] < d.size[rb] {',                  // 16
+  '        ra, rb = rb, ra',                           // 17
+  '    }',                                             // 18
+  '    d.parent[rb] = ra',                             // 19
+  '    d.size[ra] += d.size[rb]',                      // 20
+  '    return true',                                   // 21
+  '}',                                                 // 22
+];
+
+/* ops: [{type:'union',a,b} | {type:'find',a}] -> {steps, parent, size, results} */
+function gen(n, ops) {
+  var parent = [], size = [], steps = [], results = [], opLabel = '', callStack = [];
+  for (var i = 0; i < n; i++) { parent.push(i); size.push(1); }
+  function snap(text, line, hit, found, edge) {
+    steps.push({ parent: parent.slice(), size: size.slice(), hit: hit || [], range: callStack.slice(), found: found || [], edge: edge || null, text: text, line: line, op: opLabel });
+  }
+  function find(x) {
+    callStack.push(x);
+    snap('Find(' + x + '): is parent[' + x + '] (which is ' + parent[x] + ') equal to ' + x + '?', [4, 5], [x]);
+    var root;
+    if (parent[x] !== x) {
+      snap(x + ' is not its own parent, so it is not a root. Ask its parent, ' + parent[x] + ', to find the root.', [5, 6], [x]);
+      root = find(parent[x]);
+      if (parent[x] !== root) {
+        parent[x] = root;
+        snap('Path compression: ' + x + ' now points straight at the root ' + root + ', so the next Find from ' + x + ' is one hop.', 6, [x], [root], [x, root]);
+      } else {
+        snap(x + ' already points at the root ' + root + '. Nothing to shorten.', 6, [x], [root]);
+      }
+    } else {
+      root = x;
+      snap(x + ' is its own parent, so it is a root. Return ' + x + '.', [5, 8], [], [x]);
+    }
+    callStack.pop();
+    return root;
+  }
+  function union(a, b) {
+    snap('Union(' + a + ', ' + b + '): first find the root of each item.', [11, 12], [a, b]);
+    var ra = find(a), rb = find(b);
+    if (ra === rb) {
+      snap('Both have root ' + ra + ': they are already in the same group, so nothing changes. Union returns false.', [13, 14], [], [ra]);
+      return false;
+    }
+    snap('Different roots (' + ra + ' and ' + rb + '): two separate groups. Sizes: size[' + ra + ']=' + size[ra] + ', size[' + rb + ']=' + size[rb] + '.', [13, 16], [ra, rb]);
+    if (size[ra] < size[rb]) {
+      var t = ra; ra = rb; rb = t;
+      snap('The first tree is smaller, so swap: the bigger tree\'s root (' + ra + ') will stay on top.', [16, 17], [ra, rb]);
+    }
+    parent[rb] = ra; size[ra] += size[rb];
+    snap('Hang root ' + rb + ' under root ' + ra + ' (parent[' + rb + '] = ' + ra + '), and size[' + ra + '] becomes ' + size[ra] + '. Union returns true.', [19, 20, 21], [rb], [ra], [rb, ra]);
+    return true;
+  }
+  ops.forEach(function (op, k) {
+    opLabel = 'Operation ' + (k + 1) + ' of ' + ops.length + ': ' + (op.type === 'union' ? 'union ' + op.a + ' ' + op.b : 'find ' + op.a);
+    if (op.type === 'union') results.push(union(op.a, op.b));
+    else {
+      var r = find(op.a);
+      results.push(r);
+      snap('Find(' + op.a + ') returns the root ' + r + '.', 8, [], [r]);
+    }
+  });
+  return { steps: steps, parent: parent, size: size, results: results };
+}
+
+function parseOps(str, n) {
+  var parts = str.split(',').map(function (s) { return s.trim(); }).filter(Boolean), ops = [], m;
+  if (!parts.length) return { error: 'Type at least one operation, for example: union 0 1' };
+  if (parts.length > 15) return { error: 'Please use at most 15 operations.' };
+  for (var i = 0; i < parts.length; i++) {
+    if ((m = /^union\s+(\d+)\s+(\d+)$/i.exec(parts[i]))) {
+      if (+m[1] >= n || +m[2] >= n) return { error: 'In "' + parts[i] + '" the items must be between 0 and ' + (n - 1) + '.' };
+      ops.push({ type: 'union', a: +m[1], b: +m[2] });
+    } else if ((m = /^find\s+(\d+)$/i.exec(parts[i]))) {
+      if (+m[1] >= n) return { error: 'In "' + parts[i] + '" the item must be between 0 and ' + (n - 1) + '.' };
+      ops.push({ type: 'find', a: +m[1] });
+    } else return { error: 'I do not understand "' + parts[i] + '". Use "union A B" or "find A".' };
+  }
+  return { ops: ops };
+}
+
+/* forest layout from a parent array: returns {pos: [{x,d}], w, h} */
+function forestLayout(parent) {
+  var n = parent.length, kids = [], roots = [], i;
+  for (i = 0; i < n; i++) kids.push([]);
+  for (i = 0; i < n; i++) { if (parent[i] === i) roots.push(i); else kids[parent[i]].push(i); }
+  var pos = new Array(n), next = 0, maxd = 0;
+  function place(v, d) {
+    if (d > maxd) maxd = d;
+    if (!kids[v].length) { pos[v] = { x: next++, d: d }; return pos[v].x; }
+    var xs = kids[v].map(function (c) { return place(c, d + 1); });
+    pos[v] = { x: (xs[0] + xs[xs.length - 1]) / 2, d: d };
+    return pos[v].x;
+  }
+  roots.forEach(function (r) { place(r, 0); next += 0.4; });
+  return { pos: pos, w: Math.max(next - 0.4, 1), h: maxd + 1, roots: roots };
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+
+  function forestSvg(st) {
+    var F = forestLayout(st.parent);
+    var dx = 54, dy = 62, r = 18, pad = 12;
+    var W = Math.max(F.w * dx + pad * 2, 160), H = F.h * dy + pad + 14, parts = [];
+    function px(v) { return pad + F.pos[v].x * dx + dx / 2; }
+    function py(v) { return pad + F.pos[v].d * dy + r; }
+    st.parent.forEach(function (p, v) {
+      if (p === v) return;
+      var hl = st.edge && st.edge[0] === v && st.edge[1] === p;
+      parts.push(Viz.s('line', { class: 'edge' + (hl ? ' found' : ''), x1: px(v), y1: py(v), x2: px(p), y2: py(p) }));
+    });
+    st.parent.forEach(function (p, v) {
+      var cls = 'node';
+      if (st.hit.indexOf(v) !== -1) cls += ' hit'; else if (st.found.indexOf(v) !== -1) cls += ' found'; else if (st.range.indexOf(v) !== -1) cls += ' range';
+      parts.push(Viz.s('circle', { class: cls, cx: px(v), cy: py(v), r: r }));
+      parts.push(Viz.s('text', { x: px(v), y: py(v) + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, text: String(v) }));
+      if (p === v) parts.push(Viz.s('text', { x: px(v) + r + 4, y: py(v) + 4, 'text-anchor': 'start', 'font-size': 11, text: 'size ' + st.size[v] }));
+    });
+    return Viz.svg(W, H, parts);
+  }
+
+  function render(st, i, body) {
+    body.appendChild(Viz.note('<b>' + st.op + '</b>'));
+    var cls = {}, marks = {};
+    st.parent.forEach(function (_, v) {
+      if (st.hit.indexOf(v) !== -1) cls[v] = 'hit'; else if (st.found.indexOf(v) !== -1) cls[v] = 'found'; else if (st.range.indexOf(v) !== -1) cls[v] = 'range';
+    });
+    body.appendChild(Viz.array(st.parent, { title: 'parent[i]  (a root points to itself)', classes: cls, marks: marks }));
+    body.appendChild(Viz.array(st.size, { title: 'size[i]  (only meaningful for roots)' }));
+    body.appendChild(Viz.note('The groups, drawn as trees (the top node is the root):'));
+    body.appendChild(forestSvg(st));
+  }
+
+  function run() {
+    errBox.textContent = '';
+    var nStr = document.getElementById('n').value.trim(), n = Number(nStr);
+    if (!/^\d+$/.test(nStr) || n < 2 || n > 10) { errBox.textContent = 'The number of items must be a whole number from 2 to 10.'; return; }
+    var p = parseOps(document.getElementById('ops').value, n);
+    if (p.error) { errBox.textContent = p.error; return; }
+    app.innerHTML = '';
+    var st = Viz.stepper({ mount: app, code: CODE, render: render });
+    st.load(gen(n, p.ops).steps);
+  }
+
+  document.getElementById('legend').appendChild(Viz.legend([
+    { cls: 'hit', label: 'item being looked at' }, { cls: 'range', label: 'on the path being followed' }, { cls: 'found', label: 'the root' },
+  ]));
+  document.getElementById('go').addEventListener('click', run);
+  run();
+})();
+</script>
+</body>
+</html>

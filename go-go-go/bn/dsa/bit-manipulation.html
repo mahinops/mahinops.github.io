@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Binary switch-এর সারি হিসেবে সংখ্যা দেখে AND, OR, XOR, shift ও bit গোনার trick কীভাবে কাজ করে, তা step by step দেখুন।">
+<title>Bit Manipulation</title>
+<link rel="stylesheet" href="../../assets/viz.css">
+<style>.viz-cell { width: 42px; height: 42px; } .viz-col { min-width: 42px; } .rowtitle { font: 600 13px var(--sans); color: var(--muted); margin: 8px 0 3px; }</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">← সব visual</a> · <a href="../../dsa/bit-manipulation.html">English</a></nav>
+  <h1>Bit Manipulation</h1>
+  <p class="lead">প্রতিটি সংখ্যা হলো on/off switch-এর একটি সারি। Bit trick গুলো সরাসরি সেই switch গুলো উল্টে দেয়।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা (light switch-এর সারি)</h2>
+    <p>Computer-এর ভেতরে সংখ্যা <b>binary</b>-তে store হয়: switch-এর একটি সারি, প্রতিটি হয় 0 (off) নয়তো 1 (on)। প্রতিটি switch-এর একটি <b>place value</b> আছে: ডান দিক থেকে 1, 2, 4, 8, 16, 32, 64, 128। যে switch গুলো on, তাদের মান যোগ করুন। যেমন <code>00001100</code> হলো 8 + 4 = 12। এই page-এ 8টি switch ব্যবহার হয়েছে (Go-র <code>uint8</code>, সংখ্যা 0 থেকে 255)।</p>
+    <ul>
+      <li><b>AND (<code>&amp;</code>)</b>: কোনো column 1 হয় শুধু যদি <i>দুই</i> সংখ্যাতেই সেখানে 1 থাকে। Bit check করতে বা রেখে দিতে চমৎকার।</li>
+      <li><b>OR (<code>|</code>)</b>: <i>যেকোনো একটিতে</i> 1 থাকলে 1। Bit on করতে চমৎকার।</li>
+      <li><b>XOR (<code>^</code>)</b>: bit দুটি <i>আলাদা</i> হলে 1। একই মান দিয়ে দুইবার করলে আগের অবস্থায় ফিরে যায়, তাই সমান সংখ্যা কাটাকাটি হয়ে 0 হয়।</li>
+      <li><b>Shift (<code>&lt;&lt;</code> / <code>&gt;&gt;</code>)</b>: সব switch বাঁয়ে বা ডানে সরিয়ে দেয়। 1 ঘর বাঁয়ে সরালে সংখ্যা দ্বিগুণ হয়; 1 ঘর ডানে সরালে অর্ধেক।</li>
+    </ul>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+    <label>Operation
+      <select id="op">
+        <option value="and">a &amp; b (AND)</option>
+        <option value="or">a | b (OR)</option>
+        <option value="xor">a ^ b (XOR)</option>
+        <option value="shl">a &lt;&lt; n (shift left)</option>
+        <option value="shr">a &gt;&gt; n (shift right)</option>
+        <option value="clear">n &amp; (n-1) (clear lowest 1 bit)</option>
+        <option value="count">Count the 1 bits</option>
+        <option value="single">Single number via XOR</option>
+      </select>
+    </label>
+    <label id="la">a (0 থেকে 255)<input id="a" value="12" size="6"></label>
+    <label id="lb">b (0 থেকে 255)<input id="b" value="10" size="6"></label>
+    <label id="ll">Number-এর list (একটি বাদে প্রতিটি দুইবার করে আছে)<input id="list" value="4, 1, 2, 1, 2" size="22"></label>
+    <button id="go">Run</button>
+  </div>
+  <div class="viz-note" id="hint"></div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul>
+      <li>একই জোড়ায় (12 আর 10) AND, OR আর XOR করুন। তিনটি result row column ধরে ধরে তুলনা করুন।</li>
+      <li>1-কে 7 ঘর বাঁয়ে shift করুন, তারপর 3-কে 7 ঘর বাঁয়ে। বাঁ দিকের কিনারা দিয়ে যে bit পড়ে যায় তার কী হয়?</li>
+      <li>8, 12, 255-এ <b>n &amp; (n-1)</b> করুন। 2-এর power (যেমন 8) কেন 0 হয়ে যায়?</li>
+      <li>255 আর 128-এর <b>1 bit গুনুন</b>। প্রতিটির জন্য loop কয়বার ঘোরে?</li>
+      <li><b>Single number</b>: list-এর order বদলান। উত্তর কি বদলায়? না বদলালে কেন?</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul>
+      <li><b><code>&amp;</code> আর <code>&amp;&amp;</code> গুলিয়ে ফেলা।</b> <code>&amp;</code> সংখ্যার bit-এর উপর কাজ করে; <code>&amp;&amp;</code> কাজ করে true/false মানের উপর।</li>
+      <li><b>Operator precedence।</b> Go-তে <code>&amp;</code>, <code>==</code>-এর চেয়ে বেশি শক্তভাবে bind করে, তাই <code>a &amp; b == 0</code> মানে <code>(a &amp; b) == 0</code>। C আর কিছু ভাষায় এটা উল্টো, তাই সন্দেহ থাকলে parentheses দিন।</li>
+      <li><b>Shift করার সময় overflow।</b> Type-এর width পার হয়ে যাওয়া bit হারিয়ে যায়। <code>uint8</code> <code>1 &lt;&lt; 8</code> ধরে রাখতে পারে না।</li>
+      <li><b>Signed shift।</b> Negative <code>int</code>-কে ডানে shift করলে sign bit থেকে যায়; বিষয়টা সহজ রাখতে এই page-এ unsigned সংখ্যা ব্যবহার করা হয়েছে।</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, সহজ ভাষায়:</b> AND, OR, XOR আর shift প্রতিটি একটি করে machine instruction (<code>O(1)</code>)। <code>n &amp; (n-1)</code> দিয়ে bit গোনা loop-এ ঘোরে প্রতিটি 1 bit-এর জন্য একবার, প্রতিটি bit position-এর জন্য নয়। Single-number trick list একবার scan করে এবং বাড়তি memory লাগে না।
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var CODES = {
+  and: ['func and(a, b uint8) uint8 {', '    return a & b', '}'],
+  or: ['func or(a, b uint8) uint8 {', '    return a | b', '}'],
+  xor: ['func xor(a, b uint8) uint8 {', '    return a ^ b', '}'],
+  shl: ['func shiftLeft(a uint8, n uint) uint8 {', '    return a << n', '}'],
+  shr: ['func shiftRight(a uint8, n uint) uint8 {', '    return a >> n', '}'],
+  clear: ['func clearLowestBit(n uint8) uint8 {', '    return n & (n - 1)', '}'],
+  count: [
+    'func countBits(n uint8) int {',   // 0
+    '    count := 0',                   // 1
+    '    for n != 0 {',                 // 2
+    '        n &= n - 1',               // 3
+    '        count++',                  // 4
+    '    }',                            // 5
+    '    return count',                 // 6
+    '}',                                // 7
+  ],
+  single: [
+    'func singleNumber(nums []uint8) uint8 {',   // 0
+    '    var result uint8',                       // 1
+    '    for _, n := range nums {',               // 2
+    '        result ^= n',                        // 3
+    '    }',                                      // 4
+    '    return result',                          // 5
+    '}',                                          // 6
+  ],
+};
+var HEADER = ['128', '64', '32', '16', '8', '4', '2', '1'];
+
+function bits(x) { var o = []; for (var k = 7; k >= 0; k--) o.push((x >> k) & 1); return o; }
+function bin(x) { return bits(x).join(''); }
+function lowestSet(x) { for (var k = 0; k < 8; k++) if ((x >> k) & 1) return 7 - k; return -1; }
+
+function genBit(op, p) {
+  var steps = [], result = 0, i, c;
+  function row(title, b, cls) { return { title: title, bits: b, cls: cls || {} }; }
+  function snap(rows, text, line) { steps.push({ rows: rows, text: text, line: line }); }
+  function hl(col, base) { var o = {}; for (var k in base) o[k] = base[k]; o[col] = 'hit'; return o; }
+
+  if (op === 'and' || op === 'or' || op === 'xor') {
+    var a = p.a, b = p.b, ba = bits(a), bb = bits(b);
+    var fn = { and: function (x, y) { return x & y; }, or: function (x, y) { return x | y; }, xor: function (x, y) { return x ^ y; } }[op];
+    var sym = { and: '&', or: '|', xor: '^' }[op];
+    var rule = { and: 'AND 1 দেয় শুধু যখন দুটি bit-ই 1', or: 'OR 1 দেয় যখন অন্তত একটি bit 1', xor: 'XOR 1 দেয় যখন দুটি bit আলাদা' }[op];
+    result = fn(a, b);
+    var rb = bits(result), shown = [null, null, null, null, null, null, null, null];
+    snap([row('a = ' + a + '  (' + bin(a) + ')', ba), row('b = ' + b + '  (' + bin(b) + ')', bb), row('a ' + sym + ' b = ?', shown.slice())],
+      'দুটি সংখ্যাকেই binary-তে লিখুন। প্রতিটি column একটি switch, উপরে তার place value। প্রতিটি column আলাদাভাবে মেলানো হয়। নিয়ম: ' + rule + '।', 1);
+    var cls = {};
+    for (c = 0; c < 8; c++) {
+      shown[c] = rb[c]; cls[c] = 'found';
+      snap([row('a = ' + a, ba, hl(c, {})), row('b = ' + b, bb, hl(c, {})), row('a ' + sym + ' b = ?', shown.slice(), hl(c, cls))],
+        'Column ' + HEADER[c] + ': ' + ba[c] + ' ' + sym + ' ' + bb[c] + ' = ' + rb[c] + '।', 1);
+    }
+    var all = {}; for (c = 0; c < 8; c++) all[c] = 'found';
+    snap([row('a = ' + a, ba), row('b = ' + b, bb), row('a ' + sym + ' b = ' + result + '  (' + bin(result) + ')', rb, all)],
+      'শেষ: ' + a + ' ' + sym + ' ' + b + ' = ' + result + '। শেষ row-এর 1 গুলোর place value যোগ করে মিলিয়ে নিন: হবে ' + result + '।', 1);
+  } else if (op === 'shl' || op === 'shr') {
+    var left = op === 'shl', cur = p.a, n = p.b, lbl = left ? '<<' : '>>';
+    snap([row('a = ' + cur + '  (' + bin(cur) + ')', bits(cur))], 'শুরুতে a = ' + cur + '। প্রতিটি bit ' + (left ? 'বাঁয়ে' : 'ডানে') + ' ' + n + ' ঘর' + (n === 1 ? '' : '') + ' সরানো হবে, একবারে এক ঘর করে।', 1);
+    for (i = 1; i <= n; i++) {
+      var lost = left ? (cur >> 7) & 1 : cur & 1;
+      cur = left ? (cur << 1) & 255 : cur >> 1;
+      var cl = {}; cl[left ? 7 : 0] = 'hit';
+      snap([row('' + i + ' বার shift করার পর' + (i === 1 ? '' : '') + ' = ' + cur + '  (' + bin(cur) + ')', bits(cur), cl)],
+        'Shift ' + i + ': প্রতিটি bit এক ঘর ' + (left ? 'বাঁয়ে' : 'ডানে') + ' সরে। ' + (left ? 'ডান দিকে' : 'বাঁ দিকে') + ' একটি 0 ঢোকে। ' + (left ? 'বাঁ' : 'ডান') + ' দিকের কিনারা থেকে ঠেলে বেরিয়ে যাওয়া bit (' + lost + ') হারিয়ে যায়।', 1);
+    }
+    result = cur;
+    var allc = {}; for (c = 0; c < 8; c++) allc[c] = 'found';
+    snap([row('a ' + lbl + ' ' + n + ' = ' + result + '  (' + bin(result) + ')', bits(result), allc)],
+      'শেষ: ' + p.a + ' ' + lbl + ' ' + n + ' = ' + result + (left ? '। অর্থাৎ ' + p.a + ' x 2^' + n + ' = ' + (p.a * Math.pow(2, n)) + (p.a * Math.pow(2, n) > 255 ? ', যা 8 bit-এ ধরে না, তাই শুধু নিচের 8 bit থাকে (' + result + ')' : '') + '।' : '। অর্থাৎ ' + p.a + ' ÷ 2^' + n + ', নিচের দিকে round করা।'), 1);
+  } else if (op === 'clear') {
+    var v = p.a, v1 = v - 1, low = lowestSet(v), lowCls = {}, flip = {};
+    lowCls[low] = 'hit'; for (c = low; c < 8; c++) flip[c] = 'hit';
+    result = v & v1;
+    snap([row('n = ' + v + '  (' + bin(v) + ')', bits(v), lowCls)], 'শুরুতে n = ' + v + '। এর lowest 1 bit (ডান দিকের প্রথম 1) highlight করা আছে।', 1);
+    snap([row('n = ' + v, bits(v), lowCls), row('n - 1 = ' + v1 + '  (' + bin(v1) + ')', bits(v1), flip)],
+      'এক বিয়োগ করলে ওই lowest 1 হয়ে যায় 0, আর তার ডান দিকের প্রতিটি 0 হয়ে যায় 1 (যেমন 1000 - 1 = 0111)। বাঁ দিকের সবকিছু একই থাকে। যে column গুলো বদলেছে সেগুলো highlight করা আছে।', 1);
+    var allk = {}; for (c = 0; c < 8; c++) allk[c] = 'found';
+    snap([row('n = ' + v, bits(v), lowCls), row('n - 1 = ' + v1, bits(v1), flip), row('n & (n-1) = ' + result + '  (' + bin(result) + ')', bits(result), allk)],
+      'AND 1 রাখে শুধু সেখানে যেখানে দুই row-তেই 1। যে column গুলো বদলেছে সেখানে দুই row মেলে না, তাই সবগুলো 0 হয়ে যায়। ফলাফল: lowest 1 bit মুছে গেছে। ' + (result === 0 ? 'শুধু একটি bit on ছিল (n হলো 2-এর power), তাই ফলাফল 0।' : ''), 1);
+  } else if (op === 'count') {
+    var m = p.a, count = 0;
+    snap([row('n = ' + m + '  (' + bin(m) + ')', bits(m))], 'n = ' + m + '-এর 1 bit গুনতে চাই। count = 0 দিয়ে শুরু।', 1);
+    while (m !== 0) {
+      var lw = lowestSet(m), cc = {}; cc[lw] = 'hit';
+      var before = m;
+      m = m & (m - 1); count++;
+      snap([row('আগে n ছিল ' + before + '  (' + bin(before) + ')', bits(before), cc)],
+        'n 0 নয়, তাই loop-এর আরেক ধাপ হয়। n &= n - 1 lowest 1 bit মুছে দেয় (highlight করা); n হয় ' + m + '। count = ' + count + '।', [2, 3, 4]);
+    }
+    result = count;
+    snap([row('n = 0  (00000000)', bits(0))], 'n এখন 0, তাই loop থামে। 1 bit-এর সংখ্যা count = ' + count + '। Loop প্রতিটি 1 bit-এর জন্য একবার ঘুরেছে, প্রতিটি bit position-এর জন্য নয়।', 6);
+  } else {
+    var list = p.list, acc = 0;
+    snap([row('result = 0  (00000000)', bits(0))], 'result শুরুতে 0। কোনো সংখ্যাকে নিজের সাথে XOR করলে 0 হয়, তাই যে সংখ্যা দুইবার আছে তারা কাটাকাটি হয়ে যাবে। XOR-এ order-ও কোনো ব্যাপার না।', 1);
+    list.forEach(function (x) {
+      var nacc = acc ^ x, bx = bits(x), flips = {};
+      for (var k = 0; k < 8; k++) if (bx[k]) flips[k] = 'hit';
+      snap([row('result (আগে) = ' + acc + '  (' + bin(acc) + ')', bits(acc), flips), row('n = ' + x + '  (' + bin(x) + ')', bx, flips), row('result ^ n = ' + nacc + '  (' + bin(nacc) + ')', bits(nacc), flips)],
+        'result ^= n: ' + acc + ' ^ ' + x + ' = ' + nacc + '। n-এ যেখানে 1 আছে, result-এর সেই column উল্টে যায়।', [2, 3]);
+      acc = nacc;
+    });
+    result = acc;
+    snap([row('result = ' + acc + '  (' + bin(acc) + ')', bits(acc), (function () { var o = {}; for (var k = 0; k < 8; k++) o[k] = 'found'; return o; })())],
+      'যে সংখ্যা দুইবার ছিল তারা কাটাকাটি হয়ে গেছে, বাকি আছে যেটা একবার ছিল: ' + acc + '।', 5);
+  }
+  return { steps: steps, result: result };
+}
+
+function parseList(str) {
+  var toks = str.split(/[\s,]+/).filter(Boolean), out = [], i, counts = {}, odd = [];
+  for (i = 0; i < toks.length; i++) {
+    if (!/^\d+$/.test(toks[i]) || +toks[i] > 255) return { error: '"' + toks[i] + '" 0 থেকে 255-এর মধ্যে integer নয়।' };
+    out.push(+toks[i]); counts[+toks[i]] = (counts[+toks[i]] || 0) + 1;
+  }
+  if (out.length < 3 || out.length > 9 || out.length % 2 === 0) return { error: 'Odd সংখ্যক মান দিন, 3 থেকে 9টি।' };
+  for (var k in counts) { if (counts[k] === 1) odd.push(k); else if (counts[k] !== 2) return { error: 'একটি সংখ্যা বাদে প্রতিটি সংখ্যা ঠিক দুইবার থাকতে হবে, যে একটি সংখ্যা একবার থাকবে।' }; }
+  if (odd.length !== 1) return { error: 'ঠিক একটি সংখ্যা একবার থাকতে হবে; বাকি সবাই ঠিক দুইবার।' };
+  return { list: out };
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+  var $ = function (id) { return document.getElementById(id); };
+  var HINTS = {
+    and: 'AND: result-এর কোনো column 1 হয় শুধু যদি a আর b দুটিতেই সেখানে 1 থাকে।',
+    or: 'OR: result-এর কোনো column 1 হয় যদি a বা b (বা দুটিই)-তে সেখানে 1 থাকে।',
+    xor: 'XOR: result-এর কোনো column 1 হয় যদি a আর b-র সেখানে আলাদা bit থাকে।',
+    shl: 'n ঘর left shift: bit গুলো n ঘর বাঁয়ে সরে, ডান দিকে 0 বসে। বাঁ কিনারা পার হওয়া bit হারিয়ে যায়।',
+    shr: 'n ঘর right shift: bit গুলো n ঘর ডানে সরে। ডান কিনারা পার হওয়া bit হারিয়ে যায়।',
+    clear: 'n & (n-1) ডান দিকের প্রথম 1 bit মুছে দেয়। Bit গোনা আর 2-এর power চেনার একটি classic building block।',
+    count: 'Brian Kernighan-এর method: lowest 1 bit বারবার মুছুন আর গুনুন কতবার মুছলেন।',
+    single: 'একটি বাদে প্রতিটি মান দুইবার আছে। সবগুলো XOR করুন: জোড়াগুলো কাটাকাটি হয়, একা মানটা থেকে যায়।',
+  };
+
+  function render(st, i, body) {
+    body.appendChild(Viz.array(HEADER, { title: 'place value', indexes: false, classes: (function () { var o = {}; for (var k = 0; k < 8; k++) o[k] = 'dim'; return o; })() }));
+    st.rows.forEach(function (r) {
+      body.appendChild(Viz.array(r.bits, { title: r.title, indexes: false, classes: (function () { var o = {}; r.bits.forEach(function (b, k) { if (b === null) o[k] = 'dim'; }); for (var k2 in r.cls) o[k2] = r.cls[k2]; return o; })() }));
+    });
+  }
+
+  function syncFields() {
+    var op = $('op').value;
+    $('la').style.display = op === 'single' ? 'none' : '';
+    $('lb').style.display = (op === 'clear' || op === 'count' || op === 'single') ? 'none' : '';
+    $('ll').style.display = op === 'single' ? '' : 'none';
+    $('la').firstChild.textContent = (op === 'clear' || op === 'count') ? 'n (' + (op === 'clear' ? '1' : '0') + ' থেকে 255)' : 'a (0 থেকে 255)';
+    $('lb').firstChild.textContent = (op === 'shl' || op === 'shr') ? 'n, shift-এর পরিমাণ (0 থেকে 7)' : 'b (0 থেকে 255)';
+    $('hint').textContent = HINTS[op];
+  }
+
+  function run() {
+    errBox.textContent = '';
+    var op = $('op').value, p = {};
+    syncFields();
+    function num(id, lo, hi, name) {
+      var s = $(id).value.trim();
+      if (!/^\d+$/.test(s) || +s < lo || +s > hi) { errBox.textContent = name + ' অবশ্যই ' + lo + ' থেকে ' + hi + '-এর মধ্যে একটি integer হতে হবে।'; return null; }
+      return +s;
+    }
+    if (op === 'single') {
+      var l = parseList($('list').value);
+      if (l.error) { errBox.textContent = l.error; return; }
+      p.list = l.list;
+    } else {
+      p.a = num('a', op === 'clear' ? 1 : 0, 255, op === 'clear' || op === 'count' ? 'n' : 'a');
+      if (p.a === null) return;
+      if (op === 'and' || op === 'or' || op === 'xor') { p.b = num('b', 0, 255, 'b'); if (p.b === null) return; }
+      if (op === 'shl' || op === 'shr') { p.b = num('b', 0, 7, 'Shift-এর পরিমাণ'); if (p.b === null) return; }
+    }
+    app.innerHTML = '';
+    var st = Viz.stepper({ mount: app, code: CODES[op], render: render });
+    st.load(genBit(op, p).steps);
+  }
+
+  $('legend').appendChild(Viz.legend([
+    { cls: 'hit', label: 'যে column দেখা হচ্ছে / যে bit বদলায়' }, { cls: 'found', label: 'result-এর bit' }, { cls: 'dim', label: 'place value / এখনো জানা নেই' },
+  ]));
+  $('go').addEventListener('click', run);
+  $('op').addEventListener('change', run);
+  run();
+})();
+</script>
+</body>
+</html>

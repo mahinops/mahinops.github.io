@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linked List</title>
+<meta name="description" content="Linked list reverse করা আর fast ও slow pointer দিয়ে cycle detect করা, ছবিতে ধাপে ধাপে।">
+<link rel="stylesheet" href="../../assets/viz.css">
+<style>.stat{font:14px var(--mono);margin:4px 0}.arrowhead{fill:var(--cell-line)}.vars{display:flex;flex-wrap:wrap}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; সব visual</a> &middot; <a href="../../dsa/linked-list.html">English</a></nav>
+  <h1>Linked List</h1>
+  <p class="lead">Box-এর একটা chain, যেখানে প্রতিটা box শুধু পরেরটাকে চেনে।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা</h2>
+    <p>Linked list অনেকটা <b>treasure hunt</b>-এর মতো: প্রতিটা clue (node)-এ একটা value থাকে আর বলা থাকে পরের clue কোথায়। সরাসরি 5 নম্বর clue-তে যাওয়া যায় না; শুরু থেকে chain ধরে এগোতে হয়। শেষ clue-টা <code>nil</code> (কিছু নেই) দেখায়।</p>
+<p><b>Reverse</b> করা মানে প্রতিটা arrow উল্টে দেওয়া। এজন্য তিনটা helper লাগে: <code>prev</code> (যে অংশ reverse হয়ে গেছে), <code>curr</code> (যে node এখন ঠিক করা হচ্ছে) আর <code>next</code> (আগে থেকে save করা, যাতে arrow উল্টানোর পর বাকি chain হারিয়ে না যায়)।</p>
+<p><b>Cycle detection:</b> একটা ট্র্যাকে দুজন দৌড়বিদ, একজন অন্যজনের দ্বিগুণ জোরে। ট্র্যাক গোলাকার (loop) হলে দ্রুতজন একসময় ধীরজনকে এক চক্কর ছাড়িয়ে যায় আর তারা মিলে যায়। ট্র্যাক সোজা হলে দ্রুতজন শুধু শেষ প্রান্ত দিয়ে বেরিয়ে যায়।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+  <label>সমস্যা<select id="mode"><option value="rev">List reverse করুন</option><option value="cyc">Cycle detect করুন (fast &amp; slow)</option></select></label>
+  <label>Value<input id="vals" value="1, 2, 3, 4, 5"></label>
+  <label id="cycWrap">শেষ node যে index-এ ফিরে যায় (-1 = কোথাও না)<input id="cyc" value="1" size="4"></label>
+  <button id="go">Run</button>
+</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul><li>Reverse: ধীরে ধীরে step করে এই ক্রমটা দেখুন: <b>next save করা &rarr; arrow উল্টানো &rarr; prev সরানো &rarr; curr সরানো</b>। next save করার আগে arrow উল্টালে কী ভুল হয়?</li><li>এক value-র list reverse করুন, তারপর দুই value-র। Code-এ কি আলাদা special case লাগে?</li><li>Cycle: back-index <code>-1</code> দিন (cycle নেই) আর দেখুন fast কীভাবে শেষ প্রান্ত দিয়ে বেরিয়ে যায়।</li><li>Cycle: back-index <code>0</code> দিন, তারপর শেষ index দিন (একটা node নিজেকেই দেখাচ্ছে)। তবুও কি cycle ধরা পড়ে?</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul><li><b><code>curr.Next</code> save করার আগে উল্টে দেওয়া:</b> বাকি list হারিয়ে যায়।</li><li><b>Reverse করার পর <code>head</code> return করা:</b> আগের head এখন tail। <code>prev</code> return করুন।</li><li><b><code>fast.Next.Next</code>-এর আগে <code>fast.Next != nil</code> check না করা:</b> এতে nil pointer dereference panic হয়।</li><li><b>Array-র মতো linked list-এ index দিয়ে যাওয়া:</b> k নম্বর item-এ পৌঁছাতে k ধাপ লাগে।</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Complexity</h2>
+    <p><b>Reverse: O(n) time complexity, O(1) space complexity</b> &ndash; একবার pass, তিনটা pointer। <b>Cycle detection: O(n) time complexity, O(1) space complexity</b> &ndash; hash-set দিয়ে করলে লাগে O(n) space complexity, সেটার সাথে তুলনা করুন।</p>
+  </div>
+
+  <div class="pagenav"><a href="queue-and-monotonic-stack.html">&larr; Queue & Monotonic Stack</a><a href="sorting.html">Sorting &rarr;</a></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script id="algo">
+
+function reverseListSteps(vals) {
+  var n = vals.length, next = vals.map(function (_, i) { return i + 1 < n ? i + 1 : -1; }), prev = -1, curr = 0, steps = [];
+  function nm(i) { return i === -1 ? 'nil' : 'node ' + vals[i]; }
+  function snap(line, text, extra) { steps.push(Object.assign({ mode: 'rev', vals: vals, next: next.slice(), prev: prev, curr: curr, line: line, text: text }, extra || {})); }
+  snap(0, 'List-এ ' + n + 'টা node আছে। প্রতিটা arrow একটা Next pointer। শেষটা nil দেখায়।', { head: true });
+  snap(1, 'prev শুরুতে nil: এখনো কিছু reverse হয়নি।');
+  snap(2, 'curr = head: প্রথম node ঠিক করা শুরু করছি (' + nm(curr) + ')।');
+  while (curr !== -1) {
+    var nx = next[curr];
+    snap(4, 'next save করি: next = curr.Next (' + nm(nx) + '), যাতে বাকি chain হারিয়ে না যায়।', { nxt: nx });
+    next[curr] = prev;
+    snap(5, 'Arrow উল্টাই: curr.Next = prev। ' + nm(curr) + ' এখন দেখাচ্ছে ' + nm(prev) + '।', { nxt: nx, hot: curr });
+    prev = curr;
+    snap(6, 'prev সামনে সরাই: prev = curr (' + nm(prev) + ')।', { nxt: nx });
+    curr = nx;
+    snap(7, 'curr সামনে সরাই: curr = next (' + nm(curr) + ')।', { nxt: nx });
+  }
+  var out = [], p = prev; while (p !== -1) { out.push(vals[p]); p = next[p]; }
+  snap(9, 'curr এখন nil, তাই প্রতিটা arrow উল্টে গেছে। prev-ই নতুন head। সেখান থেকে পড়লে পাওয়া যায়: ' + out.join(' → ') + '।', { done: true, result: out });
+  return steps;
+}
+function cycleSteps(vals, back) {
+  var n = vals.length, slow = 0, fast = 0, steps = [];
+  function nextOf(i) { return i < n - 1 ? i + 1 : (back >= 0 ? back : -1); }
+  var next = vals.map(function (_, i) { return nextOf(i); });
+  function nm(i) { return i === -1 ? 'nil' : 'node ' + vals[i]; }
+  function snap(line, text, extra) { steps.push(Object.assign({ mode: 'cyc', vals: vals, next: next, slow: slow, fast: fast, line: line, text: text }, extra || {})); }
+  snap(1, 'slow আর fast দুটোই head থেকে শুরু করে (' + nm(0) + ')।');
+  var guard = 0;
+  while (fast !== -1 && nextOf(fast) !== -1 && guard++ < 200) {
+    snap(2, 'fast কি দুই ধাপ যেতে পারবে? fast (' + nm(fast) + ') আর fast.Next (' + nm(nextOf(fast)) + ') দুটোই আছে, তাই হ্যাঁ।');
+    slow = nextOf(slow);
+    snap(3, 'slow এক ধাপ এগিয়ে ' + nm(slow) + '-এ যায়।');
+    fast = nextOf(nextOf(fast));
+    snap(4, 'fast দুই ধাপ এগিয়ে ' + nm(fast) + '-এ যায়।');
+    if (slow === fast) { snap([5, 6], 'slow আর fast একই node-এ (' + nm(slow) + '). fast এখন slow-কে ছাড়িয়ে এক চক্কর ঘুরে এসেছে: cycle আছে।', { done: true, result: true }); return steps; }
+  }
+  snap(2, 'fast ' + (fast === -1 ? 'nil হয়ে গেছে' : '(' + nm(fast) + ') থেকে আর Next নেই') + ': শেষ প্রান্ত পেরিয়ে গেছে। যে list-এর শেষ আছে তাতে cycle নেই।', { done: true, result: false });
+  return steps;
+}
+
+</script>
+<script id="ui">
+
+function $id(x) { return document.getElementById(x); }
+function showErr(m) { $id('err').textContent = m || ''; }
+var current = null;
+function mountStepper(opts) {
+  if (current) current.pause();
+  var app = $id('app'); app.innerHTML = ''; app.className = '';
+  current = Viz.stepper(Object.assign({ mount: '#app' }, opts));
+  return current;
+}
+function setLegend(items) { var l = $id('legend'); l.innerHTML = ''; l.appendChild(Viz.legend(items)); }
+function mark(marks, ix, label) { marks[ix] = (marks[ix] || []).concat(label); }
+
+
+var REV_CODE = ['func reverse(head *ListNode) *ListNode {',
+'    var prev *ListNode',
+'    curr := head',
+'    for curr != nil {',
+'        next := curr.Next',
+'        curr.Next = prev',
+'        prev = curr',
+'        curr = next',
+'    }',
+'    return prev',
+'}'];
+var CYC_CODE = ['func hasCycle(head *ListNode) bool {',
+'    slow, fast := head, head',
+'    for fast != nil && fast.Next != nil {',
+'        slow = slow.Next',
+'        fast = fast.Next.Next',
+'        if slow == fast {',
+'            return true',
+'        }',
+'    }',
+'    return false',
+'}'];
+var COL = { prev: '#4dabf7', curr: '#ff922b', next: '#51cf66', slow: '#4dabf7', fast: '#ff922b' };
+function drawList(body, st, ptrs) {
+  var n = st.vals.length, X = function (i) { return 55 + i * 100; }, Y = 100, W = Math.max(480, 100 * n + 40), H = 215, k = [];
+  k.push(Viz.s('defs', {}, [Viz.s('marker', { id: 'ah', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' }, [Viz.s('path', { d: 'M 0 0 L 10 5 L 0 10 z', class: 'arrowhead' })])]));
+  for (var i = 0; i < n; i++) {
+    var j = st.next[i], hot = st.hot === i, cls = 'edge' + (hot ? ' hit' : ''), a = { 'marker-end': 'url(#ah)', class: cls, fill: 'none' };
+    if (j === -1) { k.push(Viz.s('line', Object.assign({ x1: X(i), y1: Y + 20, x2: X(i), y2: Y + 52 }, a))); k.push(Viz.s('text', { x: X(i), y: Y + 70, 'text-anchor': 'middle', style: 'font-size:12px', text: 'nil' })); }
+    else if (j === i + 1) k.push(Viz.s('line', Object.assign({ x1: X(i) + 30, y1: Y - 7, x2: X(j) - 32, y2: Y - 7 }, a)));
+    else if (j === i - 1) k.push(Viz.s('line', Object.assign({ x1: X(i) - 30, y1: Y + 9, x2: X(j) + 32, y2: Y + 9 }, a)));
+    else if (j === i) k.push(Viz.s('path', Object.assign({ d: 'M ' + (X(i) - 12) + ' ' + (Y - 20) + ' C ' + (X(i) - 40) + ' ' + (Y - 65) + ' ' + (X(i) + 40) + ' ' + (Y - 65) + ' ' + (X(i) + 12) + ' ' + (Y - 22) }, a)));
+    else { var d = Y + 20 + 20 + Math.abs(i - j) * 8; k.push(Viz.s('path', Object.assign({ d: 'M ' + X(i) + ' ' + (Y + 20) + ' C ' + X(i) + ' ' + d + ' ' + X(j) + ' ' + d + ' ' + X(j) + ' ' + (Y + 22) }, a))); }
+  }
+  for (var q = 0; q < n; q++) {
+    var c = 'node' + (st.done && st.result === true && q === st.fast ? ' found' : '');
+    k.push(Viz.s('rect', { x: X(q) - 30, y: Y - 20, width: 60, height: 40, rx: 8, class: c }));
+    k.push(Viz.s('text', { x: X(q), y: Y + 6, 'text-anchor': 'middle', style: 'font-size:18px;font-weight:700', text: String(st.vals[q]) }));
+  }
+  var stack = {};
+  ptrs.forEach(function (p) { if (p.idx >= 0) (stack[p.idx] = stack[p.idx] || []).push(p); });
+  Object.keys(stack).forEach(function (ix) {
+    stack[ix].forEach(function (p, t) { k.push(Viz.s('text', { x: X(Number(ix)), y: Y - 32 - t * 15, 'text-anchor': 'middle', style: 'font-size:13px;font-weight:700;fill:' + COL[p.name], text: p.name + ' ↓' })); });
+  });
+  var svg = Viz.svg(W, H, k); svg.style.maxWidth = 'none'; svg.style.width = W + 'px'; svg.setAttribute('width', W);
+  body.appendChild(svg);
+}
+function varRow(items, st) {
+  return Viz.el('div', { class: 'vars' }, items.map(function (it) {
+    return Viz.varBox(it[0], it[1] === -1 ? 'nil' : st.vals[it[1]], { addr: it[1] === -1 ? '' : 'node #' + it[1] });
+  }));
+}
+function render(st, i, body) {
+  if (st.mode === 'rev') {
+    drawList(body, st, [{ name: 'prev', idx: st.prev }, { name: 'curr', idx: st.curr }, { name: 'next', idx: st.nxt === undefined ? -1 : st.nxt }]);
+    body.appendChild(varRow([['prev', st.prev], ['curr', st.curr], ['next', st.nxt === undefined ? -1 : st.nxt]], st));
+    if (st.done) body.appendChild(Viz.note('<b>নতুন list: ' + st.result.join(' → ') + ' → nil</b>'));
+  } else {
+    drawList(body, st, [{ name: 'slow', idx: st.slow }, { name: 'fast', idx: st.fast }]);
+    body.appendChild(varRow([['slow', st.slow], ['fast', st.fast]], st));
+    if (st.done) body.appendChild(Viz.note('<b>ফলাফল: ' + st.result + '</b>'));
+  }
+}
+function run() {
+  showErr('');
+  var vals = Viz.parseNums($id('vals').value), mode = $id('mode').value;
+  if (!vals.length || vals.length > 8) { showErr('1 থেকে 8টার মধ্যে value দিন।'); return; }
+  if (mode === 'rev') {
+    setLegend([{ cls: 'hit', label: 'যে arrow এইমাত্র উল্টেছে' }]);
+    mountStepper({ code: REV_CODE, render: render }).load(reverseListSteps(vals));
+  } else {
+    var b = Number($id('cyc').value);
+    if ($id('cyc').value.trim() === '' || !Number.isInteger(b) || b < -1 || b >= vals.length) { showErr('Back-index একটা integer হতে হবে, -1 থেকে ' + (vals.length - 1) + '-এর মধ্যে।'); return; }
+    setLegend([{ cls: 'found', label: 'যেখানে দুজনের দেখা হলো' }]);
+    mountStepper({ code: CYC_CODE, render: render }).load(cycleSteps(vals, b));
+  }
+}
+$id('mode').addEventListener('change', function () {
+  var rev = $id('mode').value === 'rev';
+  $id('cycWrap').style.display = rev ? 'none' : '';
+  run();
+});
+$id('cycWrap').style.display = 'none';
+$id('go').addEventListener('click', run);
+run();
+
+</script>
+</body>
+</html>

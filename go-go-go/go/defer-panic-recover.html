@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Defer, Panic and Recover - Go visual</title>
+<meta name="description" content="Watch the defer stack run last-in-first-out, a panic unwind the stack, and recover catch it.">
+<link rel="stylesheet" href="../assets/viz.css">
+<style>
+.viz-layout{grid-template-columns:minmax(0,1fr)}
+.viz-stage,.viz-code{min-width:0;max-width:100%}
+@media (max-width:760px){.viz-layout.viz-has-code{grid-template-columns:minmax(0,1fr)}}
+body{overflow-x:hidden}
+.viz-svg .ah{fill:var(--accent)}
+.viz-svg .arrow{fill:none;stroke:var(--accent);stroke-width:2.5}
+.viz-svg .arrow.bad{stroke:var(--bad-line)}
+.viz-svg .node.bad{fill:var(--bad);stroke:var(--bad-line)}
+.viz-svg .node.nilp{stroke-dasharray:5 4}
+.viz-svg .nm{font-size:12px;fill:var(--muted)}
+.viz-svg .val{font-size:17px;font-weight:700}
+.viz-svg .ad{font-size:10px;fill:var(--muted)}
+.viz-svg .val.small{font-size:12px}
+.viz-svg .lbl{font-size:12px;fill:var(--accent);font-weight:700}
+.viz-cell.spare{background:transparent;border-style:dashed;color:var(--muted)}
+.hdrs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.chip{border:2px solid var(--cell-line);background:var(--cell);border-radius:10px;padding:4px 10px;font:600 13px var(--mono)}
+.chip.hit{background:var(--hit);border-color:var(--hit-line)}
+.chip.found{background:var(--found);border-color:var(--found-line)}
+.chip.dim{opacity:.45}
+.chip.bad{background:var(--bad);border-color:var(--bad-line)}
+.stackcol{display:flex;flex-direction:column-reverse;gap:6px;max-width:420px}
+.frame{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:6px 10px;font:13px var(--mono)}
+.frame b{display:block;margin-bottom:2px}
+.frame.hit{background:var(--hit);border-color:var(--hit-line)}
+.frame.found{background:var(--found);border-color:var(--found-line)}
+.frame.bad{background:var(--bad);border-color:var(--bad-line)}
+.frame.dim{opacity:.55}
+.out{font:13px var(--mono);background:var(--code-bg);color:var(--code-ink);padding:8px 10px;border-radius:8px;min-height:2.2em;white-space:pre-wrap;margin-top:10px}
+.out i{color:#6b7a90;font-style:normal}
+.row2{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.lane{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:8px 12px;min-width:170px;font:13px var(--mono)}
+.lane h4{margin:0 0 4px;font:700 13px var(--sans)}
+.lane.hit{background:var(--hit);border-color:var(--hit-line)}
+.lane.found{background:var(--found);border-color:var(--found-line)}
+.lane.bad{background:var(--bad);border-color:var(--bad-line)}
+.lane.dim{opacity:.55}
+.slots{display:flex;gap:6px}
+.slot{width:44px;height:44px;border:2px dashed var(--cell-line);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 15px var(--mono)}
+.slot.full{border-style:solid;background:var(--range);border-color:var(--range-line)}
+.iface{display:inline-flex;border:2px solid var(--cell-line);border-radius:10px;overflow:hidden;background:var(--cell);margin:4px 10px 4px 0}
+.iface div{padding:6px 10px;font:600 13px var(--mono)}
+.iface .t{background:var(--dim)}
+.iface.hit{background:var(--hit);border-color:var(--hit-line)}
+.iface.found{background:var(--found);border-color:var(--found-line)}
+.iface.bad{background:var(--bad);border-color:var(--bad-line)}
+.bar{height:20px;border-radius:5px;background:var(--range);border:2px solid var(--range-line);transition:width .3s}
+.bar.hit{background:var(--hit);border-color:var(--hit-line)}
+.bar.found{background:var(--found);border-color:var(--found-line)}
+.bar.dim{background:var(--dim);border-color:transparent}
+.tl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;align-items:center;font:13px var(--mono)}
+.tree{font:13px var(--mono)} .tree .tn{border:2px solid var(--cell-line);border-radius:8px;padding:4px 8px;margin:4px 0;background:var(--cell);display:inline-block}
+.tree .tn.bad{background:var(--bad);border-color:var(--bad-line)} .tree .tn.hit{background:var(--hit);border-color:var(--hit-line)} .tree .tn.found{background:var(--found);border-color:var(--found-line)}
+.tree ul{list-style:none;margin:0;padding-left:26px;border-left:2px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/go/defer-panic-recover.html">বাংলা</a></nav>
+  <h1>Defer, Panic and Recover</h1>
+  <p class="lead"><code>defer</code> is a to-do list that runs <b>when the function ends</b>, newest item first.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea</h2>
+    <p>You are leaving a house. You think of chores as you go: &ldquo;turn off the oven&rdquo;, then &ldquo;lock the window&rdquo;, then &ldquo;lock the door&rdquo;. Before you can leave you must undo them in <b>reverse</b>: door first (it was added last), then window, then oven. That is <code>defer</code>: a <b>last-in, first-out</b> stack of calls that run when the surrounding function returns, even if it returns because of a panic.</p>
+ <p>A <b>panic</b> is an emergency: normal execution stops and Go unwinds the stack, running deferred calls. If a deferred function calls <code>recover()</code>, the emergency is cancelled and the function returns normally. If nobody recovers, the program crashes.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Example<select id="sc"></select></label>
+    <span id="inputs" style="display:contents"></span>
+    <button id="run">Run</button>
+  </div>
+  <p class="viz-note" id="scdesc"></p>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul><li>In &ldquo;Recover from a panic&rdquo; use b = 2, then b = 0. Compare the final output.</li><li>In &ldquo;defer runs in reverse&rdquo; add another defer in your head: where would it print?</li><li>In &ldquo;panic without recover&rdquo; note that <code>cleanup</code> still prints before the crash message.</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul><li><code>recover()</code> only works when called <b>directly inside a deferred function</b>. Elsewhere it returns nil.</li><li>Deferring inside a loop: all deferred calls wait until the function ends, not the iteration (can hold files open too long).</li><li>Arguments to a deferred call are evaluated when the <code>defer</code> line runs, not when it executes.</li><li>Using panic for ordinary errors. Return an <code>error</code> instead; keep panic for bugs and impossible states.</li></ul>
+  </div>
+
+  <div class="pagenav"><a href="closures.html">&larr; Closures</a><a href="strings-bytes-runes.html">Strings, Bytes and Runes &rarr;</a></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+
+var E = Viz.el;
+/* ---- scenarios + dynamic inputs ---- */
+function multi(scenarios) {
+  var mount = Viz.$('#app'), sel = Viz.$('#sc'), inputsBox = Viz.$('#inputs'), err = Viz.$('#err'), desc = Viz.$('#scdesc');
+  var cur = 0, store = {}, pendingStep = null;
+  var hm = location.hash.match(/sc=(\d+)(?:&step=(\d+))?/);
+  if (hm && scenarios[+hm[1]]) { cur = +hm[1]; pendingStep = hm[2] ? +hm[2] : null; }
+  window.I = function (id) { var n = document.getElementById('in_' + id); return n ? n.value : ''; };
+  window.N = function (id, lo, hi) {
+    var raw = I(id).trim(); var v = Number(raw);
+    if (raw === '' || isNaN(v)) throw new Error('"' + id + '" must be a number.');
+    if (lo !== undefined && v < lo) throw new Error('"' + id + '" must be at least ' + lo + '.');
+    if (hi !== undefined && v > hi) throw new Error('"' + id + '" must be at most ' + hi + '.');
+    return Math.floor(v) === v ? v : Math.floor(v);
+  };
+  scenarios.forEach(function (sc, i) { sel.appendChild(E('option', { value: String(i), text: sc.name })); });
+  function buildInputs() {
+    inputsBox.innerHTML = '';
+    (scenarios[cur].inputs || []).forEach(function (inp) {
+      var key = cur + ':' + inp.id;
+      var val = store[key] !== undefined ? store[key] : inp.value;
+      var ctl;
+      if (inp.options) {
+        ctl = E('select', { id: 'in_' + inp.id }, inp.options.map(function (o) { return E('option', { value: o[0], text: o[1] }); }));
+        ctl.value = val;
+      } else {
+        ctl = E('input', { id: 'in_' + inp.id, value: val, size: inp.size || 10 });
+      }
+      ctl.addEventListener('change', function () { store[key] = ctl.value; show(); });
+      inputsBox.appendChild(E('label', { text: inp.label }, [ctl]));
+    });
+  }
+  function show() {
+    var sc = scenarios[cur];
+    err.textContent = '';
+    mount.innerHTML = '';
+    desc.textContent = sc.desc || '';
+    var steps;
+    try { steps = sc.steps(); } catch (e) { err.textContent = e.message; return; }
+    var st = Viz.stepper({ mount: mount, code: typeof sc.code === 'function' ? sc.code() : sc.code, render: sc.render });
+    st.load(steps);
+    if (pendingStep !== null) { st.go(pendingStep); pendingStep = null; }
+  }
+  sel.addEventListener('change', function () { cur = +sel.value; buildInputs(); show(); });
+  Viz.$('#run').addEventListener('click', function () { show(); });
+  sel.value = String(cur); buildInputs(); show();
+  if (location.hash === '#test') {
+    var log = [];
+    scenarios.forEach(function (sc, k) {
+      try {
+        cur = k; buildInputs();
+        var steps = sc.steps(), code = typeof sc.code === 'function' ? sc.code() : sc.code, tmp = document.createElement('div');
+        if (!steps.length) throw new Error('no steps');
+        steps.forEach(function (stp, j) {
+          tmp.innerHTML = ''; sc.render(stp, j, tmp);
+          if (!tmp.firstChild) throw new Error('empty render at step ' + j);
+          [].concat(stp.line === undefined ? [] : stp.line).forEach(function (ln) { if (!(ln >= 0 && ln < code.length)) throw new Error('bad line ' + ln + ' at step ' + j); });
+          if (!stp.text) throw new Error('no text at step ' + j);
+        });
+        log.push('OK   ' + sc.name + ' (' + steps.length + ' steps)');
+      } catch (e) { log.push('FAIL ' + sc.name + ': ' + e.message); }
+    });
+    cur = 0; sel.value = '0'; buildInputs(); show();
+    document.body.appendChild(E('pre', { id: 'testresult', text: log.join('\n') }));
+  }
+}
+
+/* ---- memory diagram: boxes + arrows (illustrative addresses) ---- */
+var _mid = 0;
+function mem(body, cells, arrows, o) {
+  o = o || {};
+  var W = 124, H = 70, G = 34, X0 = 12, Y0 = 12, n = Math.max(cells.length, 1), id = 'ah' + (++_mid);
+  var width = X0 * 2 + n * W + (n - 1) * G, hasA = arrows && arrows.length, height = Y0 + H + (hasA ? 92 : 14);
+  var kids = [Viz.s('defs', {}, [Viz.s('marker', { id: id, viewBox: '0 0 10 10', refX: '8', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto' }, [Viz.s('path', { d: 'M0,0L10,5L0,10z', class: 'ah' })])])];
+  cells.forEach(function (c, i) {
+    var x = X0 + i * (W + G);
+    kids.push(Viz.s('rect', { x: x, y: Y0, width: W, height: H, rx: 10, class: 'node ' + (c.cls || '') }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 17, 'text-anchor': 'middle', class: 'nm', text: c.name }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 42, 'text-anchor': 'middle', class: 'val' + (String(c.value).length > 8 ? ' small' : ''), text: String(c.value) }));
+    if (c.addr) kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 62, 'text-anchor': 'middle', class: 'ad', text: c.addr }));
+  });
+  (arrows || []).forEach(function (a) {
+    var x1 = X0 + a.from * (W + G) + W / 2, x2 = X0 + a.to * (W + G) + W / 2, y = Y0 + H, d;
+    if (a.from === a.to) { x1 -= 22; x2 += 22; d = 'M' + x1 + ',' + y + ' C' + (x1 - 10) + ',' + (y + 55) + ' ' + (x2 + 10) + ',' + (y + 55) + ' ' + x2 + ',' + (y + 3); }
+    else d = 'M' + x1 + ',' + y + ' C' + x1 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 4);
+    kids.push(Viz.s('path', { d: d, class: 'arrow ' + (a.cls || ''), 'marker-end': 'url(#' + id + ')' }));
+    if (a.label) kids.push(Viz.s('text', { x: (x1 + x2) / 2, y: y + 66, 'text-anchor': 'middle', class: 'lbl', text: a.label }));
+  });
+  var svgEl = Viz.svg(width, height, kids); svgEl.style.minWidth = Math.min(width, 600) + 'px';
+  body.appendChild(svgEl);
+  if (o.note !== false) body.appendChild(Viz.note('Addresses like 0xc000012000 are made up for illustration; real addresses differ on every run.'));
+}
+function out(body, lines) {
+  body.appendChild(E('div', { class: 'out', html: lines && lines.length ? lines.map(function (l) { return esc(l); }).join('<br>') : '<i>(program output appears here)</i>' }));
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function chips(items) { return E('div', { class: 'hdrs' }, items.map(function (c) { return E('span', { class: 'chip ' + (c.cls || ''), text: c.text }); })); }
+
+document.getElementById('legend').appendChild(Viz.legend([{cls:'hit',label:'running now'},{cls:'bad',label:'panicking'},{cls:'found',label:'recovered / finished'},{cls:'dim',label:'waiting'}]));
+
+function render(st, i, body) {
+  var left = E('div', {}, [E('div', { class: 'viz-note', text: 'defer stack (top runs first)' }),
+    E('div', { class: 'stackcol' }, (st.stack || []).map(function (d) { return E('div', { class: 'frame ' + (d.cls || '') }, [E('div', { text: d.text })]); }))]);
+  var mid = E('div', { class: 'lane ' + (st.scls || '') }, [E('h4', { text: 'status' }), E('div', { text: st.status || '' })]);
+  body.appendChild(E('div', { class: 'row2' }, [left, mid]));
+  if (st.out) out(body, st.out);
+}
+function D(text, cls) { return { text: text, cls: cls }; }
+multi([
+ { name: 'defer runs in reverse', desc: 'Deferred calls are pushed on a stack and run last-in, first-out when the function returns.',
+   code: ['func main() {', '    defer fmt.Println("one")', '    defer fmt.Println("two")', '    defer fmt.Println("three")', '    fmt.Println("main body")', '}'],
+   render: render,
+   steps: function () {
+     return [
+      { line: 1, text: 'defer registers the call. It does NOT run now: it is put on the stack.', stack: [D('Println("one")', 'hit')], status: 'running main', out: [] },
+      { line: 2, text: 'Second defer goes on TOP of the first.', stack: [D('Println("one")'), D('Println("two")', 'hit')], status: 'running main', out: [] },
+      { line: 3, text: 'Third defer on top.', stack: [D('Println("one")'), D('Println("two")'), D('Println("three")', 'hit')], status: 'running main', out: [] },
+      { line: 4, text: 'The normal body runs first.', stack: [D('Println("one")'), D('Println("two")'), D('Println("three")')], status: 'running main body', out: ['main body'] },
+      { line: 5, text: 'main is about to return, so the deferred calls run from the top: three first.', stack: [D('Println("one")', 'dim'), D('Println("two")', 'dim'), D('Println("three")', 'hit')], status: 'running deferred calls', out: ['main body', 'three'] },
+      { line: 5, text: 'Then two.', stack: [D('Println("one")', 'dim'), D('Println("two")', 'hit')], status: 'running deferred calls', out: ['main body', 'three', 'two'] },
+      { line: 5, text: 'Then one. Last registered, first executed.', stack: [D('Println("one")', 'hit')], status: 'running deferred calls', out: ['main body', 'three', 'two', 'one'] },
+      { line: 5, text: 'Stack empty: main returns.', stack: [], status: 'done', scls: 'found', out: ['main body', 'three', 'two', 'one'] }
+     ];
+   } },
+ { name: 'Recover from a panic', desc: 'Try b = 0 to trigger a runtime panic and watch the deferred function rescue it.',
+   inputs: [{ id: 'b', label: 'b (divisor)', value: '0', size: 5 }],
+   code: function () { return ['func safeDivide(a, b int) (result int, err error) {', '    defer func() {', '        if r := recover(); r != nil {', '            err = fmt.Errorf("recovered: %v", r)', '        }', '    }()', '    return a / b, nil', '}', '', 'func main() {', '    fmt.Println(safeDivide(10, ' + I('b') + '))', '}']; },
+   render: render,
+   steps: function () {
+     var b = N('b', -100, 100), steps = [], fn = 'func() { recover ... }';
+     steps.push({ line: 10, text: 'main calls safeDivide(10, ' + b + ').', stack: [], status: 'in safeDivide', out: [] });
+     steps.push({ line: 1, text: 'The deferred function is registered. It will run when safeDivide exits, however it exits.', stack: [D(fn, 'hit')], status: 'in safeDivide', out: [] });
+     if (b !== 0) {
+       var q = Math.trunc(10 / b);
+       steps.push({ line: 6, text: '10 / ' + b + ' = ' + q + '. No problem: result = ' + q + ', err = nil. The function is about to return.', stack: [D(fn)], status: 'returning ' + q + ', nil', out: [] });
+       steps.push({ line: 2, text: 'The deferred function runs. recover() returns nil because nothing panicked, so the if body is skipped.', stack: [D(fn, 'hit')], status: 'deferred func: recover() = nil', out: [] });
+       steps.push({ line: 10, text: 'main prints the results.', stack: [], status: 'done', scls: 'found', out: [q + ' <nil>'] });
+     } else {
+       steps.push({ line: 6, text: '10 / 0: integer division by zero. Go PANICS with "runtime error: integer divide by zero". Normal execution stops here.', stack: [D(fn)], status: 'PANIC: runtime error: integer divide by zero', scls: 'bad', out: [] });
+       steps.push({ line: 2, text: 'While unwinding, Go runs the deferred function. recover() stops the panic and returns the panic value.', stack: [D(fn, 'hit')], status: 'deferred func: recover() caught the panic', scls: 'hit', out: [] });
+       steps.push({ line: 3, text: 'We store the problem in the named result err. result stays 0.', stack: [D(fn, 'hit')], status: 'err = "recovered: runtime error: integer divide by zero"', scls: 'hit', out: [] });
+       steps.push({ line: 10, text: 'The panic is over and safeDivide returns normally with result 0 and our err. The program did not crash.', stack: [], status: 'done (recovered)', scls: 'found', out: ['0 recovered: runtime error: integer divide by zero'] });
+     }
+     return steps;
+   } },
+ { name: 'panic without recover', desc: 'Deferred calls still run, then the program crashes.',
+   code: ['func main() {', '    defer fmt.Println("cleanup")', '    fmt.Println("working")', '    panic("boom")', '}'],
+   render: render,
+   steps: function () {
+     return [
+      { line: 1, text: 'cleanup is deferred.', stack: [D('Println("cleanup")', 'hit')], status: 'running', out: [] },
+      { line: 2, text: 'Normal work.', stack: [D('Println("cleanup")')], status: 'running', out: ['working'] },
+      { line: 3, text: 'panic("boom"): normal flow stops. Go starts unwinding.', stack: [D('Println("cleanup")')], status: 'PANIC: boom', scls: 'bad', out: ['working'] },
+      { line: 1, text: 'Deferred calls still run while unwinding: cleanup is printed.', stack: [D('Println("cleanup")', 'hit')], status: 'PANIC: boom (running deferred calls)', scls: 'bad', out: ['working', 'cleanup'] },
+      { line: 3, text: 'Nobody called recover(), so after the deferred calls the program prints the panic and exits with status 2.', stack: [], status: 'CRASHED', scls: 'bad', out: ['working', 'cleanup', 'panic: boom', '', 'goroutine 1 [running]:', '...', 'exit status 2'] }
+     ];
+   } }
+]);
+
+})();
+</script>
+</body>
+</html>

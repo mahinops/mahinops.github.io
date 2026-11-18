@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Build a trie (prefix tree) letter by letter, then search for whole words and prefixes while watching shared prefixes get reused.">
+<title>Trie (Prefix Tree) - visual</title>
+<link rel="stylesheet" href="../assets/viz.css">
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/trie.html">বাংলা</a></nav>
+  <h1>Trie (Prefix Tree)</h1>
+  <p class="lead">A tree of letters that makes &ldquo;does any word start with this?&rdquo; very fast.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea (phone auto-complete)</h2>
+    <p>When you type &ldquo;ca&rdquo; and your phone suggests &ldquo;cat&rdquo;, &ldquo;car&rdquo; and &ldquo;cart&rdquo;, something has to find every word that starts with &ldquo;ca&rdquo; without scanning the whole dictionary. A <b>trie</b> stores words as paths of letters from a single <b>root</b>. Words that start the same way <b>share</b> the same beginning of the path.</p>
+    <ul>
+      <li><b>Insert</b> a word: walk down, one letter per step. If the edge for that letter does not exist, create it. Mark the last node as <b>&ldquo;a word ends here&rdquo;</b> (drawn as a double circle).</li>
+      <li><b>Search</b> a word: walk down its letters. Missing edge &rarr; not there. If you arrive, the word exists only if the last node is marked as a word end.</li>
+      <li><b>StartsWith</b> a prefix: the same walk, but arriving at all is enough.</li>
+    </ul>
+    <p>Notice: <code>car</code> is a prefix of <code>cart</code>. Both can be words, so &ldquo;word end&rdquo; is a separate mark, not the same as &ldquo;has no children&rdquo;.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Words to insert (lowercase letters, up to 6 words of 1 to 6 letters)<input id="words" value="cat, car, cart, dog, do" size="34"></label>
+    <label>Queries (search WORD / prefix TEXT)<input id="queries" value="search car, search ca, prefix ca, search dot" size="40"></label>
+    <button id="go">Run</button>
+  </div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul>
+      <li>Insert <code>cat, car, cart</code>. How many nodes does the tree have versus the 10 letters you typed? That saving is the point.</li>
+      <li>Run <code>search ca</code> and then <code>prefix ca</code>. Why do the answers differ?</li>
+      <li>Query <code>search dot</code> when <code>do</code> and <code>dog</code> exist. Where does the walk stop?</li>
+      <li>Insert two completely different words, like <code>apple, zebra</code>. Do they share anything?</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul>
+      <li><b>Forgetting the word-end flag.</b> Without it, <code>Search("ca")</code> would wrongly say yes once &ldquo;cat&rdquo; is stored.</li>
+      <li><b>Not initializing the children map.</b> Writing to a nil map panics in Go, so create <code>map[rune]*Trie{}</code> for every new node.</li>
+      <li><b>Mixing up Search and StartsWith.</b> Search needs the end flag; StartsWith does not.</li>
+      <li><b>Memory.</b> Every node holds a map. For only lowercase letters, a <code>[26]*Trie</code> array is faster and often smaller.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, in plain English:</b> insert, search and prefix checks all cost one step per letter of the word, no matter how many words are stored (<code>O(L)</code> for a word of length L). The price is memory: up to one node per stored letter.
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var CODE = [
+  'type Trie struct {',                                                   // 0
+  '    children map[rune]*Trie',                                          // 1
+  '    end      bool',                                                    // 2
+  '}',                                                                    // 3
+  '',                                                                     // 4
+  'func (t *Trie) Insert(word string) {',                                 // 5
+  '    node := t',                                                        // 6
+  '    for _, ch := range word {',                                        // 7
+  '        if node.children[ch] == nil {',                                // 8
+  '            node.children[ch] = &Trie{children: map[rune]*Trie{}}',    // 9
+  '        }',                                                            // 10
+  '        node = node.children[ch]',                                     // 11
+  '    }',                                                                // 12
+  '    node.end = true',                                                  // 13
+  '}',                                                                    // 14
+  '',                                                                     // 15
+  'func (t *Trie) walk(s string) *Trie {',                                // 16
+  '    node := t',                                                        // 17
+  '    for _, ch := range s {',                                           // 18
+  '        if node.children[ch] == nil {',                                // 19
+  '            return nil',                                               // 20
+  '        }',                                                            // 21
+  '        node = node.children[ch]',                                     // 22
+  '    }',                                                                // 23
+  '    return node',                                                      // 24
+  '}',                                                                    // 25
+  '',                                                                     // 26
+  'func (t *Trie) Search(word string) bool {',                            // 27
+  '    n := t.walk(word)',                                                // 28
+  '    return n != nil && n.end',                                         // 29
+  '}',                                                                    // 30
+  '',                                                                     // 31
+  'func (t *Trie) StartsWith(prefix string) bool {',                      // 32
+  '    return t.walk(prefix) != nil',                                     // 33
+  '}',                                                                    // 34
+];
+
+function parseWords(str) {
+  var parts = str.split(/[\s,]+/).filter(Boolean), out = [];
+  if (!parts.length) return { error: 'Type at least one word, for example: cat, car' };
+  for (var i = 0; i < parts.length; i++) {
+    if (!/^[a-z]{1,6}$/.test(parts[i])) return { error: '"' + parts[i] + '" is not valid. Use only lowercase letters a-z, 1 to 6 letters.' };
+    if (out.indexOf(parts[i]) === -1) out.push(parts[i]);
+  }
+  if (out.length > 6) return { error: 'Please use at most 6 different words.' };
+  return { words: out };
+}
+function parseQueries(str) {
+  var parts = str.split(',').map(function (s) { return s.trim(); }).filter(Boolean), out = [], m;
+  if (parts.length > 6) return { error: 'Please use at most 6 queries.' };
+  for (var i = 0; i < parts.length; i++) {
+    m = /^(search|prefix)\s+([a-z]{1,6})$/.exec(parts[i]);
+    if (!m) return { error: 'I do not understand "' + parts[i] + '". Use "search WORD" or "prefix TEXT" (lowercase, 1 to 6 letters).' };
+    out.push({ type: m[1], text: m[2] });
+  }
+  return { queries: out };
+}
+
+function genTrie(words, queries) {
+  var nid = 0, root = { id: nid++, ch: '', end: false, kids: [] }, steps = [], phase = '', results = [];
+  function clone(n) { return { id: n.id, ch: n.ch, end: n.end, kids: n.kids.map(clone) }; }
+  function snap(text, line, cur, path, mark) {
+    steps.push({ root: clone(root), text: text, line: line, cur: cur === undefined ? -1 : cur, path: path.slice(), mark: mark === undefined ? -1 : mark, phase: phase });
+  }
+  function child(n, ch) { for (var i = 0; i < n.kids.length; i++) if (n.kids[i].ch === ch) return n.kids[i]; return null; }
+  function insert(w) {
+    phase = 'Insert "' + w + '"';
+    var node = root, path = [root.id];
+    snap('Start at the root (it represents the empty word).', 6, root.id, path);
+    for (var i = 0; i < w.length; i++) {
+      var ch = w[i], nx = child(node, ch);
+      if (nx) {
+        node = nx; path.push(node.id);
+        snap('Letter "' + ch + '": an edge "' + ch + '" already exists, so reuse it (a shared prefix!).', [7, 8, 11], node.id, path);
+      } else {
+        nx = { id: nid++, ch: ch, end: false, kids: [] }; node.kids.push(nx); node = nx; path.push(node.id);
+        snap('Letter "' + ch + '": there is no edge "' + ch + '" yet, so create a new node.', [7, 8, 9, 11], -1, path, node.id);
+      }
+    }
+    node.end = true;
+    snap('End of "' + w + '": mark this node as the end of a word (double circle).', 13, -1, path, node.id);
+  }
+  function walk(s, line0) {
+    var node = root, path = [root.id];
+    snap('Start at the root.', 17, root.id, path);
+    for (var i = 0; i < s.length; i++) {
+      var nx = child(node, s[i]);
+      if (!nx) { snap('Letter "' + s[i] + '": no edge "' + s[i] + '" from here, so walk returns nil.', [19, 20], node.id, path); return { node: null, path: path }; }
+      node = nx; path.push(node.id);
+      snap('Letter "' + s[i] + '": the edge exists, follow it.', [18, 22], node.id, path);
+    }
+    snap('All letters were followed, so walk returns this node.', 24, node.id, path);
+    return { node: node, path: path };
+  }
+  words.forEach(insert);
+  queries.forEach(function (q) {
+    phase = (q.type === 'search' ? 'Search "' : 'StartsWith "') + q.text + '"';
+    var w = walk(q.text), ok;
+    if (q.type === 'search') {
+      ok = !!(w.node && w.node.end);
+      snap(!w.node ? 'walk returned nil, so Search("' + q.text + '") is false.' : (w.node.end ? 'The node is marked as a word end, so Search("' + q.text + '") is true.' : 'We arrived, but this node is NOT marked as a word end ("' + q.text + '" is only a prefix of a longer word), so Search is false.'), [28, 29], -1, w.path, ok ? w.node.id : -1);
+    } else {
+      ok = !!w.node;
+      snap(ok ? 'walk returned a node, so StartsWith("' + q.text + '") is true. (The end flag does not matter here.)' : 'walk returned nil, so StartsWith("' + q.text + '") is false.', 33, -1, w.path, ok ? w.node.id : -1);
+    }
+    results.push(ok);
+  });
+  return { steps: steps, results: results, root: root };
+}
+
+function layout(root) {
+  var pos = new Map(), next = 0, maxd = 0;
+  (function place(n, d) {
+    if (d > maxd) maxd = d;
+    if (!n.kids.length) { pos.set(n, { x: next++, d: d }); return; }
+    n.kids.forEach(function (c) { place(c, d + 1); });
+    pos.set(n, { x: (pos.get(n.kids[0]).x + pos.get(n.kids[n.kids.length - 1]).x) / 2, d: d });
+  })(root, 0);
+  return { pos: pos, w: next, h: maxd + 1 };
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+
+  function drawTrie(st) {
+    var L = layout(st.root), dx = 48, dy = 56, r = 14, pad = 12;
+    var W = Math.max(L.w * dx + pad * 2, 160), H = L.h * dy + pad, parts = [];
+    function cx(n) { return pad + L.pos.get(n).x * dx + dx / 2; }
+    function cy(n) { return pad + L.pos.get(n).d * dy + r + 4; }
+    L.pos.forEach(function (_, n) {
+      n.kids.forEach(function (c) {
+        var onPath = st.path.indexOf(c.id) !== -1 && st.path.indexOf(n.id) !== -1;
+        parts.push(Viz.s('line', { class: 'edge' + (onPath ? ' hit' : ''), x1: cx(n), y1: cy(n), x2: cx(c), y2: cy(c) }));
+      });
+    });
+    L.pos.forEach(function (_, n) {
+      n.kids.forEach(function (c) {
+        var mx = (cx(n) + cx(c)) / 2, my = (cy(n) + cy(c)) / 2;
+        parts.push(Viz.s('text', { x: mx - 8, y: my, 'text-anchor': 'middle', 'font-size': 14, 'font-weight': 700, style: 'paint-order:stroke;stroke:var(--card);stroke-width:4px', text: c.ch }));
+      });
+    });
+    L.pos.forEach(function (_, n) {
+      var cls = 'node';
+      if (n.id === st.mark) cls += ' found'; else if (n.id === st.cur) cls += ' hit'; else if (st.path.indexOf(n.id) !== -1) cls += ' range';
+      if (n.end) parts.push(Viz.s('circle', { class: 'edge', cx: cx(n), cy: cy(n), r: r + 4, style: 'stroke:var(--ink);stroke-width:1.5px' }));
+      parts.push(Viz.s('circle', { class: cls, cx: cx(n), cy: cy(n), r: r }));
+      if (n.ch === '' ) parts.push(Viz.s('text', { x: cx(n), y: cy(n) + 4, 'text-anchor': 'middle', 'font-size': 11, text: 'root' }));
+    });
+    return Viz.svg(W, H, parts);
+  }
+
+  function render(st, i, body) {
+    body.appendChild(Viz.note('<b>' + st.phase + '</b>'));
+    body.appendChild(drawTrie(st));
+    body.appendChild(Viz.note('Letters sit on the edges. A double circle means &ldquo;a word ends here&rdquo;.'));
+  }
+
+  function run() {
+    errBox.textContent = '';
+    var w = parseWords(document.getElementById('words').value);
+    if (w.error) { errBox.textContent = w.error; return; }
+    var q = parseQueries(document.getElementById('queries').value);
+    if (q.error) { errBox.textContent = q.error; return; }
+    app.innerHTML = '';
+    var st = Viz.stepper({ mount: app, code: CODE, render: render });
+    st.load(genTrie(w.words, q.queries).steps);
+  }
+
+  document.getElementById('legend').appendChild(Viz.legend([
+    { cls: 'hit', label: 'node being visited' }, { cls: 'range', label: 'path walked so far' }, { cls: 'found', label: 'new node / query answer is yes' },
+  ]));
+  document.getElementById('go').addEventListener('click', run);
+  run();
+})();
+</script>
+</body>
+</html>

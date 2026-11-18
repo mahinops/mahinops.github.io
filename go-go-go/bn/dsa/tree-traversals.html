@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Binary tree-র সব node কীভাবে preorder, inorder, postorder (live call stack-সহ) এবং level-order (queue-সহ) ক্রমে ঘুরে দেখা হয়, তা run করে দেখুন।">
+<title>Tree Traversals</title>
+<link rel="stylesheet" href="../../assets/viz.css">
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">← সব visual</a> · <a href="../../dsa/tree-traversals.html">English</a></nav>
+  <h1>Tree Traversals</h1>
+  <p class="lead">Binary tree-র প্রতিটি node ঘুরে দেখার চারটি উপায়, আর কেন প্রতিটিতে order আলাদা হয়।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা (কোম্পানির org chart)</h2>
+    <p>Tree অনেকটা org chart-এর মতো: উপরে একজন boss, আর প্রত্যেকের নিচে সর্বোচ্চ দুজন direct report থাকে (একটি <b>left</b> আর একটি <b>right</b> child)। "Traversal" মানে প্রত্যেককে ঠিক একবার করে ঘুরে দেখা। প্রশ্ন শুধু একটাই: <b>কখন কাউকে visit করবেন</b>:</p>
+    <ul>
+      <li><b>Preorder</b>: আগে node-কে visit করুন, তারপর তার left দিক, তারপর right দিক।</li>
+      <li><b>Inorder</b>: আগে left দিক, তারপর node, তারপর right দিক। (Search tree-তে এতে sorted order পাওয়া যায়।)</li>
+      <li><b>Postorder</b>: আগে দুই দিক, <i>শেষে</i> node। (Child আগে, parent পরে, যেমন folder tree delete করার সময় হয়।)</li>
+      <li><b>Level-order</b>: এক তলা করে, উপর থেকে নিচে। Recursion-এর বদলে <b>queue</b> ব্যবহার করে।</li>
+    </ul>
+    <p>তিনটি recursive version আসলে একই function, শুধু <code>visit</code> লাইনের জায়গা বদলায়। লক্ষ করুন, নিচে নামার সময় <b>call stack</b> বড় হয় আর call return করলে ছোট হয়।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+    <label>Tree, level ধরে ধরে (null = কোনো node নেই)<input id="tree" value="1, 2, 3, 4, 5, null, 6" size="30"></label>
+    <label>Traversal
+      <select id="mode">
+        <option value="preorder">Preorder (visit, left, right)</option>
+        <option value="inorder">Inorder (left, visit, right)</option>
+        <option value="postorder">Postorder (left, right, visit)</option>
+        <option value="level">Level-order (queue)</option>
+      </select>
+    </label>
+    <button id="go">Run</button>
+  </div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul>
+      <li>একই tree-তে চারটি mode-ই run করুন এবং output list মিলিয়ে দেখুন।</li>
+      <li><code>4, 2, 6, 1, 3, 5, 7</code> দিয়ে <b>Inorder</b> run করুন। output-এ কী লক্ষ করলেন?</li>
+      <li>একদিকে ঝুঁকে থাকা tree বানান: <code>1, null, 2, null, 3, null, 4</code>। call stack কতটা উঁচু হয়?</li>
+      <li>nil call গুলো খেয়াল করুন: প্রতিটি অনুপস্থিত child-এর জন্যও একটি call হয়, যা সাথে সাথে return করে।</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul>
+      <li><b>nil check ভুলে যাওয়া।</b> <code>if n == nil { return }</code> ছাড়া কোড nil pointer dereference করে panic করে।</li>
+      <li><b>order গুলিয়ে ফেলা।</b> মনে রাখুন: নামটাই বলে দেয় child-এর তুলনায় <i>visit</i> কোথায় বসে (pre = আগে, in = মাঝে, post = পরে)।</li>
+      <li><b>খুব গভীর tree।</b> Recursion প্রতি level-এ একটি stack frame নেয়। যে tree আসলে একটা লম্বা chain, সেখানে অনেক stack লাগে, তাই interviewer মাঝে মাঝে iterative version চান।</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, সহজ ভাষায়:</b> প্রতিটি node একবারই visit হয়, তাই time complexity node-সংখ্যার সাথে সমান হারে বাড়ে (<code>O(n)</code>)। Recursive version-এ space লাগে tree-র height-এর সমান; level-order-এ space লাগে সবচেয়ে চওড়া level-এর সমান।
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var ORDER = { preorder: ['V', 'L', 'R'], inorder: ['L', 'V', 'R'], postorder: ['L', 'R', 'V'] };
+
+function codeFor(mode) {
+  var body = {
+    V: '    *out = append(*out, n.Val) // visit',
+    L: '    ' + mode + '(n.Left, out)',
+    R: '    ' + mode + '(n.Right, out)',
+  };
+  return ['func ' + mode + '(n *TreeNode, out *[]int) {', '    if n == nil {', '        return', '    }']
+    .concat(ORDER[mode].map(function (k) { return body[k]; }), ['}']);
+}
+var LEVEL_CODE = [
+  'func levelOrder(root *TreeNode) []int {',
+  '    var out []int',
+  '    if root == nil {',
+  '        return out',
+  '    }',
+  '    queue := []*TreeNode{root}',
+  '    for len(queue) > 0 {',
+  '        n := queue[0]',
+  '        queue = queue[1:]',
+  '        out = append(out, n.Val)',
+  '        if n.Left != nil {',
+  '            queue = append(queue, n.Left)',
+  '        }',
+  '        if n.Right != nil {',
+  '            queue = append(queue, n.Right)',
+  '        }',
+  '    }',
+  '    return out',
+  '}',
+];
+
+function parseTree(tokens) {
+  if (!tokens.length || tokens[0] === null) return null;
+  var root = { val: tokens[0], left: null, right: null };
+  var q = [root], i = 1;
+  while (q.length && i < tokens.length) {
+    var n = q.shift();
+    var l = tokens[i++];
+    if (l !== null && l !== undefined) { n.left = { val: l, left: null, right: null }; q.push(n.left); }
+    if (i < tokens.length) {
+      var r = tokens[i++];
+      if (r !== null && r !== undefined) { n.right = { val: r, left: null, right: null }; q.push(n.right); }
+    }
+  }
+  return root;
+}
+
+function genRecursive(root, mode) {
+  var ord = ORDER[mode], steps = [], stack = [], out = [];
+  function lbl(n) { return n ? String(n.val) : 'nil'; }
+  function top() { for (var i = stack.length - 1; i >= 0; i--) if (stack[i]) return stack[i]; return null; }
+  function snap(text, line) { steps.push({ text: text, line: line, cur: top(), stack: stack.slice(), out: out.slice() }); }
+  function rec(n) {
+    stack.push(n);
+    snap('' + mode + '(' + lbl(n) + ') call হলো' + (n ? '।' : ': এখানে কোনো node নেই।'), 0);
+    if (!n) { snap('n nil, তাই কিছু করার নেই: caller-এ ফিরে যান।', [1, 2]); stack.pop(); return; }
+    ord.forEach(function (k, j) {
+      var line = 4 + j;
+      if (k === 'V') { out.push(n); snap('' + n.val + ' visit করুন: output-এ যোগ করুন।', line); }
+      else if (k === 'L') { snap('' + n.val + '-এর left child-এ যান (' + lbl(n.left) + ')।', line); rec(n.left); }
+      else { snap('' + n.val + '-এর right child-এ যান (' + lbl(n.right) + ')।', line); rec(n.right); }
+    });
+    snap('' + n.val + '-এর কাজ শেষ: caller-এ ফিরে যান।', 4 + ord.length);
+    stack.pop();
+  }
+  rec(root);
+  steps.push({ text: 'শেষ। Output: [' + out.map(function (n) { return n.val; }).join(', ') + ']', cur: null, stack: [], out: out.slice() });
+  return steps;
+}
+
+function genLevel(root) {
+  var steps = [], out = [], queue = [];
+  function snap(text, line, cur) { steps.push({ text: text, line: line, cur: cur || null, queue: queue.slice(), out: out.slice() }); }
+  queue.push(root);
+  snap('Root-কে queue-তে রাখুন।', 5);
+  while (queue.length) {
+    var n = queue.shift();
+    snap('Queue-র সামনে থেকে ' + n.val + ' নিন।', [7, 8], n);
+    out.push(n);
+    snap('' + n.val + ' visit করুন: output-এ যোগ করুন।', 9, n);
+    if (n.left) { queue.push(n.left); snap('Left child ' + n.left.val + ' আছে: queue-র পেছনে যোগ করুন।', [10, 11], n); }
+    if (n.right) { queue.push(n.right); snap('Right child ' + n.right.val + ' আছে: queue-র পেছনে যোগ করুন।', [13, 14], n); }
+  }
+  steps.push({ text: 'Queue খালি। Output: [' + out.map(function (x) { return x.val; }).join(', ') + ']', line: 17, cur: null, queue: [], out: out.slice() });
+  return steps;
+}
+
+function layout(root) {
+  var pos = new Map(), xi = 0, maxd = 0;
+  (function walk(n, d) {
+    if (!n) return;
+    walk(n.left, d + 1);
+    pos.set(n, { x: xi++, d: d });
+    if (d > maxd) maxd = d;
+    walk(n.right, d + 1);
+  })(root, 0);
+  return { pos: pos, w: xi, h: maxd + 1 };
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+  var stepper = null, L = null;
+
+  function drawTree(st) {
+    var dx = 46, dy = 64, r = 18, pad = 10;
+    var W = Math.max(L.w * dx + pad * 2, 140), H = L.h * dy + pad;
+    var inList = new Set((st.stack || st.queue || []).filter(Boolean));
+    var inOut = new Set(st.out);
+    var parts = [];
+    function cx(n) { return pad + L.pos.get(n).x * dx + dx / 2; }
+    function cy(n) { return pad + L.pos.get(n).d * dy + r; }
+    L.pos.forEach(function (_, n) {
+      [n.left, n.right].forEach(function (c) {
+        if (c) parts.push(Viz.s('line', { class: 'edge', x1: cx(n), y1: cy(n), x2: cx(c), y2: cy(c) }));
+      });
+    });
+    L.pos.forEach(function (_, n) {
+      var cls = 'node';
+      if (n === st.cur) cls += ' hit'; else if (inOut.has(n)) cls += ' found'; else if (inList.has(n)) cls += ' range';
+      parts.push(Viz.s('circle', { class: cls, cx: cx(n), cy: cy(n), r: r }));
+      parts.push(Viz.s('text', { x: cx(n), y: cy(n) + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, text: String(n.val) }));
+    });
+    return Viz.svg(W, H, parts);
+  }
+
+  function render(st, i, body) {
+    body.appendChild(drawTree(st));
+    if (st.stack) {
+      var labels = st.stack.map(function (n) { return n ? n.val : 'nil'; });
+      var cls = {}, marks = {};
+      if (labels.length) { cls[labels.length - 1] = 'hit'; marks[labels.length - 1] = 'top'; }
+      body.appendChild(Viz.array(labels, { title: 'call stack (ডান দিকের শেষ call-টাই এখন run হচ্ছে)', indexes: false, classes: cls, marks: marks }));
+      if (!labels.length) body.appendChild(Viz.note('(call stack খালি)'));
+    } else if (st.queue) {
+      var q = st.queue.map(function (n) { return n.val; });
+      var qm = {}; if (q.length) { qm[0] = 'front'; }
+      body.appendChild(Viz.array(q, { title: 'queue (সামনে থেকে বের হয়, পেছনে যোগ হয়)', indexes: false, marks: qm }));
+      if (!q.length) body.appendChild(Viz.note('(queue খালি)'));
+    }
+    body.appendChild(Viz.array(st.out.map(function (n) { return n.val; }), { title: 'এ পর্যন্ত output', indexes: false, classes: (function () { var c = {}; st.out.forEach(function (_, k) { c[k] = 'found'; }); return c; })() }));
+    if (!st.out.length) body.appendChild(Viz.note('(এখনো কিছু visit হয়নি)'));
+  }
+
+  function parseInput(str) {
+    var toks = str.split(/[\s,]+/).filter(Boolean), out = [];
+    for (var i = 0; i < toks.length; i++) {
+      var t = toks[i].toLowerCase();
+      if (t === 'null' || t === 'nil' || t === 'n') out.push(null);
+      else { var v = Number(t); if (isNaN(v)) return { error: '"' + toks[i] + '" সংখ্যা বা null নয়।' }; out.push(v); }
+    }
+    return { tokens: out };
+  }
+  function countNodes(n) { return n ? 1 + countNodes(n.left) + countNodes(n.right) : 0; }
+
+  function run() {
+    errBox.textContent = '';
+    var p = parseInput(document.getElementById('tree').value);
+    if (p.error) { errBox.textContent = p.error; return; }
+    var root = parseTree(p.tokens);
+    if (!root) { errBox.textContent = 'প্রথম মান root, তাই এটি null হতে পারে না।'; return; }
+    if (countNodes(root) > 15) { errBox.textContent = 'ছবি পরিষ্কার রাখতে সর্বোচ্চ 15টি node ব্যবহার করুন।'; return; }
+    var mode = document.getElementById('mode').value;
+    L = layout(root);
+    app.innerHTML = '';
+    stepper = Viz.stepper({ mount: app, code: mode === 'level' ? LEVEL_CODE : codeFor(mode), render: render });
+    stepper.load(mode === 'level' ? genLevel(root) : genRecursive(root, mode));
+  }
+
+  document.getElementById('legend').appendChild(Viz.legend([
+    { cls: 'hit', label: 'বর্তমান node' }, { cls: 'range', label: 'অপেক্ষায় (stack-এ / queue-তে)' }, { cls: 'found', label: 'visit হয়েছে' },
+  ]));
+  document.getElementById('go').addEventListener('click', run);
+  document.getElementById('mode').addEventListener('change', run);
+  run();
+})();
+</script>
+</body>
+</html>

@@ -1,56 +1,49 @@
-# Chirpy Starter
+# mahinops.github.io
 
-[![Gem Version](https://img.shields.io/gem/v/jekyll-theme-chirpy)][gem]&nbsp;
-[![GitHub license](https://img.shields.io/github/license/cotes2020/chirpy-starter.svg?color=blue)][mit]
+Personal site of Mokhlesur Mahin: an About page, a blog (Go, DSA, DevOps and cloud notes) and the **Go Visual Learning** lessons.
 
-When installing the [**Chirpy**][chirpy] theme through [RubyGems.org][gem], Jekyll can only read files in the folders
-`_data`, `_layouts`, `_includes`, `_sass` and `assets`, as well as a small part of options of the `_config.yml` file
-from the theme's gem. If you have ever installed this theme gem, you can use the command
-`bundle info --path jekyll-theme-chirpy` to locate these files.
+Live at <https://mahinops.github.io>. Built with [Jekyll](https://jekyllrb.com) and the [Chirpy](https://github.com/cotes2020/jekyll-theme-chirpy) theme, deployed with GitHub Actions.
 
-The Jekyll team claims that this is to leave the ball in the user’s court, but this also results in users not being
-able to enjoy the out-of-the-box experience when using feature-rich themes.
+## What is where
 
-To fully use all the features of **Chirpy**, you need to copy the other critical files from the theme's gem to your
-Jekyll site. The following is a list of targets:
+| Path | What it is |
+|---|---|
+| `_posts/` | Blog posts |
+| `_tabs/` | Sidebar pages: About, Go Visual Learning, Archives, Categories, Tags |
+| `_data/` | Sidebar contact links, share buttons, and `lessons.yml` (generated, see below) |
+| `go-go-go/` | The interactive lessons, copied as static files from the `go-go-go` project |
+| `assets/img/` | Site images (profile photo) |
+| `assets/css/` | Custom styles on top of the theme |
+| `scripts/` | Helper scripts for the lessons |
+| `.github/workflows/` | Build and deploy pipeline |
+
+## Run it locally
 
 ```shell
-.
-├── _config.yml
-├── _plugins
-├── _tabs
-└── index.html
+bundle install
+bundle exec jekyll serve
 ```
 
-To save you time, and also in case you lose some files while copying, we extract those files/configurations of the
-latest version of the **Chirpy** theme and the [CD][CD] workflow to here, so that you can start writing in minutes.
+Then open <http://127.0.0.1:4000>.
 
-## Prerequisites
+## Write a post
 
-Follow the instructions in the [Jekyll Docs](https://jekyllrb.com/docs/installation/) to complete the installation of
-the basic environment. [Git](https://git-scm.com/) also needs to be installed.
+Add `_posts/YYYY-MM-DD-title.md` with front matter (`title`, `date`, `categories`, `tags`) and push to `main`.
 
-## Installation
+## Update the lessons
 
-Sign in to GitHub and [**use this template**][use-template] to generate a brand new repository and name it
-`USERNAME.github.io`, where `USERNAME` represents your GitHub username.
+The lessons are the `visual/` folder of the `go-go-go` project. To refresh them:
 
-Then clone it to your local machine and run:
-
-```console
-$ bundle
+```shell
+scripts/sync-lessons.sh /path/to/go-go-go/visual
 ```
 
-## Usage
+This copies the files into `go-go-go/` and regenerates `_data/lessons.yml`, which feeds the Go Visual Learning page. Commit and push to publish.
 
-Please see the [theme's docs](https://github.com/cotes2020/jekyll-theme-chirpy#documentation).
+## Deploy
+
+Every push to `main` runs `.github/workflows/pages-deploy.yml`: build with Jekyll, check internal links with `html-proofer`, publish to GitHub Pages.
 
 ## License
 
-This work is published under [MIT][mit] License.
-
-[gem]: https://rubygems.org/gems/jekyll-theme-chirpy
-[chirpy]: https://github.com/cotes2020/jekyll-theme-chirpy/
-[use-template]: https://github.com/cotes2020/chirpy-starter/generate
-[CD]: https://en.wikipedia.org/wiki/Continuous_deployment
-[mit]: https://github.com/cotes2020/chirpy-starter/blob/master/LICENSE
+[MIT](LICENSE), from the Chirpy starter.

@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Heap-এ push, pop ও heapify করার সময় sift up আর sift down কীভাবে কাজ করে, তা array ও tree দুই রূপেই দেখুন।">
+<title>Heap / Priority Queue</title>
+<link rel="stylesheet" href="../../assets/viz.css">
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">← সব visual</a> · <a href="../../dsa/heap-priority-queue.html">English</a></nav>
+  <h1>Heap / Priority Queue</h1>
+  <p class="lead">এমন একটি structure যেখানে সবচেয়ে ছোট item সবসময় উপরে থাকে, আর add বা remove করা দ্রুত হয়।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা (হাসপাতালের waiting room)</h2>
+    <p>Emergency room-এ কে আগে এসেছে সেটা নয়, বরং যার অবস্থা সবচেয়ে জরুরি তাকে আগে দেখা হয়। <b>Priority queue</b> ঠিক এটাই করে। <b>Min-heap</b> এটি বানানোর একটি কার্যকর উপায়: এমন একটি tree যেখানে <b>প্রতিটি parent তার children-এর চেয়ে ছোট বা সমান</b>। তাই সবচেয়ে ছোট মানটা সবসময় একদম উপরে (root-এ) থাকে এবং সাথে সাথে পাওয়া যায়।</p>
+    <p>মজার ব্যাপার হলো, tree-টা কোনো pointer ছাড়াই একটা সাধারণ array-তে রাখা হয়। <code>i</code> index-এর item-এর জন্য: <b>children</b> থাকে <code>2i+1</code> আর <code>2i+2</code>-তে, এবং <b>parent</b> থাকে <code>(i-1)/2</code>-তে। নিচের দুটি view আসলে একই data।</p>
+    <ul>
+      <li><b>Push</b>: নতুন item শেষে রাখুন, তারপর <b>sift up</b> করুন: parent-এর চেয়ে ছোট হলে parent-এর সাথে swap করুন।</li>
+      <li><b>Pop</b>: root নিয়ে নিন, শেষ item-কে root-এ আনুন, তারপর <b>sift down</b> করুন: ছোট child-এর চেয়ে বড় হলে swap করুন।</li>
+      <li><b>Heapify</b>: এলোমেলো array-কে heap বানান, শেষ parent থেকে root পর্যন্ত পেছনে এসে sift down করে।</li>
+    </ul>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+    <label>Operation (comma দিয়ে আলাদা করুন)<input id="ops" value="push 5, push 3, push 8, push 1, pop, pop" size="48"></label>
+    <button id="go">Run</button>
+  </div>
+  <div class="viz-note">অনুমোদিত: <b>push N</b>, <b>pop</b>, <b>heapify N N N ...</b> (heapify বর্তমান heap-কে ওই array দিয়ে বদলে দেয়)। সর্বোচ্চ 20টি operation এবং 15টি item।</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul>
+      <li><code>9, 7, 5, 3, 1</code> push করুন (বড়টা আগে)। প্রতিটি নতুন item একদম উপরে পৌঁছে যায়। কেন?</li>
+      <li><code>1, 2, 3, 4, 5</code> push করুন (ছোটটা আগে)। এবার কয়টি swap হয়?</li>
+      <li><code>heapify 9 8 7 6 5 4 3 2 1</code> run করুন এবং দেখুন tree নিচ থেকে উপরের দিকে কীভাবে ঠিক হয়।</li>
+      <li>বারবার pop করুন: মানগুলো sorted order-এ বের হয়। এটাই heap sort।</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul>
+      <li><b>array-টা sorted ভাবা।</b> শুধু parent &le; child নিয়মটা সত্য। Sibling আর cousin যেকোনো order-এ থাকতে পারে।</li>
+      <li><b>খালি heap-এ pop করা।</b> <code>h.a[0]</code> "index out of range" বলে panic করে। আগে length দেখে নিন।</li>
+      <li><b>index-এর হিসাব ভুল।</b> 0-based array-তে children থাকে <code>2i+1</code> আর <code>2i+2</code>-তে (1-based বইয়ে <code>2i</code> আর <code>2i+1</code>)।</li>
+      <li><b>আসল Go code-এ</b> সাধারণত <code>container/heap</code> ব্যবহার করা হয়, যা একই sift logic দিয়ে Push/Pop দেয়। এই page-এ দেখানো হয়েছে ভেতরে কী ঘটে।</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, সহজ ভাষায়:</b> সবচেয়ে ছোট মান পড়া সাথে সাথে হয় (<code>O(1)</code>)। Push আর pop root থেকে leaf পর্যন্ত একটি path ধরে যায়, তাই প্রায় log&#8322;(n) ধাপ লাগে (<code>O(log n)</code>): 1,000,000 item-এর জন্য মাত্র প্রায় 20টি swap। পুরো array-র heapify লাগে মাত্র <code>O(n)</code>।
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var CODE = [
+  'func (h *MinHeap) Push(x int) {',                    // 0
+  '    h.a = append(h.a, x)',                           // 1
+  '    i := len(h.a) - 1',                              // 2
+  '    for i > 0 {',                                    // 3
+  '        p := (i - 1) / 2',                           // 4
+  '        if h.a[p] <= h.a[i] {',                      // 5
+  '            break',                                  // 6
+  '        }',                                          // 7
+  '        h.a[p], h.a[i] = h.a[i], h.a[p]',            // 8
+  '        i = p',                                      // 9
+  '    }',                                              // 10
+  '}',                                                  // 11
+  '',                                                   // 12
+  'func (h *MinHeap) Pop() int {',                      // 13
+  '    top := h.a[0]',                                  // 14
+  '    last := len(h.a) - 1',                           // 15
+  '    h.a[0] = h.a[last]',                             // 16
+  '    h.a = h.a[:last]',                               // 17
+  '    h.siftDown(0)',                                  // 18
+  '    return top',                                     // 19
+  '}',                                                  // 20
+  '',                                                   // 21
+  'func (h *MinHeap) siftDown(i int) {',                // 22
+  '    n := len(h.a)',                                  // 23
+  '    for {',                                          // 24
+  '        l, r, small := 2*i+1, 2*i+2, i',             // 25
+  '        if l < n && h.a[l] < h.a[small] {',          // 26
+  '            small = l',                              // 27
+  '        }',                                          // 28
+  '        if r < n && h.a[r] < h.a[small] {',          // 29
+  '            small = r',                              // 30
+  '        }',                                          // 31
+  '        if small == i {',                            // 32
+  '            return',                                 // 33
+  '        }',                                          // 34
+  '        h.a[i], h.a[small] = h.a[small], h.a[i]',    // 35
+  '        i = small',                                  // 36
+  '    }',                                              // 37
+  '}',                                                  // 38
+  '',                                                   // 39
+  'func Heapify(a []int) *MinHeap {',                   // 40
+  '    h := &MinHeap{a: a}',                            // 41
+  '    for i := len(a)/2 - 1; i >= 0; i-- {',           // 42
+  '        h.siftDown(i)',                              // 43
+  '    }',                                              // 44
+  '    return h',                                       // 45
+  '}',                                                  // 46
+];
+
+/* ops: [{type:'push', v}, {type:'pop'}, {type:'heapify', arr}] -> {steps, popped, arr} */
+function gen(ops) {
+  var a = [], steps = [], popped = [], opLabel = '';
+  function snap(text, line, cls, marks) {
+    steps.push({ a: a.slice(), cls: cls || {}, marks: marks || {}, text: text, line: line, op: opLabel, popped: popped.slice() });
+  }
+  function one(i, c) { var o = {}; o[i] = c; return o; }
+  function allFound() { var o = {}; a.forEach(function (_, i) { o[i] = 'found'; }); return o; }
+
+  function siftDown(i) {
+    var n = a.length;
+    while (true) {
+      var l = 2 * i + 1, r = 2 * i + 2, small = i;
+      var cls = {}, marks = {};
+      cls[i] = 'hit'; marks[i] = 'i';
+      if (l < n) { cls[l] = 'range'; marks[l] = 'left'; }
+      if (r < n) { cls[r] = 'range'; marks[r] = 'right'; }
+      if (l < n && a[l] < a[small]) small = l;
+      if (r < n && a[r] < a[small]) small = r;
+      var txt;
+      if (l >= n) txt = 'Index ' + i + ' (মান ' + a[i] + ') এর কোনো child নেই, তাই এটি আগে থেকেই ঠিক জায়গায় আছে।';
+      else txt = 'তুলনা: a[' + i + ']=' + a[i] + ' আর তার children a[' + l + ']=' + a[l] + (r < n ? ' ও a[' + r + ']=' + a[r] : '') + '। তিনটির মধ্যে সবচেয়ে ছোট মান ' + a[small] + '।';
+      snap(txt, [25, 26, 29], cls, marks);
+      if (small === i) {
+        snap('' + a[i] + '-এর চেয়ে ছোট কোনো child নেই: heap-এর নিয়ম ঠিক আছে। এখানেই থামুন।', [32, 33], one(i, 'found'));
+        return;
+      }
+      var t = a[i]; a[i] = a[small]; a[small] = t;
+      var c2 = {}; c2[i] = 'found'; c2[small] = 'hit';
+      snap('Swap করুন: a[' + i + '] ও a[' + small + ']: ছোট মান উপরে ওঠে, বড় মান নিচে নামে।', [35, 36], c2, one(small, 'i'));
+      i = small;
+    }
+  }
+
+  function push(x) {
+    a.push(x);
+    var i = a.length - 1;
+    snap('Push ' + x + ': পরবর্তী ফাঁকা জায়গায়, অর্থাৎ শেষে রাখুন (index ' + i + ')।', [1, 2], one(i, 'hit'), one(i, 'new'));
+    while (i > 0) {
+      var p = (i - 1) >> 1;
+      var c = {}, m = {};
+      c[p] = 'range'; c[i] = 'hit'; m[p] = 'parent'; m[i] = 'i';
+      snap('index ' + i + ' এর parent হলো index ' + p + ' ((i-1)/2 সূত্রে)। তুলনা: a[' + p + ']=' + a[p] + ' আর a[' + i + ']=' + a[i] + '।', [3, 4, 5], c, m);
+      if (a[p] <= a[i]) {
+        var f = {}; f[p] = 'found'; f[i] = 'found';
+        snap('Parent ' + a[p] + ' ≤ ' + a[i] + ': heap-এর নিয়ম ঠিক আছে। এখানেই থামুন।', [5, 6], f);
+        return;
+      }
+      var t = a[p]; a[p] = a[i]; a[i] = t;
+      i = p;
+      snap('Child তার parent-এর চেয়ে ছোট ছিল, তাই swap করুন। নতুন item উপরে উঠে index ' + i + '-এ এসেছে।', [8, 9], one(i, 'hit'), one(i, 'i'));
+    }
+    snap('নতুন item root-এ (index 0) পৌঁছে গেছে: এর উপরে আর কিছু নেই। এখানেই থামুন।', 3, one(0, 'found'));
+  }
+
+  function pop() {
+    if (!a.length) { snap('খালি heap-এ pop: Go-তে h.a[0] "index out of range" বলে panic করত। এখানে কিছু হয় না।', 14); return; }
+    var top = a[0];
+    snap('সবচেয়ে ছোট মান সবসময় root-এ থাকে: top = a[0] = ' + top + '।', 14, one(0, 'hit'), one(0, 'top'));
+    var last = a.length - 1, lv = a[last];
+    a[0] = lv; a.length = last;
+    if (!a.length) snap('এটাই একমাত্র item ছিল, তাই heap এখন খালি।', [15, 16, 17]);
+    else {
+      snap('শেষ item (' + lv + ') root-এ আনুন এবং array এক ঘর ছোট করুন। এখন root-এ heap-এর নিয়ম ভেঙে যেতে পারে।', [15, 16, 17], one(0, 'hit'), one(0, 'i'));
+      snap('siftDown(0) call করুন, যাতে এটি নিজের সঠিক জায়গায় নেমে যায়।', 18, one(0, 'hit'), one(0, 'i'));
+      siftDown(0);
+    }
+    popped.push(top);
+    snap('Pop return করে ' + top + '। এ পর্যন্ত pop হয়েছে: [' + popped.join(', ') + ']।', 19, allFound());
+  }
+
+  function heapify(arr) {
+    a = arr.slice();
+    snap('এলোমেলো একটি array থেকে শুরু করুন। এটাকে tree ভাবুন, কিন্তু heap-এর নিয়ম এখনো খাটছে না।', [40, 41]);
+    for (var i = Math.floor(a.length / 2) - 1; i >= 0; i--) {
+      snap('Index ' + i + '-এর subtree ঠিক করুন। শেষ parent থেকে শুরু করে root পর্যন্ত পেছনে আসব; leaf গুলো নিজে থেকেই ঠিক আছে।', [42, 43], one(i, 'hit'), one(i, 'i'));
+      siftDown(i);
+    }
+    snap('Heapify শেষ: প্রতিটি parent তার children-এর চেয়ে ছোট বা সমান।', 45, allFound());
+  }
+
+  ops.forEach(function (op, k) {
+    opLabel = 'Operation ' + (k + 1) + ' / ' + ops.length + ': ' + (op.type === 'push' ? 'push ' + op.v : op.type === 'pop' ? 'pop' : 'heapify [' + op.arr.join(', ') + ']');
+    if (op.type === 'push') push(op.v);
+    else if (op.type === 'pop') pop();
+    else heapify(op.arr);
+  });
+  return { steps: steps, popped: popped, arr: a };
+}
+
+function parseOps(str) {
+  var parts = str.split(',').map(function (s) { return s.trim(); }).filter(Boolean), ops = [], m;
+  if (!parts.length) return { error: 'অন্তত একটি operation লিখুন, যেমন: push 5, pop' };
+  if (parts.length > 20) return { error: 'সর্বোচ্চ 20টি operation ব্যবহার করুন।' };
+  for (var i = 0; i < parts.length; i++) {
+    if ((m = /^push\s+(-?\d+)$/i.exec(parts[i]))) ops.push({ type: 'push', v: parseInt(m[1], 10) });
+    else if (/^pop$/i.test(parts[i])) ops.push({ type: 'pop' });
+    else if ((m = /^heapify\s+((?:-?\d+\s*)+)$/i.exec(parts[i]))) ops.push({ type: 'heapify', arr: m[1].trim().split(/\s+/).map(Number) });
+    else return { error: 'বুঝতে পারছি না: "' + parts[i] + '"। push N, pop, বা heapify N N N লিখুন।' };
+  }
+  return { ops: ops };
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+
+  function treeSvg(st) {
+    var n = st.a.length;
+    if (!n) return Viz.note('(heap খালি)');
+    var levels = Math.floor(Math.log2(n)) + 1;
+    var slots = Math.pow(2, levels - 1);
+    var unit = 46, r = 18, dy = 58, pad = 10;
+    var W = Math.max(slots * unit + pad * 2, 140), H = levels * dy + pad;
+    var parts = [];
+    function px(i) { var d = Math.floor(Math.log2(i + 1)); var idxInLevel = i - (Math.pow(2, d) - 1); var span = (W - pad * 2) / Math.pow(2, d); return pad + (idxInLevel + 0.5) * span; }
+    function py(i) { return pad + Math.floor(Math.log2(i + 1)) * dy + r; }
+    for (var i = 1; i < n; i++) {
+      var p = (i - 1) >> 1;
+      parts.push(Viz.s('line', { class: 'edge', x1: px(p), y1: py(p), x2: px(i), y2: py(i) }));
+    }
+    for (var j = 0; j < n; j++) {
+      var cls = 'node' + (st.cls[j] ? ' ' + st.cls[j] : '');
+      parts.push(Viz.s('circle', { class: cls, cx: px(j), cy: py(j), r: r }));
+      parts.push(Viz.s('text', { x: px(j), y: py(j) + 5, 'text-anchor': 'middle', 'font-size': 14, 'font-weight': 700, text: String(st.a[j]) }));
+    }
+    return Viz.svg(W, H, parts);
+  }
+
+  function render(st, i, body) {
+    body.appendChild(Viz.note('<b>' + st.op + '</b>'));
+    if (st.a.length) body.appendChild(Viz.array(st.a, { title: 'array  (i-এর children হলো 2i+1 আর 2i+2)', classes: st.cls, marks: st.marks }));
+    else body.appendChild(Viz.note('array: [ ]  (খালি)'));
+    body.appendChild(Viz.note('একই data tree আকারে আঁকলে:'));
+    body.appendChild(treeSvg(st));
+    if (st.popped.length) body.appendChild(Viz.note('এ পর্যন্ত pop হয়েছে: <b>[' + st.popped.join(', ') + ']</b>'));
+  }
+
+  function run() {
+    errBox.textContent = '';
+    var p = parseOps(document.getElementById('ops').value);
+    if (p.error) { errBox.textContent = p.error; return; }
+    var g = gen(p.ops);
+    var maxLen = Math.max.apply(null, g.steps.map(function (s) { return s.a.length; }));
+    if (maxLen > 15) { errBox.textContent = 'Heap বাড়তে বাড়তে ' + maxLen + 'টি item হয়ে যাবে। দয়া করে 15টি বা তার কম রাখুন।'; return; }
+    app.innerHTML = '';
+    var st = Viz.stepper({ mount: app, code: CODE, render: render });
+    st.load(g.steps);
+  }
+
+  document.getElementById('legend').appendChild(Viz.legend([
+    { cls: 'hit', label: 'যে item সরানো / যাচাই করা হচ্ছে' }, { cls: 'range', label: 'যে parent বা child-এর সাথে তুলনা হচ্ছে' }, { cls: 'found', label: 'আপাতত নিজের জায়গায়' },
+  ]));
+  document.getElementById('go').addEventListener('click', run);
+  run();
+})();
+</script>
+</body>
+</html>

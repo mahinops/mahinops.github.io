@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backtracking - visual</title>
+<meta name="description" content="Explore choices, undo the last one when stuck, and try the next, shown as a decision tree and an N-Queens board.">
+<link rel="stylesheet" href="../assets/viz.css">
+<style>.viz-svg .halo{paint-order:stroke;stroke:var(--card);stroke-width:4px;stroke-linejoin:round}.viz-svg .node.memo{fill:#7048e8;stroke:#b197fc}.viz-svg text.memo{fill:#fff}.stat{font:14px var(--mono);margin:4px 0}.stackbox{font:13px var(--mono);margin:6px 0}.frame{display:inline-block;border:2px solid var(--cell-line);border-radius:6px;padding:1px 7px;margin:2px;background:var(--cell)}.frame.top{background:var(--hit);border-color:var(--hit-line)}.board{display:grid;gap:0;border:2px solid var(--cell-line);width:max-content;margin:8px 0}.sq{width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:30px;background:var(--cell)}.sq.dark{background:var(--dim)}.sq.try{outline:3px solid var(--hit-line);outline-offset:-3px;background:var(--hit)}.sq.bad{background:var(--bad);outline:3px solid var(--bad-line);outline-offset:-3px}.sq.cf{background:var(--hit)}.sq.sol{background:var(--found)}.sq.ok{background:var(--found);outline:3px solid var(--found-line);outline-offset:-3px}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/backtracking.html">বাংলা</a></nav>
+  <h1>Backtracking</h1>
+  <p class="lead">Try a choice, explore where it leads, undo it, and try the next one.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea</h2>
+    <p>Walking through a <b>maze</b> with chalk: at each fork you pick a path and keep going. If you hit a dead end you walk back to the last fork (<b>backtrack</b>), rub out your chalk mark and take the other path. Backtracking systematically tries every possibility but gives up on a branch as soon as it cannot work.</p>
+<p>The pattern is always: <b>choose</b> &rarr; <b>explore</b> (recursion) &rarr; <b>un-choose</b>. Subsets: for each item decide &ldquo;take it&rdquo; or &ldquo;skip it&rdquo;. N-Queens: place one queen per row; if a square is attacked, skip it; if a row has no safe square, go back and move the previous queen.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+  <label>Problem<select id="mode"><option value="sub">All subsets (decision tree)</option><option value="nq">N-Queens (board)</option></select></label>
+  <label id="itemsWrap">Items (1 to 4)<input id="items" value="1, 2, 3" size="12"></label>
+  <label id="nWrap">Board size n<select id="n"><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option></select></label>
+  <label id="firstWrap">Stop at first solution<select id="first"><option value="1" selected>Yes</option><option value="0">No (find all)</option></select></label>
+  <button id="go">Run</button>
+</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul><li>Subsets: add a 4th item. How many leaves (subsets) are there now? (It doubles with each item.)</li><li>Watch the <b>path</b> line: it grows on &ldquo;take&rdquo; and shrinks on &ldquo;backtrack&rdquo;. That shrink is the undo step.</li><li>N-Queens n = 4: watch the red squares. What does the message say about <i>why</i> a square is attacked?</li><li>N-Queens: set &ldquo;Stop at first solution&rdquo; to No and count the solutions found for n = 4, 5 and 6.</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul><li><b>Forgetting to undo</b> (the &ldquo;un-choose&rdquo; step): later branches then see leftover choices.</li><li><b>Saving the path without copying it:</b> in Go, <code>append(res, path)</code> shares memory that is changed later. Copy: <code>append([]int{}, path...)</code>.</li><li><b>Not pruning:</b> checking safety only at the end explores far more branches than necessary.</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">How fast is it?</h2>
+    <p>Subsets: <b>O(2<sup>n</sup>)</b> results, so O(n&middot;2<sup>n</sup>) time to build them. N-Queens: worse than polynomial but pruning (skipping attacked squares early) cuts the search enormously compared with trying all placements. Space: O(n) recursion depth plus the stored results.</p>
+  </div>
+
+  <div class="pagenav"><a href="recursion-call-tree.html">&larr; Recursion Call Tree</a><span></span></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script id="algo">
+
+function subsetsSteps(nums) {
+  var nodes = [], steps = [], path = [], res = [], stackIds = [], active = null;
+  function snap(line, text, extra) {
+    steps.push(Object.assign({
+      nodes: nodes, line: line, text: text, path: path.slice(), res: res.map(function (r) { return r.slice(); }),
+      states: nodes.map(function (nd) { return stackIds.indexOf(nd.id) !== -1 ? (nd.id === active ? 'active' : 'wait') : nd.fin; }),
+    }, extra || {}));
+  }
+  function dfs(i, parent, edge) {
+    var nd = { id: nodes.length, i: i, kids: [], parent: parent, edge: edge, path: path.slice(), fin: '' };
+    nodes.push(nd); if (parent !== null) nodes[parent].kids.push(nd.id);
+    stackIds.push(nd.id); active = nd.id;
+    snap([4, 5], i === nums.length ? 'dfs(' + i + '): every item has been decided.' : 'dfs(' + i + '): decide what to do with nums[' + i + '] = ' + nums[i] + '.');
+    if (i === nums.length) {
+      res.push(path.slice()); nd.fin = 'done';
+      snap([5, 6, 7], 'Record a COPY of the path: [' + path.join(', ') + ']. That is subset number ' + res.length + '.');
+      stackIds.pop(); active = parent; return;
+    }
+    path.push(nums[i]);
+    snap(9, 'Choose: take ' + nums[i] + '. path = [' + path.join(', ') + ']. Now explore deeper.');
+    dfs(i + 1, nd.id, 'take ' + nums[i]); active = nd.id;
+    path.pop();
+    snap(11, 'Backtrack: un-choose ' + nums[i] + '. path = [' + path.join(', ') + '].');
+    snap(12, 'Now explore the other option: skip ' + nums[i] + '.');
+    dfs(i + 1, nd.id, 'skip'); active = nd.id;
+    nd.fin = 'done'; stackIds.pop(); active = parent;
+  }
+  dfs(0, null, '');
+  snap(15, 'Finished. ' + res.length + ' subsets in total (2 choices per item: 2^' + nums.length + ' = ' + Math.pow(2, nums.length) + ').', { done: true, result: res.map(function (r) { return r.slice(); }) });
+  return steps;
+}
+function nqueensSteps(n, firstOnly) {
+  var steps = [], cols = [], sols = [], stop = false;
+  function snap(line, text, extra) { steps.push(Object.assign({ n: n, cols: cols.slice(), nsol: sols.length, line: line, text: text }, extra || {})); }
+  function conflict(row, c) {
+    for (var r = 0; r < cols.length; r++) { var cc = cols[r]; if (cc === c || cc - c === row - r || c - cc === row - r) return r; }
+    return -1;
+  }
+  function solve(row) {
+    if (stop) return;
+    if (row === n) {
+      sols.push(cols.slice());
+      snap([1, 2, 3], 'Every row has a queen and none attack each other: solution #' + sols.length + ' found!', { solution: true });
+      if (firstOnly) stop = true;
+      return;
+    }
+    var placedAny = false;
+    for (var c = 0; c < n && !stop; c++) {
+      snap(5, 'Row ' + row + ': try column ' + c + '.', { tryAt: [row, c] });
+      var cf = conflict(row, c);
+      if (cf >= 0) {
+        var cc = cols[cf], why = cc === c ? 'the same column' : 'the same diagonal';
+        snap(6, 'Not safe: the queen at row ' + cf + ', column ' + cc + ' attacks this square along ' + why + '. Skip it.', { tryAt: [row, c], bad: true, culprit: [cf, cc] });
+      } else {
+        placedAny = true;
+        cols.push(c);
+        snap([6, 7], 'Safe! Place a queen at row ' + row + ', column ' + c + ', then move to row ' + (row + 1) + '.', { tryAt: [row, c], ok: true });
+        solve(row + 1);
+        if (stop) return;
+        cols.pop();
+        snap(9, 'Backtrack: remove the queen from row ' + row + ', column ' + c + ' and try the next column.', { tryAt: [row, c], removed: true });
+      }
+    }
+    if (!stop && !placedAny && row < n) snap(11, 'Dead end: no column in row ' + row + ' works, so go back to the previous row and move that queen.', {});
+  }
+  snap(0, 'Place ' + n + ' queens on a ' + n + 'x' + n + ' board so that none attack each other. One queen per row.');
+  solve(0);
+  snap(undefined, sols.length ? (firstOnly ? 'Stopped at the first solution.' : 'Search complete: ' + sols.length + ' solution(s) in total.') : 'Search complete: no solution.', { done: true, result: sols.map(function (s) { return s.slice(); }) });
+  return steps;
+}
+
+</script>
+<script id="ui">
+
+function $id(x) { return document.getElementById(x); }
+function showErr(m) { $id('err').textContent = m || ''; }
+var current = null;
+function mountStepper(opts) {
+  if (current) current.pause();
+  var app = $id('app'); app.innerHTML = ''; app.className = '';
+  current = Viz.stepper(Object.assign({ mount: '#app' }, opts));
+  return current;
+}
+function setLegend(items) { var l = $id('legend'); l.innerHTML = ''; l.appendChild(Viz.legend(items)); }
+function mark(marks, ix, label) { marks[ix] = (marks[ix] || []).concat(label); }
+
+
+var _layoutCache = null;
+function layoutTree(nodes, dx, dy) {
+  if (_layoutCache && _layoutCache.nodes === nodes && _layoutCache.dx === dx) return _layoutCache.L;
+  var slot = 0, pos = {}, maxD = 0;
+  function visit(id, d) {
+    var nd = nodes[id]; maxD = Math.max(maxD, d);
+    if (!nd.kids.length) { pos[id] = { x: slot * dx + dx / 2, y: d * dy + 30 }; slot++; }
+    else {
+      nd.kids.forEach(function (k) { visit(k, d + 1); });
+      pos[id] = { x: (pos[nd.kids[0]].x + pos[nd.kids[nd.kids.length - 1]].x) / 2, y: d * dy + 30 };
+    }
+  }
+  visit(0, 0);
+  var L = { pos: pos, width: slot * dx, height: maxD * dy + 80 };
+  _layoutCache = { nodes: nodes, dx: dx, L: L };
+  return L;
+}
+var STATE_CLASS = { '': 'dim', wait: 'range', active: 'hit', done: 'found', memo: 'memo' };
+function drawTree(body, nodes, st, o) {
+  var L = layoutTree(nodes, o.dx, o.dy), W = Math.max(L.width, 220), kids = [];
+  nodes.forEach(function (nd) {
+    nd.kids.forEach(function (k) {
+      var a = L.pos[nd.id], b = L.pos[k], stt = st.states[k], seen = stt !== undefined && stt !== '';
+      kids.push(Viz.s('line', { x1: a.x, y1: a.y + 15, x2: b.x, y2: b.y - 15, class: 'edge' + (stt === 'active' ? ' hit' : seen ? ' found' : ''), style: seen ? '' : 'opacity:.2' }));
+      if (nodes[k].edge && seen) kids.push(Viz.s('text', { x: (a.x + b.x) / 2 + (b.x < a.x ? -16 : 16), y: (a.y + b.y) / 2 + 3, 'text-anchor': 'middle', class: 'halo', style: 'font-size:10px', text: nodes[k].edge }));
+    });
+  });
+  nodes.forEach(function (nd) {
+    var p = L.pos[nd.id], stt = st.states[nd.id] || '', cls = STATE_CLASS[stt];
+    kids.push(Viz.s('rect', { x: p.x - o.w / 2, y: p.y - 15, width: o.w, height: 30, rx: 8, class: 'node ' + cls, style: stt === '' ? 'opacity:.35' : '' }));
+    kids.push(Viz.s('text', { x: p.x, y: p.y + 4, 'text-anchor': 'middle', class: stt === 'memo' ? 'memo' : '', style: 'font-size:12px;font-weight:700' + (stt === '' ? ';opacity:.4' : ''), text: o.label(nd) }));
+    var sub = stt === '' ? '' : o.sub(nd, st);
+    if (sub) kids.push(Viz.s('text', { x: p.x, y: p.y + 31, 'text-anchor': 'middle', class: 'halo', style: 'font-size:11px', text: sub }));
+  });
+  var svg = Viz.svg(W, L.height, kids);
+  svg.style.maxWidth = 'none'; svg.style.width = W + 'px'; svg.setAttribute('width', W);
+  body.appendChild(svg);
+}
+
+var SUB_CODE = ['func subsets(nums []int) [][]int {',
+'    var res [][]int',
+'    var path []int',
+'    var dfs func(i int)',
+'    dfs = func(i int) {',
+'        if i == len(nums) {',
+'            res = append(res, append([]int{}, path...))',
+'            return',
+'        }',
+'        path = append(path, nums[i])      // choose',
+'        dfs(i + 1)',
+'        path = path[:len(path)-1]         // un-choose (backtrack)',
+'        dfs(i + 1)                        // skip',
+'    }',
+'    dfs(0)',
+'    return res',
+'}'];
+var NQ_CODE = ['func solve(row int, cols []int, n int, res *[][]int) {',
+'    if row == n {',
+'        *res = append(*res, append([]int{}, cols...))',
+'        return',
+'    }',
+'    for c := 0; c < n; c++ {',
+'        if safe(cols, row, c) {',
+'            cols = append(cols, c)            // place',
+'            solve(row+1, cols, n, res)',
+'            cols = cols[:len(cols)-1]         // remove (backtrack)',
+'        }',
+'    }',
+'}',
+'func safe(cols []int, row, c int) bool {',
+'    for r, cc := range cols {',
+'        if cc == c || cc-c == row-r || c-cc == row-r {',
+'            return false',
+'        }',
+'    }',
+'    return true',
+'}'];
+function renderSub(st, i, body) {
+  drawTree(body, st.nodes, st, {
+    dx: 84, dy: 76, w: 76,
+    label: function (nd) { return '[' + nd.path.join(',') + ']'; },
+    sub: function () { return ''; },
+  });
+  body.appendChild(Viz.el('div', { class: 'stat', html: 'path = <b>[' + st.path.join(', ') + ']</b>' }));
+  body.appendChild(Viz.el('div', { class: 'stackbox' }, [Viz.el('span', { text: 'subsets found (' + st.res.length + '): ' })].concat(
+    st.res.length ? st.res.map(function (r) { return Viz.el('span', { class: 'frame', text: '[' + r.join(',') + ']' }); }) : [Viz.el('span', { text: '(none yet)' })])));
+}
+function renderNq(st, i, body) {
+  var n = st.n, cells = [];
+  for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) {
+    var cls = 'sq' + ((r + c) % 2 ? ' dark' : ''), txt = '';
+    if (st.cols[r] === c) txt = '♛';
+    if (st.solution && st.cols[r] === c) cls += ' sol';
+    if (st.culprit && st.culprit[0] === r && st.culprit[1] === c) cls += ' cf';
+    if (st.tryAt && st.tryAt[0] === r && st.tryAt[1] === c) cls = 'sq' + ((r + c) % 2 ? ' dark' : '') + (st.bad ? ' bad' : st.ok ? ' ok' : ' try');
+    cells.push(Viz.el('div', { class: cls, text: txt }));
+  }
+  var board = Viz.el('div', { class: 'board', style: { gridTemplateColumns: 'repeat(' + n + ', 52px)' } }, cells);
+  body.appendChild(board);
+  body.appendChild(Viz.el('div', { class: 'stat', html: 'queens placed = <b>' + st.cols.length + '</b> / ' + n + ' &nbsp; solutions found = <b>' + st.nsol + '</b>' }));
+}
+function render(st, i, body) { if (st.n !== undefined) renderNq(st, i, body); else renderSub(st, i, body); }
+function run() {
+  showErr('');
+  var mode = $id('mode').value;
+  if (mode === 'sub') {
+    var items = Viz.parseNums($id('items').value);
+    if (!items.length || items.length > 4) { showErr('Enter between 1 and 4 items.'); return; }
+    setLegend([{ cls: 'hit', label: 'current call' }, { cls: 'range', label: 'waiting (on the path)' }, { cls: 'found', label: 'finished' }, { cls: 'dim', label: 'not reached yet' }]);
+    mountStepper({ code: SUB_CODE, render: render }).load(subsetsSteps(items));
+  } else {
+    var n = Number($id('n').value), first = $id('first').value === '1';
+    setLegend([{ cls: 'hit', label: 'square being tried' }, { cls: 'bad', label: 'attacked (skip)' }, { cls: 'ok', label: 'safe (place)' }, { cls: 'found', label: 'solution' }]);
+    mountStepper({ code: NQ_CODE, render: render }).load(nqueensSteps(n, first));
+  }
+}
+$id('mode').addEventListener('change', function () {
+  var sub = $id('mode').value === 'sub';
+  $id('itemsWrap').style.display = sub ? '' : 'none'; $id('nWrap').style.display = sub ? 'none' : ''; $id('firstWrap').style.display = sub ? 'none' : '';
+  run();
+});
+$id('nWrap').style.display = 'none'; $id('firstWrap').style.display = 'none';
+$id('go').addEventListener('click', run);
+run();
+
+</script>
+</body>
+</html>

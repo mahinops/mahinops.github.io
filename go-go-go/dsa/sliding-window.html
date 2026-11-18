@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sliding Window - visual</title>
+<meta name="description" content="Slide a window across a list, adding the new item and dropping the old one, instead of recomputing from scratch.">
+<link rel="stylesheet" href="../assets/viz.css">
+<style>.seen{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.chip{font:600 14px var(--mono);border:2px solid var(--cell-line);border-radius:8px;padding:3px 8px;background:var(--cell)}.chip.hit{background:var(--hit);border-color:var(--hit-line)}.stat{font:14px var(--mono);margin:4px 0}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/sliding-window.html">বাংলা</a></nav>
+  <h1>Sliding Window</h1>
+  <p class="lead">Reuse the work from the last position instead of starting over.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea</h2>
+    <p>Picture looking through a frame that shows 3 houses at a time while you walk down a street. To know the total value of the houses in view after one step, you do not re-add all 3: you <b>add the new house that appeared</b> and <b>subtract the one that left</b>.</p>
+<p>A window can also <b>grow and shrink</b>: for &ldquo;longest stretch with no repeated letter&rdquo;, the right edge grows one letter at a time, and when a repeat appears the left edge jumps forward just far enough to remove it.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+  <label>Problem<select id="mode"><option value="max">Max sum of k in a row (fixed window)</option><option value="longest">Longest substring without repeats (growing window)</option></select></label>
+  <label id="numsWrap">Numbers<input id="arr" value="2, 1, 5, 1, 3, 2, 9, 1"></label>
+  <label id="kWrap">k (window size)<input id="k" value="3" size="4"></label>
+  <label id="strWrap">Text<input id="str" value="abcabcbb" size="16"></label>
+  <button id="go">Run</button>
+</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul><li>Fixed window: use k = 1, then k = the full length. What does each case do?</li><li>Notice how the sum changes by <i>one add and one subtract</i> per slide, never a full re-add.</li><li>Longest substring: try <code>pwwkew</code>. Watch the left edge jump when a repeat shows up.</li><li>Try a text with all different letters, then one with all the same letter.</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul><li><b>Re-adding the whole window</b> each time turns O(n) into O(n&middot;k).</li><li><b>Off-by-one on the dropped item:</b> when the window ends at <code>i</code>, the item that just left is <code>nums[i-k]</code>.</li><li><b>Forgetting stale entries:</b> in the substring version a letter seen <i>before</i> the window start must be ignored (<code>idx &gt;= left</code>).</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">How fast is it?</h2>
+    <p><b>Time: O(n)</b> &ndash; every item enters the window once and leaves at most once. <b>Space: O(1)</b> for the fixed window; O(alphabet) for the substring version (the map of last-seen positions).</p>
+  </div>
+
+  <div class="pagenav"><a href="two-pointers.html">&larr; Two Pointers</a><a href="hash-map-two-sum.html">Hash Map: Two Sum &rarr;</a></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script id="algo">
+
+function maxSumSteps(nums, k) {
+  var steps = [], sum = 0, best = null, bestFrom = 0;
+  function snap(line, text, extra) { steps.push(Object.assign({ mode: 'max', nums: nums, sum: sum, best: best, bestFrom: bestFrom, k: k, line: line, text: text }, extra || {})); }
+  for (var i = 0; i < k; i++) {
+    sum += nums[i];
+    snap([2, 3], 'Build the first window: add nums[' + i + '] = ' + nums[i] + ', so sum = ' + sum + '.', { from: 0, to: i, add: i });
+  }
+  best = sum; bestFrom = 0;
+  snap(5, 'The first window is complete. sum = ' + sum + ', so best = ' + best + ' so far.', { from: 0, to: k - 1 });
+  for (var j = k; j < nums.length; j++) {
+    sum += nums[j] - nums[j - k];
+    snap([6, 7], 'Slide right: add nums[' + j + '] = ' + nums[j] + ' and drop nums[' + (j - k) + '] = ' + nums[j - k] + '. New sum = ' + sum + ' (one add, one subtract).', { from: j - k + 1, to: j, add: j, drop: j - k });
+    if (sum > best) { best = sum; bestFrom = j - k + 1; snap(8, 'New window sum ' + sum + ' beats the old best, so best = ' + best + '.', { from: j - k + 1, to: j }); }
+    else snap(8, 'Sum ' + sum + ' does not beat best (' + best + '). Keep best = ' + best + '.', { from: j - k + 1, to: j });
+  }
+  snap(10, 'No more items to slide over. Return best = ' + best + '.', { from: bestFrom, to: bestFrom + k - 1, done: true, result: best });
+  return steps;
+}
+function longestSteps(s) {
+  var chars = s.split(''), steps = [], seen = {}, left = 0, best = 0, bl = 0, br = -1;
+  function copy(o) { return JSON.parse(JSON.stringify(o)); }
+  function snap(line, text, extra) { steps.push(Object.assign({ mode: 'longest', chars: chars, left: left, seen: copy(seen), best: best, bl: bl, br: br, line: line, text: text }, extra || {})); }
+  snap(2, 'Start: left = 0 and the map of last-seen positions is empty.', { right: -1 });
+  for (var right = 0; right < chars.length; right++) {
+    var c = chars[right], has = Object.prototype.hasOwnProperty.call(seen, c), idx = has ? seen[c] : -1, inside = has && idx >= left;
+    var t = 'Look at "' + c + '" at index ' + right + '. ';
+    if (inside) t += 'It already appears at index ' + idx + ', inside the window: a repeat!';
+    else if (has) t += 'It was seen at index ' + idx + ', but that is before the window start, so it does not count.';
+    else t += 'Never seen before, so the window can grow.';
+    snap(4, t, { right: right, cur: c });
+    if (inside) {
+      left = idx + 1;
+      snap([4, 5], 'Move left to ' + left + ' (just past the old "' + c + '") so the window has no repeats again.', { right: right, cur: c });
+    }
+    seen[c] = right;
+    if (right - left + 1 > best) { best = right - left + 1; bl = left; br = right; }
+    snap([7, 8], 'Remember "' + c + '" is at index ' + right + '. Window length = ' + right + ' - ' + left + ' + 1 = ' + (right - left + 1) + '. best = ' + best + '.', { right: right, cur: c });
+  }
+  snap(10, 'Done. The longest substring without repeats has length ' + best + (best ? ': "' + chars.slice(bl, br + 1).join('') + '".' : '.'), { right: chars.length - 1, done: true, result: best });
+  return steps;
+}
+
+</script>
+<script id="ui">
+
+function $id(x) { return document.getElementById(x); }
+function showErr(m) { $id('err').textContent = m || ''; }
+var current = null;
+function mountStepper(opts) {
+  if (current) current.pause();
+  var app = $id('app'); app.innerHTML = ''; app.className = '';
+  current = Viz.stepper(Object.assign({ mount: '#app' }, opts));
+  return current;
+}
+function setLegend(items) { var l = $id('legend'); l.innerHTML = ''; l.appendChild(Viz.legend(items)); }
+function mark(marks, ix, label) { marks[ix] = (marks[ix] || []).concat(label); }
+
+
+var MAX_CODE = ['func maxSum(nums []int, k int) int {',
+'    sum := 0',
+'    for i := 0; i < k; i++ {',
+'        sum += nums[i]',
+'    }',
+'    best := sum',
+'    for i := k; i < len(nums); i++ {',
+'        sum += nums[i] - nums[i-k]',
+'        best = max(best, sum)',
+'    }',
+'    return best',
+'}'];
+var LONG_CODE = ['func lengthOfLongest(s string) int {',
+'    seen := map[byte]int{} // last index of each byte',
+'    left, best := 0, 0',
+'    for right := 0; right < len(s); right++ {',
+'        if idx, ok := seen[s[right]]; ok && idx >= left {',
+'            left = idx + 1',
+'        }',
+'        seen[s[right]] = right',
+'        best = max(best, right-left+1)',
+'    }',
+'    return best',
+'}'];
+function render(st, i, body) {
+  if (st.mode === 'max') {
+    var cls = {}, marks = {};
+    st.nums.forEach(function (_, ix) { cls[ix] = (ix >= st.from && ix <= st.to) ? 'range' : 'dim'; });
+    if (st.drop !== undefined) cls[st.drop] = 'bad';
+    if (st.add !== undefined) cls[st.add] = 'hit';
+    if (st.done) for (var ix = st.from; ix <= st.to; ix++) cls[ix] = 'found';
+    mark(marks, st.from, 'start'); if (st.to !== st.from) mark(marks, st.to, 'end');
+    body.appendChild(Viz.array(st.nums, { marks: marks, classes: cls, title: 'nums (k = ' + st.k + ')' }));
+    body.appendChild(Viz.el('div', { class: 'stat', html: 'window sum = <b>' + st.sum + '</b> &nbsp; best = <b>' + (st.best === null ? '-' : st.best) + '</b>' }));
+  } else {
+    var c2 = {}, m2 = {};
+    st.chars.forEach(function (_, ix) { c2[ix] = (ix >= st.left && ix <= st.right) ? 'range' : 'dim'; });
+    if (st.right >= 0) { c2[st.right] = 'hit'; mark(m2, st.right, 'right'); }
+    if (st.right >= 0 || st.left === 0) mark(m2, st.left, 'left');
+    if (st.done && st.best) for (var q = st.bl; q <= st.br; q++) c2[q] = 'found';
+    body.appendChild(Viz.array(st.chars, { marks: m2, classes: c2, title: 'text' }));
+    var keys = Object.keys(st.seen);
+    var box = Viz.el('div', { class: 'seen' }, keys.map(function (ch) {
+      return Viz.el('span', { class: 'chip' + (st.cur === ch ? ' hit' : ''), text: ch + ' → ' + st.seen[ch] });
+    }));
+    body.appendChild(Viz.el('div', { class: 'viz-array-title', text: 'seen (letter → last index)' }));
+    body.appendChild(box);
+    body.appendChild(Viz.el('div', { class: 'stat', html: 'window length = <b>' + (st.right < 0 ? 0 : st.right - st.left + 1) + '</b> &nbsp; best = <b>' + st.best + '</b>' }));
+  }
+}
+function run() {
+  showErr('');
+  var mode = $id('mode').value;
+  if (mode === 'max') {
+    var nums = Viz.parseNums($id('arr').value), k = Number($id('k').value);
+    if (!nums.length || nums.length > 14) { showErr('Enter between 1 and 14 numbers.'); return; }
+    if (!Number.isInteger(k) || k < 1 || k > nums.length) { showErr('k must be a whole number from 1 to ' + nums.length + '.'); return; }
+    setLegend([{ cls: 'range', label: 'inside the window' }, { cls: 'hit', label: 'just added' }, { cls: 'bad', label: 'just dropped' }, { cls: 'dim', label: 'outside' }, { cls: 'found', label: 'best window' }]);
+    mountStepper({ code: MAX_CODE, render: render }).load(maxSumSteps(nums, k));
+  } else {
+    var s = $id('str').value;
+    if (!s.length || s.length > 16) { showErr('Enter 1 to 16 characters.'); return; }
+    setLegend([{ cls: 'range', label: 'inside the window' }, { cls: 'hit', label: 'letter being added' }, { cls: 'dim', label: 'outside' }, { cls: 'found', label: 'best window' }]);
+    mountStepper({ code: LONG_CODE, render: render }).load(longestSteps(s));
+  }
+}
+$id('mode').addEventListener('change', function () {
+  var m = $id('mode').value === 'max';
+  $id('numsWrap').style.display = m ? '' : 'none'; $id('kWrap').style.display = m ? '' : 'none'; $id('strWrap').style.display = m ? 'none' : '';
+  run();
+});
+$id('strWrap').style.display = 'none';
+$id('go').addEventListener('click', run);
+run();
+
+</script>
+</body>
+</html>

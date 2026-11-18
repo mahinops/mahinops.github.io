@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maps - Go visual</title>
+<meta name="description" content="See a Go map as a phone book: set, overwrite, look up with comma-ok, delete, nil map panic and random iteration order.">
+<link rel="stylesheet" href="../assets/viz.css">
+<style>
+.viz-layout{grid-template-columns:minmax(0,1fr)}
+.viz-stage,.viz-code{min-width:0;max-width:100%}
+@media (max-width:760px){.viz-layout.viz-has-code{grid-template-columns:minmax(0,1fr)}}
+body{overflow-x:hidden}
+.viz-svg .ah{fill:var(--accent)}
+.viz-svg .arrow{fill:none;stroke:var(--accent);stroke-width:2.5}
+.viz-svg .arrow.bad{stroke:var(--bad-line)}
+.viz-svg .node.bad{fill:var(--bad);stroke:var(--bad-line)}
+.viz-svg .node.nilp{stroke-dasharray:5 4}
+.viz-svg .nm{font-size:12px;fill:var(--muted)}
+.viz-svg .val{font-size:17px;font-weight:700}
+.viz-svg .ad{font-size:10px;fill:var(--muted)}
+.viz-svg .val.small{font-size:12px}
+.viz-svg .lbl{font-size:12px;fill:var(--accent);font-weight:700}
+.viz-cell.spare{background:transparent;border-style:dashed;color:var(--muted)}
+.hdrs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.chip{border:2px solid var(--cell-line);background:var(--cell);border-radius:10px;padding:4px 10px;font:600 13px var(--mono)}
+.chip.hit{background:var(--hit);border-color:var(--hit-line)}
+.chip.found{background:var(--found);border-color:var(--found-line)}
+.chip.dim{opacity:.45}
+.chip.bad{background:var(--bad);border-color:var(--bad-line)}
+.stackcol{display:flex;flex-direction:column-reverse;gap:6px;max-width:420px}
+.frame{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:6px 10px;font:13px var(--mono)}
+.frame b{display:block;margin-bottom:2px}
+.frame.hit{background:var(--hit);border-color:var(--hit-line)}
+.frame.found{background:var(--found);border-color:var(--found-line)}
+.frame.bad{background:var(--bad);border-color:var(--bad-line)}
+.frame.dim{opacity:.55}
+.out{font:13px var(--mono);background:var(--code-bg);color:var(--code-ink);padding:8px 10px;border-radius:8px;min-height:2.2em;white-space:pre-wrap;margin-top:10px}
+.out i{color:#6b7a90;font-style:normal}
+.row2{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.lane{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:8px 12px;min-width:170px;font:13px var(--mono)}
+.lane h4{margin:0 0 4px;font:700 13px var(--sans)}
+.lane.hit{background:var(--hit);border-color:var(--hit-line)}
+.lane.found{background:var(--found);border-color:var(--found-line)}
+.lane.bad{background:var(--bad);border-color:var(--bad-line)}
+.lane.dim{opacity:.55}
+.slots{display:flex;gap:6px}
+.slot{width:44px;height:44px;border:2px dashed var(--cell-line);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 15px var(--mono)}
+.slot.full{border-style:solid;background:var(--range);border-color:var(--range-line)}
+.iface{display:inline-flex;border:2px solid var(--cell-line);border-radius:10px;overflow:hidden;background:var(--cell);margin:4px 10px 4px 0}
+.iface div{padding:6px 10px;font:600 13px var(--mono)}
+.iface .t{background:var(--dim)}
+.iface.hit{background:var(--hit);border-color:var(--hit-line)}
+.iface.found{background:var(--found);border-color:var(--found-line)}
+.iface.bad{background:var(--bad);border-color:var(--bad-line)}
+.bar{height:20px;border-radius:5px;background:var(--range);border:2px solid var(--range-line);transition:width .3s}
+.bar.hit{background:var(--hit);border-color:var(--hit-line)}
+.bar.found{background:var(--found);border-color:var(--found-line)}
+.bar.dim{background:var(--dim);border-color:transparent}
+.tl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;align-items:center;font:13px var(--mono)}
+.tree{font:13px var(--mono)} .tree .tn{border:2px solid var(--cell-line);border-radius:8px;padding:4px 8px;margin:4px 0;background:var(--cell);display:inline-block}
+.tree .tn.bad{background:var(--bad);border-color:var(--bad-line)} .tree .tn.hit{background:var(--hit);border-color:var(--hit-line)} .tree .tn.found{background:var(--found);border-color:var(--found-line)}
+.tree ul{list-style:none;margin:0;padding-left:26px;border-left:2px solid var(--line)}
+.mrow{display:block;margin:4px 0}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/go/maps.html">বাংলা</a></nav>
+  <h1>Maps</h1>
+  <p class="lead">A map is a <b>phone book</b>: look something up by its key, get its value.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea</h2>
+    <p>A phone book maps a <b>name</b> to a <b>number</b>. You never ask for &ldquo;the third entry&rdquo;; you ask for &ldquo;Ada&rdquo;. A Go <code>map[string]int</code> is the same: keys of one type, values of another, and lookups are fast no matter how big the book gets.</p>
+ <p>Two things surprise newcomers: asking for a missing key gives the <b>zero value</b> (not an error), so you use <code>v, ok := m[k]</code> to tell &ldquo;missing&rdquo; from &ldquo;present but zero&rdquo;; and the <b>order of a loop over a map is deliberately random</b>.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Example<select id="sc"></select></label>
+    <span id="inputs" style="display:contents"></span>
+    <button id="run">Run</button>
+  </div>
+  <p class="viz-note" id="scdesc"></p>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul><li>In &ldquo;comma-ok lookup&rdquo; look up <code>cy</code> (stored value 0) and <code>zed</code> (missing). Both give <code>v = 0</code>. How do you tell them apart?</li><li>In &ldquo;Iteration order&rdquo; press <b>Run</b> several times. Does the order stay the same?</li><li>In &ldquo;nil map&rdquo; find which line is allowed (a read) and which one panics (a write).</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul><li>Writing to a nil map: <code>panic: assignment to entry in nil map</code>. Create it with <code>make(map[K]V)</code> or a literal first.</li><li>Relying on iteration order. Collect the keys, <code>sort</code> them, then loop over the sorted keys.</li><li>Using <code>m[k]</code> to test existence. Use <code>_, ok := m[k]</code>.</li><li>Using a slice or a map as a key: keys must be comparable (strings, numbers, structs of those, ...).</li></ul>
+  </div>
+
+  <div class="pagenav"><a href="arrays-vs-slices.html">&larr; Arrays vs Slices</a><a href="functions-and-call-stack.html">Functions and the Call Stack &rarr;</a></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+
+var E = Viz.el;
+/* ---- scenarios + dynamic inputs ---- */
+function multi(scenarios) {
+  var mount = Viz.$('#app'), sel = Viz.$('#sc'), inputsBox = Viz.$('#inputs'), err = Viz.$('#err'), desc = Viz.$('#scdesc');
+  var cur = 0, store = {}, pendingStep = null;
+  var hm = location.hash.match(/sc=(\d+)(?:&step=(\d+))?/);
+  if (hm && scenarios[+hm[1]]) { cur = +hm[1]; pendingStep = hm[2] ? +hm[2] : null; }
+  window.I = function (id) { var n = document.getElementById('in_' + id); return n ? n.value : ''; };
+  window.N = function (id, lo, hi) {
+    var raw = I(id).trim(); var v = Number(raw);
+    if (raw === '' || isNaN(v)) throw new Error('"' + id + '" must be a number.');
+    if (lo !== undefined && v < lo) throw new Error('"' + id + '" must be at least ' + lo + '.');
+    if (hi !== undefined && v > hi) throw new Error('"' + id + '" must be at most ' + hi + '.');
+    return Math.floor(v) === v ? v : Math.floor(v);
+  };
+  scenarios.forEach(function (sc, i) { sel.appendChild(E('option', { value: String(i), text: sc.name })); });
+  function buildInputs() {
+    inputsBox.innerHTML = '';
+    (scenarios[cur].inputs || []).forEach(function (inp) {
+      var key = cur + ':' + inp.id;
+      var val = store[key] !== undefined ? store[key] : inp.value;
+      var ctl;
+      if (inp.options) {
+        ctl = E('select', { id: 'in_' + inp.id }, inp.options.map(function (o) { return E('option', { value: o[0], text: o[1] }); }));
+        ctl.value = val;
+      } else {
+        ctl = E('input', { id: 'in_' + inp.id, value: val, size: inp.size || 10 });
+      }
+      ctl.addEventListener('change', function () { store[key] = ctl.value; show(); });
+      inputsBox.appendChild(E('label', { text: inp.label }, [ctl]));
+    });
+  }
+  function show() {
+    var sc = scenarios[cur];
+    err.textContent = '';
+    mount.innerHTML = '';
+    desc.textContent = sc.desc || '';
+    var steps;
+    try { steps = sc.steps(); } catch (e) { err.textContent = e.message; return; }
+    var st = Viz.stepper({ mount: mount, code: typeof sc.code === 'function' ? sc.code() : sc.code, render: sc.render });
+    st.load(steps);
+    if (pendingStep !== null) { st.go(pendingStep); pendingStep = null; }
+  }
+  sel.addEventListener('change', function () { cur = +sel.value; buildInputs(); show(); });
+  Viz.$('#run').addEventListener('click', function () { show(); });
+  sel.value = String(cur); buildInputs(); show();
+  if (location.hash === '#test') {
+    var log = [];
+    scenarios.forEach(function (sc, k) {
+      try {
+        cur = k; buildInputs();
+        var steps = sc.steps(), code = typeof sc.code === 'function' ? sc.code() : sc.code, tmp = document.createElement('div');
+        if (!steps.length) throw new Error('no steps');
+        steps.forEach(function (stp, j) {
+          tmp.innerHTML = ''; sc.render(stp, j, tmp);
+          if (!tmp.firstChild) throw new Error('empty render at step ' + j);
+          [].concat(stp.line === undefined ? [] : stp.line).forEach(function (ln) { if (!(ln >= 0 && ln < code.length)) throw new Error('bad line ' + ln + ' at step ' + j); });
+          if (!stp.text) throw new Error('no text at step ' + j);
+        });
+        log.push('OK   ' + sc.name + ' (' + steps.length + ' steps)');
+      } catch (e) { log.push('FAIL ' + sc.name + ': ' + e.message); }
+    });
+    cur = 0; sel.value = '0'; buildInputs(); show();
+    document.body.appendChild(E('pre', { id: 'testresult', text: log.join('\n') }));
+  }
+}
+
+/* ---- memory diagram: boxes + arrows (illustrative addresses) ---- */
+var _mid = 0;
+function mem(body, cells, arrows, o) {
+  o = o || {};
+  var W = 124, H = 70, G = 34, X0 = 12, Y0 = 12, n = Math.max(cells.length, 1), id = 'ah' + (++_mid);
+  var width = X0 * 2 + n * W + (n - 1) * G, hasA = arrows && arrows.length, height = Y0 + H + (hasA ? 92 : 14);
+  var kids = [Viz.s('defs', {}, [Viz.s('marker', { id: id, viewBox: '0 0 10 10', refX: '8', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto' }, [Viz.s('path', { d: 'M0,0L10,5L0,10z', class: 'ah' })])])];
+  cells.forEach(function (c, i) {
+    var x = X0 + i * (W + G);
+    kids.push(Viz.s('rect', { x: x, y: Y0, width: W, height: H, rx: 10, class: 'node ' + (c.cls || '') }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 17, 'text-anchor': 'middle', class: 'nm', text: c.name }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 42, 'text-anchor': 'middle', class: 'val' + (String(c.value).length > 8 ? ' small' : ''), text: String(c.value) }));
+    if (c.addr) kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 62, 'text-anchor': 'middle', class: 'ad', text: c.addr }));
+  });
+  (arrows || []).forEach(function (a) {
+    var x1 = X0 + a.from * (W + G) + W / 2, x2 = X0 + a.to * (W + G) + W / 2, y = Y0 + H, d;
+    if (a.from === a.to) { x1 -= 22; x2 += 22; d = 'M' + x1 + ',' + y + ' C' + (x1 - 10) + ',' + (y + 55) + ' ' + (x2 + 10) + ',' + (y + 55) + ' ' + x2 + ',' + (y + 3); }
+    else d = 'M' + x1 + ',' + y + ' C' + x1 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 4);
+    kids.push(Viz.s('path', { d: d, class: 'arrow ' + (a.cls || ''), 'marker-end': 'url(#' + id + ')' }));
+    if (a.label) kids.push(Viz.s('text', { x: (x1 + x2) / 2, y: y + 66, 'text-anchor': 'middle', class: 'lbl', text: a.label }));
+  });
+  var svgEl = Viz.svg(width, height, kids); svgEl.style.minWidth = Math.min(width, 600) + 'px';
+  body.appendChild(svgEl);
+  if (o.note !== false) body.appendChild(Viz.note('Addresses like 0xc000012000 are made up for illustration; real addresses differ on every run.'));
+}
+function out(body, lines) {
+  body.appendChild(E('div', { class: 'out', html: lines && lines.length ? lines.map(function (l) { return esc(l); }).join('<br>') : '<i>(program output appears here)</i>' }));
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function chips(items) { return E('div', { class: 'hdrs' }, items.map(function (c) { return E('span', { class: 'chip ' + (c.cls || ''), text: c.text }); })); }
+
+document.getElementById('legend').appendChild(Viz.legend([{cls:'hit',label:'entry being used'},{cls:'found',label:'result / success'},{cls:'bad',label:'problem'},{cls:'dim',label:'removed'}]));
+
+function render(st, i, body) {
+  var rows = [E('h4', { text: st.nilmap ? 'ages (map) = nil' : 'ages (map)' })];
+  if (st.nilmap) rows.push(E('div', { class: 'viz-note', text: 'no table exists yet' }));
+  (st.entries || []).forEach(function (e) { rows.push(E('div', { class: 'chip mrow ' + (e.cls || ''), text: '"' + e.k + '"  →  ' + e.v })); });
+  var left = E('div', { class: 'lane ' + (st.mcls || '') }, rows);
+  var right = E('div', {}, (st.vars || []).map(function (v) { return Viz.varBox(v.name, v.value, { class: v.cls }); }));
+  body.appendChild(E('div', { class: 'row2' }, [left, right]));
+  if (st.out) out(body, st.out);
+}
+function ent(k, v, cls) { return { k: k, v: v, cls: cls || '' }; }
+multi([
+ { name: 'Set, overwrite, delete', desc: 'A map starts empty, grows as you assign, and shrinks with delete.',
+   code: ['ages := map[string]int{}', 'ages["ada"] = 36', 'ages["bob"] = 29', 'ages["ada"] = 37        // overwrite', 'v, ok := ages["zed"]    // missing key', 'delete(ages, "bob")'],
+   render: render,
+   steps: function () {
+     return [
+      { line: 0, text: 'An empty map. It exists and is ready to use.', entries: [] },
+      { line: 1, text: 'Assigning a new key adds an entry.', entries: [ent('ada', 36, 'hit')] },
+      { line: 2, text: 'Another new key, another entry.', entries: [ent('ada', 36), ent('bob', 29, 'hit')] },
+      { line: 3, text: 'Assigning to an EXISTING key replaces its value. Still two entries.', entries: [ent('ada', 37, 'hit'), ent('bob', 29)] },
+      { line: 4, text: 'Looking up a missing key does not crash and does not add anything. v gets the zero value (0) and ok is false.', entries: [ent('ada', 37), ent('bob', 29)], vars: [{ name: 'v', value: 0, cls: 'hit' }, { name: 'ok', value: 'false', cls: 'bad' }] },
+      { line: 5, text: 'delete removes the entry. Deleting a key that is not there is a harmless no-op.', entries: [ent('ada', 37), ent('bob', 29, 'dim')] }
+     ];
+   } },
+ { name: 'comma-ok lookup', desc: 'm[k] alone cannot tell a missing key from a stored zero. The second value can.',
+   inputs: [{ id: 'key', label: 'look up key', value: 'zed', size: 8 }],
+   code: function () { return ['ages := map[string]int{"ada": 36, "bob": 29, "cy": 0}', 'v, ok := ages["' + I('key') + '"]', 'if ok {', '    fmt.Println("found", v)', '} else {', '    fmt.Println("missing")', '}']; },
+   render: render,
+   steps: function () {
+     var k = I('key').trim(), m = { ada: 36, bob: 29, cy: 0 }, has = Object.prototype.hasOwnProperty.call(m, k), v = has ? m[k] : 0;
+     var base = [ent('ada', 36), ent('bob', 29), ent('cy', 0)];
+     function E2(hl) { return base.map(function (e) { return ent(e.k, e.v, e.k === hl ? 'hit' : ''); }); }
+     return [
+      { line: 0, text: 'A map with three entries. Note cy is present but its value is 0.', entries: E2('') },
+      { line: 1, text: has ? 'Key "' + k + '" exists, so v = ' + v + ' and ok = true.' : 'Key "' + k + '" is not in the map. v = 0 (the zero value of int) and ok = false. v alone would look the same as the stored 0 for "cy".', entries: E2(has ? k : ''), vars: [{ name: 'v', value: v, cls: 'hit' }, { name: 'ok', value: has, cls: has ? 'found' : 'bad' }] },
+      { line: has ? 3 : 5, text: has ? 'ok is true, so we take the "found" branch.' : 'ok is false, so we take the "missing" branch.', entries: E2(has ? k : ''), vars: [{ name: 'v', value: v }, { name: 'ok', value: has }], out: [has ? 'found ' + v : 'missing'] }
+     ];
+   } },
+ { name: 'nil map', desc: 'A nil map can be read but not written. This is one of the most common beginner panics.',
+   code: ['var ages map[string]int', 'fmt.Println(ages["ada"])   // OK: prints 0', 'ages["ada"] = 1            // PANIC'],
+   render: render,
+   steps: function () {
+     return [
+      { line: 0, text: 'var ages map[string]int declares a map variable, but no table was created. Its value is nil.', nilmap: true, entries: [], out: [] },
+      { line: 1, text: 'Reading from a nil map is allowed and gives the zero value.', nilmap: true, entries: [], out: ['0'] },
+      { line: 2, text: 'Writing needs a real table to put the entry in. There is none, so the program panics.', nilmap: true, mcls: 'bad', entries: [], out: ['0', 'panic: assignment to entry in nil map', 'exit status 2'] },
+      { line: 0, text: 'The fix: ages := make(map[string]int) (or a literal map[string]int{}) before writing.', entries: [], out: ['0'] }
+     ];
+   } },
+ { name: 'Iteration order is random', desc: 'Go randomises the order on purpose. Press Run again to see a different order.',
+   code: ['ages := map[string]int{"ada": 36, "bob": 29, "cy": 0, "dee": 51, "eli": 44}', 'for k, v := range ages {', '    fmt.Println(k, v)', '}'],
+   render: render,
+   steps: function () {
+     var all = [['ada', 36], ['bob', 29], ['cy', 0], ['dee', 51], ['eli', 44]], order = all.slice();
+     for (var i = order.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = order[i]; order[i] = order[j]; order[j] = t; }
+     var base = all.map(function (e) { return ent(e[0], e[1]); }), lines = [];
+     var steps = [{ line: 0, text: 'A map with five entries, inserted in this order: ada, bob, cy, dee, eli.', entries: base, out: [] }];
+     order.forEach(function (e, k) {
+       lines.push(e[0] + ' ' + e[1]);
+       steps.push({ line: 2, text: 'Iteration ' + (k + 1) + ': the loop visits "' + e[0] + '". This order was picked at random for this run. Press Run again.', entries: base.map(function (b) { return ent(b.k, b.v, b.k === e[0] ? 'hit' : ''); }), out: lines.slice() });
+     });
+     steps.push({ line: 3, text: 'Never depend on this order. If you need a stable order, collect the keys, sort them, and loop over the sorted keys.', entries: base, out: lines.slice() });
+     return steps;
+   } }
+]);
+
+})();
+</script>
+</body>
+</html>

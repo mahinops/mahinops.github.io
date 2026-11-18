@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Queue & Monotonic Stack - visual</title>
+<meta name="description" content="See first-in-first-out queues, and a stack kept in order that finds the next greater element in one pass.">
+<link rel="stylesheet" href="../assets/viz.css">
+<style>.stat{font:14px var(--mono);margin:4px 0}.pile{display:flex;flex-direction:column-reverse;align-items:center;gap:4px;min-height:40px;margin:6px 0}.plate{min-width:96px;text-align:center;font:700 15px var(--mono);border:2px solid var(--cell-line);border-radius:8px;padding:3px 6px;background:var(--cell)}.plate.top{background:var(--hit);border-color:var(--hit-line)}.pilebase{border-top:4px solid var(--cell-line);width:120px}.pilewrap{display:flex;flex-direction:column;align-items:center}.qrow{display:flex;gap:6px;align-items:center;min-height:56px;padding:6px;border:2px dashed var(--cell-line);border-radius:10px}.qlab{font:12px var(--mono);color:var(--muted);margin:2px 0}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/queue-and-monotonic-stack.html">বাংলা</a></nav>
+  <h1>Queue & Monotonic Stack</h1>
+  <p class="lead">A queue serves in arrival order. A monotonic stack keeps its items sorted so answers pop out as soon as they are known.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea</h2>
+    <p><b>Queue:</b> like a line at a shop. The first person to join is the first to be served (FIFO). You add at the <b>back</b> (enqueue) and remove from the <b>front</b> (dequeue).</p>
+<p><b>Monotonic stack:</b> for each number, find the next number to its right that is <i>bigger</i>. Instead of scanning right for each one, keep a stack of numbers still <b>waiting</b> for their bigger neighbour. When a new number arrives, every waiting number that is smaller than it has just found its answer: pop them and record it. Then the new number joins the waiting list. The waiting numbers stay in decreasing order, which is why it is called &ldquo;monotonic&rdquo;.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+  <label>Problem<select id="mode"><option value="ng">Next greater element (monotonic stack)</option><option value="q">Queue (FIFO) operations</option></select></label>
+  <label id="numsWrap">Numbers<input id="arr" value="2, 1, 2, 4, 3, 1, 5"></label>
+  <label id="opsWrap">Operations (number = enqueue, d = dequeue)<input id="ops" value="1 2 3 d d 4 d" size="20"></label>
+  <button id="go">Run</button>
+</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul><li>Next greater: use a strictly decreasing list like <code>9, 7, 5, 3</code>. Nothing pops. What is the answer for every item?</li><li>Use an increasing list like <code>1, 2, 3, 4</code>. How big does the stack get?</li><li>Why does the stack store <i>indexes</i> rather than values? (Hint: where is the answer written?)</li><li>Queue: dequeue more times than you enqueue (<code>d d</code>). The page tells you what a real program must guard against.</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul><li><b>Popping with <code>&lt;=</code> instead of <code>&lt;</code></b> changes the meaning when numbers are equal (next <i>greater</i> vs next <i>greater or equal</i>).</li><li><b>Forgetting leftovers:</b> items still on the stack at the end have no greater element, so their answer stays <code>-1</code>.</li><li><b>Dequeue from an empty queue:</b> <code>queue[0]</code> panics in Go. Always check <code>len(queue) &gt; 0</code>.</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">How fast is it?</h2>
+    <p><b>Monotonic stack: O(n) time</b> &ndash; every index is pushed once and popped at most once, even though there is a loop inside a loop. <b>Space: O(n)</b>. The naive version (scan right for each item) is O(n&sup2;). Queue operations are O(1) each (with a slice, <code>queue[1:]</code> is O(1) but keeps the memory until it is garbage collected).</p>
+  </div>
+
+  <div class="pagenav"><a href="stack-valid-parentheses.html">&larr; Stack: Valid Parentheses</a><a href="linked-list.html">Linked List &rarr;</a></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script id="algo">
+
+function nextGreaterSteps(nums) {
+  var steps = [], res = nums.map(function () { return -1; }), stack = [];
+  function snap(line, text, extra) { steps.push(Object.assign({ mode: 'ng', nums: nums, res: res.slice(), stack: stack.slice(), line: line, text: text }, extra || {})); }
+  snap([1, 2, 3], 'Start: every answer is -1 (unknown) and the stack of waiting indexes is empty.', { i: -1 });
+  for (var i = 0; i < nums.length; i++) {
+    var n = nums[i];
+    snap(4, 'Look at nums[' + i + '] = ' + n + '. Do any waiting numbers on the stack have a smaller value than ' + n + '?', { i: i });
+    var popped = 0;
+    while (stack.length && nums[stack[stack.length - 1]] < n) {
+      var top = stack.pop(); res[top] = n; popped++;
+      snap([5, 6, 7, 8], nums[top] + ' (index ' + top + ') is smaller than ' + n + ', so ' + n + ' is its next greater element. Pop index ' + top + ' and set res[' + top + '] = ' + n + '.', { i: i, popped: top });
+    }
+    var why = stack.length ? 'The top of the stack (' + nums[stack[stack.length - 1]] + ') is not smaller than ' + n + ', so stop popping. ' : (popped ? 'The stack is empty now. ' : '');
+    stack.push(i);
+    snap(10, why + 'Push index ' + i + ' (value ' + n + '): it now waits for something bigger. The stack stays in decreasing order of values.', { i: i, pushed: i });
+  }
+  snap(12, 'End of the list. Indexes still on the stack never met a bigger number, so their answers stay -1. Return res.', { i: nums.length - 1, done: true, result: res.slice() });
+  return steps;
+}
+function queueSteps(tokens) {
+  var steps = [], q = [], removed = null;
+  function snap(line, text, extra) { steps.push(Object.assign({ mode: 'q', queue: q.slice(), tokens: tokens, line: line, text: text }, extra || {})); }
+  snap(0, 'An empty queue. New items join at the back; the front is served first.', { t: -1 });
+  for (var t = 0; t < tokens.length; t++) {
+    var tk = tokens[t];
+    if (tk === 'd') {
+      if (q.length === 0) { snap([2, 3], 'Dequeue on an EMPTY queue. A real program must check len(queue) > 0 first, or queue[0] panics.', { t: t, error: true }); continue; }
+      var front = q[0];
+      snap(2, 'Dequeue: look at the front, which is ' + front + '.', { t: t, front: true });
+      q = q.slice(1);
+      snap(3, 'queue = queue[1:] drops the front. ' + front + ' has been served.', { t: t, removed: front });
+    } else {
+      q.push(Number(tk));
+      snap(1, 'Enqueue ' + tk + ': it joins the back of the line.', { t: t, added: true });
+    }
+  }
+  snap(0, 'No more operations. The queue holds [' + q.join(', ') + '], front on the left.', { t: tokens.length - 1, done: true, result: q.slice() });
+  return steps;
+}
+
+</script>
+<script id="ui">
+
+function $id(x) { return document.getElementById(x); }
+function showErr(m) { $id('err').textContent = m || ''; }
+var current = null;
+function mountStepper(opts) {
+  if (current) current.pause();
+  var app = $id('app'); app.innerHTML = ''; app.className = '';
+  current = Viz.stepper(Object.assign({ mount: '#app' }, opts));
+  return current;
+}
+function setLegend(items) { var l = $id('legend'); l.innerHTML = ''; l.appendChild(Viz.legend(items)); }
+function mark(marks, ix, label) { marks[ix] = (marks[ix] || []).concat(label); }
+
+
+var NG_CODE = ['func nextGreater(nums []int) []int {',
+'    res := make([]int, len(nums))',
+'    for i := range res { res[i] = -1 }',
+'    stack := []int{} // indexes; values go down',
+'    for i, n := range nums {',
+'        for len(stack) > 0 && nums[stack[len(stack)-1]] < n {',
+'            top := stack[len(stack)-1]',
+'            stack = stack[:len(stack)-1]',
+'            res[top] = n',
+'        }',
+'        stack = append(stack, i)',
+'    }',
+'    return res',
+'}'];
+var Q_CODE = ['queue := []int{}',
+'queue = append(queue, x)   // enqueue at the back',
+'front := queue[0]          // peek at the front',
+'queue = queue[1:]          // dequeue'];
+function render(st, i, body) {
+  if (st.mode === 'ng') {
+    var cls = {}, marks = {};
+    st.nums.forEach(function (_, ix) { cls[ix] = ix > st.i ? 'range' : 'dim'; });
+    st.stack.forEach(function (ix) { cls[ix] = 'range'; });
+    if (st.i >= 0) { cls[st.i] = 'hit'; mark(marks, st.i, 'now'); }
+    if (st.popped !== undefined) cls[st.popped] = 'found';
+    body.appendChild(Viz.array(st.nums, { marks: marks, classes: cls, title: 'nums' }));
+    var rc = {}; st.res.forEach(function (v, ix) { rc[ix] = v === -1 ? 'dim' : 'found'; });
+    body.appendChild(Viz.array(st.res, { classes: rc, title: 'res (next greater, -1 = none yet)' }));
+    var plates = st.stack.map(function (ix, k) { return Viz.el('div', { class: 'plate' + (k === st.stack.length - 1 ? ' top' : ''), text: 'idx ' + ix + ' (' + st.nums[ix] + ')' }); });
+    body.appendChild(Viz.el('div', { class: 'viz-array-title', text: 'stack of waiting numbers (top highlighted)' }));
+    body.appendChild(Viz.el('div', { class: 'pilewrap' }, [Viz.el('div', { class: 'pile' }, plates), Viz.el('div', { class: 'pilebase' })]));
+  } else {
+    var boxes = st.queue.map(function (v, k) { return Viz.el('div', { class: 'viz-cell ' + (k === 0 ? 'hit' : 'range'), text: String(v) }); });
+    if (!boxes.length) boxes = [Viz.el('span', { class: 'viz-note', text: '(empty)' })];
+    body.appendChild(Viz.el('div', { class: 'viz-array-title', text: 'operations (number = enqueue, d = dequeue)' }));
+    var cls2 = {}, m2 = {}; st.tokens.forEach(function (_, ix) { cls2[ix] = ix < st.t ? 'dim' : 'range'; });
+    if (st.t >= 0) { cls2[st.t] = st.error ? 'bad' : 'hit'; mark(m2, st.t, 'now'); }
+    body.appendChild(Viz.array(st.tokens, { classes: cls2, marks: m2, indexes: false }));
+    body.appendChild(Viz.el('div', { class: 'qlab', text: 'FRONT (served first) →' }));
+    body.appendChild(Viz.el('div', { class: 'qrow' }, boxes));
+    body.appendChild(Viz.el('div', { class: 'qlab', text: '← BACK (new items join here)' }));
+    if (st.removed !== undefined) body.appendChild(Viz.note('Served: <b>' + st.removed + '</b>'));
+  }
+}
+function run() {
+  showErr('');
+  var mode = $id('mode').value;
+  if (mode === 'ng') {
+    var nums = Viz.parseNums($id('arr').value);
+    if (!nums.length || nums.length > 12) { showErr('Enter between 1 and 12 numbers.'); return; }
+    setLegend([{ cls: 'hit', label: 'number being read' }, { cls: 'range', label: 'waiting on the stack / not read yet' }, { cls: 'found', label: 'answer found' }, { cls: 'dim', label: 'finished / unknown' }]);
+    mountStepper({ code: NG_CODE, render: render }).load(nextGreaterSteps(nums));
+  } else {
+    var toks = $id('ops').value.trim().split(/[\s,]+/).filter(Boolean);
+    if (!toks.length || toks.length > 14) { showErr('Enter between 1 and 14 operations.'); return; }
+    for (var k = 0; k < toks.length; k++) if (toks[k] !== 'd' && isNaN(Number(toks[k]))) { showErr('Each operation must be a number (enqueue) or the letter d (dequeue). Problem: "' + toks[k] + '"'); return; }
+    setLegend([{ cls: 'hit', label: 'front of the queue / current op' }, { cls: 'range', label: 'waiting' }, { cls: 'bad', label: 'error' }]);
+    mountStepper({ code: Q_CODE, render: render }).load(queueSteps(toks));
+  }
+}
+$id('mode').addEventListener('change', function () {
+  var ng = $id('mode').value === 'ng';
+  $id('numsWrap').style.display = ng ? '' : 'none'; $id('opsWrap').style.display = ng ? 'none' : '';
+  run();
+});
+$id('opsWrap').style.display = 'none';
+$id('go').addEventListener('click', run);
+run();
+
+</script>
+</body>
+</html>

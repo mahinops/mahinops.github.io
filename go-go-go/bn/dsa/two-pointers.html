@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Two Pointers</title>
+<meta name="description" content="দুটো pointer দিয়ে list-এর দুই প্রান্ত থেকে বা পাশাপাশি এগিয়ে nested loop ছাড়াই pair আর in place সমস্যার সমাধান।">
+<link rel="stylesheet" href="../../assets/viz.css">
+<style></style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; সব visual</a> &middot; <a href="../../dsa/two-pointers.html">English</a></nav>
+  <h1>Two Pointers</h1>
+  <p class="lead">দুটো nested loop-এর বদলে দুটো index pointer ব্যবহার করুন।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা</h2>
+    <p>ধরুন সংখ্যা লেখা কিছু পাথর sorted ক্রমে সাজানো আছে, আর দুজন মানুষ দুই প্রান্ত থেকে একে অপরের দিকে হাঁটছে। আপনার দরকার এমন দুটো পাথর যাদের যোগফল target-এর সমান। যোগফল <b>খুব ছোট</b> হলে বাঁ দিকের জন ডানে গিয়ে একটা বড় পাথরে দাঁড়ায়। <b>খুব বড়</b> হলে ডান দিকের জন বাঁয়ে গিয়ে একটা ছোট পাথরে দাঁড়ায়। প্রতিটা ধাপে একটা পাথর চিরতরে বাদ হয়ে যায়, তাই একবার পুরো list দেখলেই হয়।</p>
+<p>একই কৌশলে list in place reverse করা যায়: দুই প্রান্তের মান swap করুন, দুটো pointer ভেতরের দিকে সরান, আর দেখা না হওয়া পর্যন্ত এটা repeat করুন।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+  <label>সমস্যা<select id="mode"><option value="pair">নির্দিষ্ট যোগফলের pair খুঁজুন (sorted list)</option><option value="reverse">In place reverse</option></select></label>
+  <label>সংখ্যা<input id="arr" value="1, 3, 4, 6, 8, 11, 15"></label>
+  <label id="targetWrap">Target sum<input id="target" value="14" size="6"></label>
+  <button id="go">Run</button>
+</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul><li>Pair mode, target <code>14</code>: প্রতিবার কোন pointer সরছে আর কেন, লক্ষ করুন।</li><li>Target বদলে <code>100</code> করুন। Pointer দুটো কখন থামে, আর কী return হয়?</li><li>সংখ্যাগুলো এলোমেলো ক্রমে দিন। পেজ সেটা নেবে না। Unsorted data-তে two pointers কেন ভুল উত্তর দিত?</li><li>Reverse mode-এ গিয়ে odd সংখ্যক item (যেমন 5টা) দিন। মাঝের item-এর কী হয়?</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul><li><b>Unsorted input:</b> &ldquo;যোগফল ছোট, তাই বাঁ pointer এগোও&rdquo; যুক্তিটা শুধু sorted list-এই খাটে।</li><li><b>Pair problem-এ <code>l &lt;= r</code> ব্যবহার করা (<code>l &lt; r</code>-এর বদলে):</b> এতে একটা element নিজের সাথেই pair হয়ে যেতে পারে।</li><li><b>ভুল pointer সরানো:</b> যোগফল ছোট হলে শুধু বাঁ pointer সাহায্য করতে পারে, কারণ সেটা সবচেয়ে ছোট candidate-এ আছে।</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Complexity</h2>
+    <p><b>Time complexity: O(n)</b> &ndash; pointer শুধু ভেতরের দিকে যায়, তাই প্রতিটা item বড়জোর একবার দেখা হয়। Nested loop দিয়ে করলে লাগে O(n&sup2;)। <b>Space complexity: O(1)</b> &ndash; শুধু দুটো integer।</p>
+  </div>
+
+  <div class="pagenav"><a href="binary-search.html">&larr; Binary Search</a><a href="sliding-window.html">Sliding Window &rarr;</a></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script id="algo">
+
+function pairSumSteps(nums, target) {
+  var steps = [], l = 0, r = nums.length - 1;
+  function snap(line, text, extra) { steps.push(Object.assign({ mode: 'pair', arr: nums.slice(), l: l, r: r, line: line, text: text }, extra || {})); }
+  snap(1, 'শুরু: l সবচেয়ে ছোট সংখ্যায় (index 0), r সবচেয়ে বড় সংখ্যায় (index ' + r + ')।');
+  while (l < r) {
+    var sum = nums[l] + nums[r];
+    snap(3, 'sum = nums[' + l + '] + nums[' + r + '] = ' + nums[l] + ' + ' + nums[r] + ' = ' + sum + '.', { sum: sum, hl: [l, r] });
+    if (sum === target) {
+      snap([4, 5], sum + ' হলো target ' + target + '। Pair পাওয়া গেছে, index ' + l + ' আর ' + r + '।', { sum: sum, found: [l, r], result: [l, r] });
+      return steps;
+    } else if (sum < target) {
+      l++;
+      snap([6, 7], 'Sum খুব ছোট। বড় করার একমাত্র উপায় বাঁ দিকের সংখ্যা বড় করা, তাই l ডানে সরিয়ে index ' + l + '-এ নিই।', { sum: sum });
+    } else {
+      r--;
+      snap([8, 9], 'Sum খুব বড়। ছোট করার একমাত্র উপায় ডান দিকের সংখ্যা ছোট করা, তাই r বাঁয়ে সরিয়ে index ' + r + '-এ নিই।', { sum: sum });
+    }
+  }
+  snap(11, 'l আর r মিলে গেছে (l = ' + l + ', r = ' + r + '), তাই চেষ্টা করার মতো আর কোনো pair নেই। "not found" return করুন।', { result: null });
+  return steps;
+}
+function reverseSteps(nums) {
+  var a = nums.slice(), steps = [], l = 0, r = a.length - 1;
+  function snap(line, text, extra) { steps.push(Object.assign({ mode: 'reverse', arr: a.slice(), l: l, r: r, line: line, text: text }, extra || {})); }
+  snap(1, 'শুরু: l প্রথম item-এ (index 0), r শেষ item-এ (index ' + r + ')।');
+  while (l < r) {
+    snap(2, 'l (' + l + ') < r (' + r + '), তাই এখনো swap করার মতো কিছু আছে।', { hl: [l, r] });
+    var t = a[l]; a[l] = a[r]; a[r] = t;
+    snap(3, 'Swap a[' + l + '] আর a[' + r + ']। এখন ' + a[l] + ' আর ' + a[r] + ' নিজেদের final জায়গায় আছে।', { swapped: [l, r] });
+    l++; r--;
+    snap([4, 5], 'দুটো pointer ভেতরের দিকে সরাই: l = ' + l + ', r = ' + r + '।');
+  }
+  snap(2, l === r ? 'l আর r একই item-এ (index ' + l + '). এটা আগে থেকেই ঠিক জায়গায় আছে। শেষ!' : 'l আর r-এর চেয়ে ছোট নেই। শেষ!', { done: true, result: a.slice() });
+  return steps;
+}
+
+</script>
+<script id="ui">
+
+function $id(x) { return document.getElementById(x); }
+function showErr(m) { $id('err').textContent = m || ''; }
+var current = null;
+function mountStepper(opts) {
+  if (current) current.pause();
+  var app = $id('app'); app.innerHTML = ''; app.className = '';
+  current = Viz.stepper(Object.assign({ mount: '#app' }, opts));
+  return current;
+}
+function setLegend(items) { var l = $id('legend'); l.innerHTML = ''; l.appendChild(Viz.legend(items)); }
+function mark(marks, ix, label) { marks[ix] = (marks[ix] || []).concat(label); }
+
+
+var PAIR_CODE = ['func pairSum(nums []int, target int) (int, int, bool) {',
+'    l, r := 0, len(nums)-1',
+'    for l < r {',
+'        sum := nums[l] + nums[r]',
+'        if sum == target {',
+'            return l, r, true',
+'        } else if sum < target {',
+'            l++',
+'        } else {',
+'            r--',
+'        }',
+'    }',
+'    return 0, 0, false',
+'}'];
+var REV_CODE = ['func reverse(nums []int) {',
+'    l, r := 0, len(nums)-1',
+'    for l < r {',
+'        nums[l], nums[r] = nums[r], nums[l]',
+'        l++',
+'        r--',
+'    }',
+'}'];
+function render(st, i, body) {
+  var n = st.arr.length, marks = {}, cls = {};
+  for (var ix = 0; ix < n; ix++) {
+    if (st.mode === 'pair') cls[ix] = (ix >= st.l && ix <= st.r) ? 'range' : 'dim';
+    else cls[ix] = (ix < st.l || ix > st.r) ? 'found' : 'range';
+  }
+  if (!st.done) { mark(marks, st.l, 'l'); mark(marks, st.r, 'r'); }
+  (st.hl || []).forEach(function (ix) { cls[ix] = 'hit'; });
+  (st.swapped || []).forEach(function (ix) { cls[ix] = 'bad'; });
+  (st.found || []).forEach(function (ix) { cls[ix] = 'found'; });
+  if (st.done) for (var k = 0; k < n; k++) cls[k] = 'found';
+  body.appendChild(Viz.array(st.arr, { marks: marks, classes: cls, title: 'nums' }));
+  if (st.sum !== undefined) body.appendChild(Viz.note('sum = <b>' + st.sum + '</b>'));
+  if (st.mode === 'pair' && st.result !== undefined) body.appendChild(Viz.note(st.result ? '<b>ফলাফল: index ' + st.result[0] + ' আর ' + st.result[1] + '</b>' : '<b>ফলাফল: পাওয়া যায়নি</b>'));
+}
+function run() {
+  showErr('');
+  var mode = $id('mode').value, nums = Viz.parseNums($id('arr').value);
+  if (!nums.length || nums.length > 14) { showErr('1 থেকে 14টার মধ্যে সংখ্যা দিন।'); return; }
+  if (mode === 'pair') {
+    var tv = $id('target').value.trim(), target = Number(tv);
+    if (tv === '' || isNaN(target)) { showErr('Target একটা সংখ্যা হতে হবে।'); return; }
+    for (var i = 1; i < nums.length; i++) if (nums[i] < nums[i - 1]) { showErr('Two pointers-এর জন্য list sorted হতে হবে (ছোট থেকে বড়)। আগে sort করে নিন।'); return; }
+    setLegend([{ cls: 'range', label: 'এখনো candidate' }, { cls: 'hit', label: 'যোগ করা হচ্ছে' }, { cls: 'dim', label: 'বাদ' }, { cls: 'found', label: 'উত্তর' }]);
+    mountStepper({ code: PAIR_CODE, render: render }).load(pairSumSteps(nums, target));
+  } else {
+    setLegend([{ cls: 'range', label: 'এখনো swap হয়নি' }, { cls: 'hit', label: 'এখন swap হবে' }, { cls: 'bad', label: 'এইমাত্র swap হয়েছে' }, { cls: 'found', label: 'final জায়গা' }]);
+    mountStepper({ code: REV_CODE, render: render }).load(reverseSteps(nums));
+  }
+}
+$id('mode').addEventListener('change', function () {
+  var pair = $id('mode').value === 'pair';
+  $id('targetWrap').style.display = pair ? '' : 'none';
+  $id('arr').value = pair ? '1, 3, 4, 6, 8, 11, 15' : '1, 2, 3, 4, 5, 6';
+  run();
+});
+$id('go').addEventListener('click', run);
+run();
+
+</script>
+</body>
+</html>

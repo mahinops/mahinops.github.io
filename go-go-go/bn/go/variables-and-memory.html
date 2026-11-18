@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Variables and Memory</title>
+<meta name="description" content="Go-র variable-কে memory-র একটা নামওয়ালা box হিসেবে দেখুন: declare, assign, copy, zero value আর shadowing।">
+<link rel="stylesheet" href="../../assets/viz.css">
+<style>
+.viz-layout{grid-template-columns:minmax(0,1fr)}
+.viz-stage,.viz-code{min-width:0;max-width:100%}
+@media (max-width:760px){.viz-layout.viz-has-code{grid-template-columns:minmax(0,1fr)}}
+body{overflow-x:hidden}
+.viz-svg .ah{fill:var(--accent)}
+.viz-svg .arrow{fill:none;stroke:var(--accent);stroke-width:2.5}
+.viz-svg .arrow.bad{stroke:var(--bad-line)}
+.viz-svg .node.bad{fill:var(--bad);stroke:var(--bad-line)}
+.viz-svg .node.nilp{stroke-dasharray:5 4}
+.viz-svg .nm{font-size:12px;fill:var(--muted)}
+.viz-svg .val{font-size:17px;font-weight:700}
+.viz-svg .ad{font-size:10px;fill:var(--muted)}
+.viz-svg .val.small{font-size:12px}
+.viz-svg .lbl{font-size:12px;fill:var(--accent);font-weight:700}
+.viz-cell.spare{background:transparent;border-style:dashed;color:var(--muted)}
+.hdrs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.chip{border:2px solid var(--cell-line);background:var(--cell);border-radius:10px;padding:4px 10px;font:600 13px var(--mono)}
+.chip.hit{background:var(--hit);border-color:var(--hit-line)}
+.chip.found{background:var(--found);border-color:var(--found-line)}
+.chip.dim{opacity:.45}
+.chip.bad{background:var(--bad);border-color:var(--bad-line)}
+.stackcol{display:flex;flex-direction:column-reverse;gap:6px;max-width:420px}
+.frame{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:6px 10px;font:13px var(--mono)}
+.frame b{display:block;margin-bottom:2px}
+.frame.hit{background:var(--hit);border-color:var(--hit-line)}
+.frame.found{background:var(--found);border-color:var(--found-line)}
+.frame.bad{background:var(--bad);border-color:var(--bad-line)}
+.frame.dim{opacity:.55}
+.out{font:13px var(--mono);background:var(--code-bg);color:var(--code-ink);padding:8px 10px;border-radius:8px;min-height:2.2em;white-space:pre-wrap;margin-top:10px}
+.out i{color:#6b7a90;font-style:normal}
+.row2{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.lane{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:8px 12px;min-width:170px;font:13px var(--mono)}
+.lane h4{margin:0 0 4px;font:700 13px var(--sans)}
+.lane.hit{background:var(--hit);border-color:var(--hit-line)}
+.lane.found{background:var(--found);border-color:var(--found-line)}
+.lane.bad{background:var(--bad);border-color:var(--bad-line)}
+.lane.dim{opacity:.55}
+.slots{display:flex;gap:6px}
+.slot{width:44px;height:44px;border:2px dashed var(--cell-line);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 15px var(--mono)}
+.slot.full{border-style:solid;background:var(--range);border-color:var(--range-line)}
+.iface{display:inline-flex;border:2px solid var(--cell-line);border-radius:10px;overflow:hidden;background:var(--cell);margin:4px 10px 4px 0}
+.iface div{padding:6px 10px;font:600 13px var(--mono)}
+.iface .t{background:var(--dim)}
+.iface.hit{background:var(--hit);border-color:var(--hit-line)}
+.iface.found{background:var(--found);border-color:var(--found-line)}
+.iface.bad{background:var(--bad);border-color:var(--bad-line)}
+.bar{height:20px;border-radius:5px;background:var(--range);border:2px solid var(--range-line);transition:width .3s}
+.bar.hit{background:var(--hit);border-color:var(--hit-line)}
+.bar.found{background:var(--found);border-color:var(--found-line)}
+.bar.dim{background:var(--dim);border-color:transparent}
+.tl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;align-items:center;font:13px var(--mono)}
+.tree{font:13px var(--mono)} .tree .tn{border:2px solid var(--cell-line);border-radius:8px;padding:4px 8px;margin:4px 0;background:var(--cell);display:inline-block}
+.tree .tn.bad{background:var(--bad);border-color:var(--bad-line)} .tree .tn.hit{background:var(--hit);border-color:var(--hit-line)} .tree .tn.found{background:var(--found);border-color:var(--found-line)}
+.tree ul{list-style:none;margin:0;padding-left:26px;border-left:2px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; সব visual</a> · <a href="../../go/variables-and-memory.html">English</a></nav>
+  <h1>Variables and Memory</h1>
+  <p class="lead">Variable হলো memory-র একটা <b>নামওয়ালা box</b>, যেটা এক type-এর একটা value ধরে রাখে।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা</h2>
+    <p>এক সারি locker-এর কথা ভাবুন। প্রতিটা locker-এর দরজায় একটা <b>নাম</b> লেখা (variable-এর নাম), ভেতরে থাকে একটা জিনিস (<b>value</b>), আর একটা <b>locker নম্বর</b> আছে (memory address)। <code>age := 30</code> লেখার মানে হলো &ldquo;একটা খালি locker নাও, তার গায়ে <code>age</code> লিখে দাও, ভেতরে 30 রাখো&rdquo;।</p>
+ <p><code>other := age</code> লিখলে Go ভেতরের জিনিসটার একটা ফটোকপি করে <b>নতুন</b> একটা locker-এ রাখে। copy বদলালে আসলটা কখনো বদলায় না। Go-র প্রায় সবকিছুই এভাবে কাজ করে: <b>assignment করলে value copy হয়</b>।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+    <label>উদাহরণ<select id="sc"></select></label>
+    <span id="inputs" style="display:contents"></span>
+    <button id="run">Run</button>
+  </div>
+  <p class="viz-note" id="scdesc"></p>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul><li>&ldquo;Declare, copy আর change&rdquo; উদাহরণে <code>other</code>-এ অন্য একটা সংখ্যা দিন: <code>age</code> কি কখনো বদলায়?</li><li>&ldquo;Zero values&rdquo; উদাহরণে দেখুন, আপনি কিছু set না করলেও প্রতিটা variable-এর একটা value আছে। একটা string শুরুতে কী থাকে?</li><li>&ldquo;Shadowing&rdquo; উদাহরণে ভেতরের মান বদলান আর দেখুন বাইরের <code>x</code> একই থাকছে।</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul><li>ভাবা যে <code>b := a</code> লিখলে <code>b</code>, <code>a</code>-এর আরেকটা নাম হয়ে যায়। আসলে এটা একটা স্বাধীন copy তৈরি করে।</li><li>Go-তে ব্যবহার না করা variable হলে <b>compile error</b> হয়: <code>declared and not used: x</code>।</li><li>কোনো block-এর ভেতরে <code>=</code> লেখার জায়গায় <code>:=</code> লিখলে বাইরের variable update হয় না, বরং একটা <i>নতুন</i> variable তৈরি হয় (shadowing)।</li></ul>
+  </div>
+
+  <div class="pagenav"><span></span><a href="pointers.html">Pointers &rarr;</a></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script>
+(function () {
+
+var E = Viz.el;
+/* ---- scenarios + dynamic inputs ---- */
+function multi(scenarios) {
+  var mount = Viz.$('#app'), sel = Viz.$('#sc'), inputsBox = Viz.$('#inputs'), err = Viz.$('#err'), desc = Viz.$('#scdesc');
+  var cur = 0, store = {}, pendingStep = null;
+  var hm = location.hash.match(/sc=(\d+)(?:&step=(\d+))?/);
+  if (hm && scenarios[+hm[1]]) { cur = +hm[1]; pendingStep = hm[2] ? +hm[2] : null; }
+  window.I = function (id) { var n = document.getElementById('in_' + id); return n ? n.value : ''; };
+  window.N = function (id, lo, hi) {
+    var raw = I(id).trim(); var v = Number(raw);
+    if (raw === '' || isNaN(v)) throw new Error('"' + id + '" অবশ্যই একটা সংখ্যা হতে হবে।');
+    if (lo !== undefined && v < lo) throw new Error('"' + id + '" অন্তত ' + lo + ' হতে হবে।');
+    if (hi !== undefined && v > hi) throw new Error('"' + id + '" সর্বোচ্চ ' + hi + ' পর্যন্ত হতে পারে।');
+    return Math.floor(v) === v ? v : Math.floor(v);
+  };
+  scenarios.forEach(function (sc, i) { sel.appendChild(E('option', { value: String(i), text: sc.name })); });
+  function buildInputs() {
+    inputsBox.innerHTML = '';
+    (scenarios[cur].inputs || []).forEach(function (inp) {
+      var key = cur + ':' + inp.id;
+      var val = store[key] !== undefined ? store[key] : inp.value;
+      var ctl;
+      if (inp.options) {
+        ctl = E('select', { id: 'in_' + inp.id }, inp.options.map(function (o) { return E('option', { value: o[0], text: o[1] }); }));
+        ctl.value = val;
+      } else {
+        ctl = E('input', { id: 'in_' + inp.id, value: val, size: inp.size || 10 });
+      }
+      ctl.addEventListener('change', function () { store[key] = ctl.value; show(); });
+      inputsBox.appendChild(E('label', { text: inp.label }, [ctl]));
+    });
+  }
+  function show() {
+    var sc = scenarios[cur];
+    err.textContent = '';
+    mount.innerHTML = '';
+    desc.textContent = sc.desc || '';
+    var steps;
+    try { steps = sc.steps(); } catch (e) { err.textContent = e.message; return; }
+    var st = Viz.stepper({ mount: mount, code: typeof sc.code === 'function' ? sc.code() : sc.code, render: sc.render });
+    st.load(steps);
+    if (pendingStep !== null) { st.go(pendingStep); pendingStep = null; }
+  }
+  sel.addEventListener('change', function () { cur = +sel.value; buildInputs(); show(); });
+  Viz.$('#run').addEventListener('click', function () { show(); });
+  sel.value = String(cur); buildInputs(); show();
+  if (location.hash === '#test') {
+    var log = [];
+    scenarios.forEach(function (sc, k) {
+      try {
+        cur = k; buildInputs();
+        var steps = sc.steps(), code = typeof sc.code === 'function' ? sc.code() : sc.code, tmp = document.createElement('div');
+        if (!steps.length) throw new Error('no steps');
+        steps.forEach(function (stp, j) {
+          tmp.innerHTML = ''; sc.render(stp, j, tmp);
+          if (!tmp.firstChild) throw new Error('empty render at step ' + j);
+          [].concat(stp.line === undefined ? [] : stp.line).forEach(function (ln) { if (!(ln >= 0 && ln < code.length)) throw new Error('bad line ' + ln + ' at step ' + j); });
+          if (!stp.text) throw new Error('no text at step ' + j);
+        });
+        log.push('OK   ' + sc.name + ' (' + steps.length + ' steps)');
+      } catch (e) { log.push('FAIL ' + sc.name + ': ' + e.message); }
+    });
+    cur = 0; sel.value = '0'; buildInputs(); show();
+    document.body.appendChild(E('pre', { id: 'testresult', text: log.join('\n') }));
+  }
+}
+
+/* ---- memory diagram: boxes + arrows (illustrative addresses) ---- */
+var _mid = 0;
+function mem(body, cells, arrows, o) {
+  o = o || {};
+  var W = 124, H = 70, G = 34, X0 = 12, Y0 = 12, n = Math.max(cells.length, 1), id = 'ah' + (++_mid);
+  var width = X0 * 2 + n * W + (n - 1) * G, hasA = arrows && arrows.length, height = Y0 + H + (hasA ? 92 : 14);
+  var kids = [Viz.s('defs', {}, [Viz.s('marker', { id: id, viewBox: '0 0 10 10', refX: '8', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto' }, [Viz.s('path', { d: 'M0,0L10,5L0,10z', class: 'ah' })])])];
+  cells.forEach(function (c, i) {
+    var x = X0 + i * (W + G);
+    kids.push(Viz.s('rect', { x: x, y: Y0, width: W, height: H, rx: 10, class: 'node ' + (c.cls || '') }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 17, 'text-anchor': 'middle', class: 'nm', text: c.name }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 42, 'text-anchor': 'middle', class: 'val' + (String(c.value).length > 8 ? ' small' : ''), text: String(c.value) }));
+    if (c.addr) kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 62, 'text-anchor': 'middle', class: 'ad', text: c.addr }));
+  });
+  (arrows || []).forEach(function (a) {
+    var x1 = X0 + a.from * (W + G) + W / 2, x2 = X0 + a.to * (W + G) + W / 2, y = Y0 + H, d;
+    if (a.from === a.to) { x1 -= 22; x2 += 22; d = 'M' + x1 + ',' + y + ' C' + (x1 - 10) + ',' + (y + 55) + ' ' + (x2 + 10) + ',' + (y + 55) + ' ' + x2 + ',' + (y + 3); }
+    else d = 'M' + x1 + ',' + y + ' C' + x1 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 4);
+    kids.push(Viz.s('path', { d: d, class: 'arrow ' + (a.cls || ''), 'marker-end': 'url(#' + id + ')' }));
+    if (a.label) kids.push(Viz.s('text', { x: (x1 + x2) / 2, y: y + 66, 'text-anchor': 'middle', class: 'lbl', text: a.label }));
+  });
+  var svgEl = Viz.svg(width, height, kids); svgEl.style.minWidth = Math.min(width, 600) + 'px';
+  body.appendChild(svgEl);
+  if (o.note !== false) body.appendChild(Viz.note('এখানে 0xc000012000-এর মতো address গুলো বোঝানোর জন্য বানানো; আসল address প্রতিবার run করলে আলাদা হয়।'));
+}
+function out(body, lines) {
+  body.appendChild(E('div', { class: 'out', html: lines && lines.length ? lines.map(function (l) { return esc(l); }).join('<br>') : '<i>(প্রোগ্রামের output এখানে আসবে)</i>' }));
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function chips(items) { return E('div', { class: 'hdrs' }, items.map(function (c) { return E('span', { class: 'chip ' + (c.cls || ''), text: c.text }); })); }
+
+document.getElementById('legend').appendChild(Viz.legend([{cls:'hit',label:'এইমাত্র বদলেছে / ব্যবহার হচ্ছে'},{cls:'found',label:'ইচ্ছে করেই অপরিবর্তিত'},{cls:'range',label:'একটা copy'}]));
+
+function cell(name, value, addr, cls) { return { name: name, value: value, addr: addr, cls: cls || '' }; }
+function render(st, i, body) { mem(body, st.cells, []); if (st.out) out(body, st.out); }
+multi([
+ { name: 'Declare, copy আর change', desc: 'Assignment করলে value copy হয়। copy-টা আসলের থেকে সম্পূর্ণ আলাদা।',
+   inputs: [{ id: 'age', label: 'age শুরুতে', value: '30', size: 6 }, { id: 'other', label: 'other-এ দিন', value: '99', size: 6 }],
+   code: function () { return ['func main() {', '    age := ' + I('age'), '    name := "Ada"', '    age = age + 1', '    other := age', '    other = ' + I('other'), '}']; },
+   render: render,
+   steps: function () {
+     var a = N('age', -1000000, 1000000), o = N('other', -1000000, 1000000), a1 = a + 1;
+     return [
+      { line: 1, text: 'age := ' + a + ' লিখলে age নামে একটা box তৈরি হয় (type int), আর তার ভেতরে রাখা হয় ' + a + '।', cells: [cell('age (int)', a, '0xc000012080', 'hit')] },
+      { line: 2, text: 'name := "Ada" দ্বিতীয় একটা box তৈরি করে। string box-এ text থাকে।', cells: [cell('age (int)', a, '0xc000012080'), cell('name (string)', '"Ada"', '0xc000012088', 'hit')] },
+      { line: 3, text: 'age = age + 1 একই box-এর ভেতরের মান বদলায়। address একই থাকে।', cells: [cell('age (int)', a1, '0xc000012080', 'hit'), cell('name (string)', '"Ada"', '0xc000012088')] },
+      { line: 4, text: 'other := age একটা নতুন box বানায় এবং বর্তমান value-র (' + a1 + ') ফটোকপি তার ভেতরে রাখে।', cells: [cell('age (int)', a1, '0xc000012080'), cell('name (string)', '"Ada"', '0xc000012088'), cell('other (int)', a1, '0xc000012090', 'range')] },
+      { line: 5, text: 'other = ' + o + ' লিখলে শুধু copy বদলায়। age-এ থাকে ' + a1 + '।', cells: [cell('age (int)', a1, '0xc000012080', 'found'), cell('name (string)', '"Ada"', '0xc000012088'), cell('other (int)', o, '0xc000012090', 'hit')] }
+     ];
+   } },
+ { name: 'Zero values', desc: 'যে variable declare করা হয়েছে কিন্তু কোনো মান দেওয়া হয়নি, সেটা শুরুতে তার type-এর zero value পায়। কোনো অর্থহীন মান থাকে না।',
+   code: ['func main() {', '    var n int', '    var f float64', '    var s string', '    var ok bool', '    var p *int', '    var xs []int', '}'],
+   render: render,
+   steps: function () {
+     var defs = [['n (int)', '0'], ['f (float64)', '0'], ['s (string)', '""  (empty)'], ['ok (bool)', 'false'], ['p (*int)', 'nil'], ['xs ([]int)', 'nil']];
+     var texts = ['int শুরুতে 0।', 'float64 শুরুতে 0।', 'string শুরুতে খালি string, nil নয়।', 'bool শুরুতে false।', 'pointer শুরুতে nil: এখনো কোথাও point করছে না।', 'slice শুরুতে nil। এটা খালি, আর এর ওপর append করা যায়।'];
+     return defs.map(function (d, k) {
+       var cells = defs.slice(0, k + 1).map(function (x, j) { return cell(x[0], x[1], '0xc0000120' + (80 + j * 8).toString(16), j === k ? 'hit' : ''); });
+       return { line: k + 1, text: texts[k], cells: cells };
+     });
+   } },
+ { name: 'Shadowing', desc: '{ } এর ভেতরে := একটা আলাদা variable তৈরি করে, যেটা block শেষ না হওয়া পর্যন্ত বাইরের variable-টাকে আড়াল করে রাখে।',
+   inputs: [{ id: 'inner', label: 'ভেতরের x-এ দিন', value: '2', size: 6 }],
+   code: ['func main() {', '    x := 1', '    {', '        x := 2   // NEW variable', '        _ = x', '    }', '    fmt.Println(x)', '}'],
+   render: render,
+   steps: function () {
+     var v = N('inner', -1000, 1000);
+     return [
+      { line: 1, text: 'বাইরের x তৈরি হলো, মান 1।', cells: [cell('x (বাইরের)', 1, '0xc000012080', 'hit')], out: [] },
+      { line: 3, text: 'Block-এর ভেতরে := একদম নতুন একটা x তৈরি করে। এটা একই নামের কিন্তু আলাদা box, আর এটা বাইরের x-কে আড়াল করে রাখে।', cells: [cell('x (বাইরের, আড়ালে)', 1, '0xc000012080', 'dim'), cell('x (ভেতরের)', v, '0xc000012088', 'hit')], out: [] },
+      { line: 5, text: 'Block শেষ। ভেতরের x আর নেই।', cells: [cell('x (বাইরের)', 1, '0xc000012080', 'found')], out: [] },
+      { line: 6, text: 'Println(x) বাইরের x-ই দেখে, যার মান এখনো 1। := এর বদলে = লিখলে এটা বদলে যেত।', cells: [cell('x (বাইরের)', 1, '0xc000012080', 'found')], out: ['1'] }
+     ];
+   } }
+]);
+
+})();
+</script>
+</body>
+</html>

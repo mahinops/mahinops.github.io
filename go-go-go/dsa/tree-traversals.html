@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Watch preorder, inorder, postorder (with a live call stack) and level-order (with a queue) walk a binary tree.">
+<title>Tree Traversals - visual</title>
+<link rel="stylesheet" href="../assets/viz.css">
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/tree-traversals.html">বাংলা</a></nav>
+  <h1>Tree Traversals</h1>
+  <p class="lead">Four ways to visit every node of a binary tree, and why the order differs.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea (a company org chart)</h2>
+    <p>A tree is like an org chart: one boss at the top, and each person has at most two direct reports (a <b>left</b> and a <b>right</b> child). &ldquo;Traversal&rdquo; means walking through everyone exactly once. The only question is <b>when you say hello to a person</b>:</p>
+    <ul>
+      <li><b>Preorder</b>: greet the person <i>first</i>, then their left side, then their right side.</li>
+      <li><b>Inorder</b>: left side first, then the person, then the right side. (On a search tree this gives sorted order.)</li>
+      <li><b>Postorder</b>: both sides first, the person <i>last</i>. (Children before parents, like deleting a folder tree.)</li>
+      <li><b>Level-order</b>: floor by floor, top to bottom. Uses a <b>queue</b> instead of recursion.</li>
+    </ul>
+    <p>The three recursive versions are the same function with the line <code>visit</code> moved. Watch the <b>call stack</b> grow when we go down and shrink when a call returns.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Tree, level by level (null = no node)<input id="tree" value="1, 2, 3, 4, 5, null, 6" size="30"></label>
+    <label>Traversal
+      <select id="mode">
+        <option value="preorder">Preorder (visit, left, right)</option>
+        <option value="inorder">Inorder (left, visit, right)</option>
+        <option value="postorder">Postorder (left, right, visit)</option>
+        <option value="level">Level-order (queue)</option>
+      </select>
+    </label>
+    <button id="go">Run</button>
+  </div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul>
+      <li>Run all four modes on the same tree and compare the output lists.</li>
+      <li>Type <code>4, 2, 6, 1, 3, 5, 7</code> and run <b>Inorder</b>. What do you notice about the output?</li>
+      <li>Make a lopsided tree: <code>1, null, 2, null, 3, null, 4</code>. How tall does the call stack get?</li>
+      <li>Watch the nil calls: every missing child still gets a call that returns immediately.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul>
+      <li><b>Forgetting the nil check.</b> Without <code>if n == nil { return }</code> the code dereferences a nil pointer and panics.</li>
+      <li><b>Mixing up the orders.</b> Remember: the name says where <i>visit</i> goes relative to the children (pre = before, in = between, post = after).</li>
+      <li><b>Very deep trees.</b> Recursion uses one stack frame per level. A tree that is really a long chain can use a lot of stack, so interviewers sometimes ask for an iterative version.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, in plain English:</b> every node is visited once, so the time grows in step with the number of nodes (<code>O(n)</code>). The recursive versions need space equal to the tree&rsquo;s height; level-order needs space equal to the widest floor.
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var ORDER = { preorder: ['V', 'L', 'R'], inorder: ['L', 'V', 'R'], postorder: ['L', 'R', 'V'] };
+
+function codeFor(mode) {
+  var body = {
+    V: '    *out = append(*out, n.Val) // visit',
+    L: '    ' + mode + '(n.Left, out)',
+    R: '    ' + mode + '(n.Right, out)',
+  };
+  return ['func ' + mode + '(n *TreeNode, out *[]int) {', '    if n == nil {', '        return', '    }']
+    .concat(ORDER[mode].map(function (k) { return body[k]; }), ['}']);
+}
+var LEVEL_CODE = [
+  'func levelOrder(root *TreeNode) []int {',
+  '    var out []int',
+  '    if root == nil {',
+  '        return out',
+  '    }',
+  '    queue := []*TreeNode{root}',
+  '    for len(queue) > 0 {',
+  '        n := queue[0]',
+  '        queue = queue[1:]',
+  '        out = append(out, n.Val)',
+  '        if n.Left != nil {',
+  '            queue = append(queue, n.Left)',
+  '        }',
+  '        if n.Right != nil {',
+  '            queue = append(queue, n.Right)',
+  '        }',
+  '    }',
+  '    return out',
+  '}',
+];
+
+function parseTree(tokens) {
+  if (!tokens.length || tokens[0] === null) return null;
+  var root = { val: tokens[0], left: null, right: null };
+  var q = [root], i = 1;
+  while (q.length && i < tokens.length) {
+    var n = q.shift();
+    var l = tokens[i++];
+    if (l !== null && l !== undefined) { n.left = { val: l, left: null, right: null }; q.push(n.left); }
+    if (i < tokens.length) {
+      var r = tokens[i++];
+      if (r !== null && r !== undefined) { n.right = { val: r, left: null, right: null }; q.push(n.right); }
+    }
+  }
+  return root;
+}
+
+function genRecursive(root, mode) {
+  var ord = ORDER[mode], steps = [], stack = [], out = [];
+  function lbl(n) { return n ? String(n.val) : 'nil'; }
+  function top() { for (var i = stack.length - 1; i >= 0; i--) if (stack[i]) return stack[i]; return null; }
+  function snap(text, line) { steps.push({ text: text, line: line, cur: top(), stack: stack.slice(), out: out.slice() }); }
+  function rec(n) {
+    stack.push(n);
+    snap('Call ' + mode + '(' + lbl(n) + ')' + (n ? '.' : ': there is no node here.'), 0);
+    if (!n) { snap('n is nil, so there is nothing to do: return to the caller.', [1, 2]); stack.pop(); return; }
+    ord.forEach(function (k, j) {
+      var line = 4 + j;
+      if (k === 'V') { out.push(n); snap('Visit ' + n.val + ': add it to the output.', line); }
+      else if (k === 'L') { snap('Go to the left child of ' + n.val + ' (' + lbl(n.left) + ').', line); rec(n.left); }
+      else { snap('Go to the right child of ' + n.val + ' (' + lbl(n.right) + ').', line); rec(n.right); }
+    });
+    snap('Finished with ' + n.val + ': return to the caller.', 4 + ord.length);
+    stack.pop();
+  }
+  rec(root);
+  steps.push({ text: 'Done. Output: [' + out.map(function (n) { return n.val; }).join(', ') + ']', cur: null, stack: [], out: out.slice() });
+  return steps;
+}
+
+function genLevel(root) {
+  var steps = [], out = [], queue = [];
+  function snap(text, line, cur) { steps.push({ text: text, line: line, cur: cur || null, queue: queue.slice(), out: out.slice() }); }
+  queue.push(root);
+  snap('Put the root in the queue.', 5);
+  while (queue.length) {
+    var n = queue.shift();
+    snap('Take ' + n.val + ' from the front of the queue.', [7, 8], n);
+    out.push(n);
+    snap('Visit ' + n.val + ': add it to the output.', 9, n);
+    if (n.left) { queue.push(n.left); snap('Left child ' + n.left.val + ' exists: add it to the back of the queue.', [10, 11], n); }
+    if (n.right) { queue.push(n.right); snap('Right child ' + n.right.val + ' exists: add it to the back of the queue.', [13, 14], n); }
+  }
+  steps.push({ text: 'The queue is empty. Output: [' + out.map(function (x) { return x.val; }).join(', ') + ']', line: 17, cur: null, queue: [], out: out.slice() });
+  return steps;
+}
+
+function layout(root) {
+  var pos = new Map(), xi = 0, maxd = 0;
+  (function walk(n, d) {
+    if (!n) return;
+    walk(n.left, d + 1);
+    pos.set(n, { x: xi++, d: d });
+    if (d > maxd) maxd = d;
+    walk(n.right, d + 1);
+  })(root, 0);
+  return { pos: pos, w: xi, h: maxd + 1 };
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+  var stepper = null, L = null;
+
+  function drawTree(st) {
+    var dx = 46, dy = 64, r = 18, pad = 10;
+    var W = Math.max(L.w * dx + pad * 2, 140), H = L.h * dy + pad;
+    var inList = new Set((st.stack || st.queue || []).filter(Boolean));
+    var inOut = new Set(st.out);
+    var parts = [];
+    function cx(n) { return pad + L.pos.get(n).x * dx + dx / 2; }
+    function cy(n) { return pad + L.pos.get(n).d * dy + r; }
+    L.pos.forEach(function (_, n) {
+      [n.left, n.right].forEach(function (c) {
+        if (c) parts.push(Viz.s('line', { class: 'edge', x1: cx(n), y1: cy(n), x2: cx(c), y2: cy(c) }));
+      });
+    });
+    L.pos.forEach(function (_, n) {
+      var cls = 'node';
+      if (n === st.cur) cls += ' hit'; else if (inOut.has(n)) cls += ' found'; else if (inList.has(n)) cls += ' range';
+      parts.push(Viz.s('circle', { class: cls, cx: cx(n), cy: cy(n), r: r }));
+      parts.push(Viz.s('text', { x: cx(n), y: cy(n) + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, text: String(n.val) }));
+    });
+    return Viz.svg(W, H, parts);
+  }
+
+  function render(st, i, body) {
+    body.appendChild(drawTree(st));
+    if (st.stack) {
+      var labels = st.stack.map(function (n) { return n ? n.val : 'nil'; });
+      var cls = {}, marks = {};
+      if (labels.length) { cls[labels.length - 1] = 'hit'; marks[labels.length - 1] = 'top'; }
+      body.appendChild(Viz.array(labels, { title: 'call stack (the right end is the call running now)', indexes: false, classes: cls, marks: marks }));
+      if (!labels.length) body.appendChild(Viz.note('(call stack is empty)'));
+    } else if (st.queue) {
+      var q = st.queue.map(function (n) { return n.val; });
+      var qm = {}; if (q.length) { qm[0] = 'front'; }
+      body.appendChild(Viz.array(q, { title: 'queue (leaves from the front, joins at the back)', indexes: false, marks: qm }));
+      if (!q.length) body.appendChild(Viz.note('(queue is empty)'));
+    }
+    body.appendChild(Viz.array(st.out.map(function (n) { return n.val; }), { title: 'output so far', indexes: false, classes: (function () { var c = {}; st.out.forEach(function (_, k) { c[k] = 'found'; }); return c; })() }));
+    if (!st.out.length) body.appendChild(Viz.note('(nothing visited yet)'));
+  }
+
+  function parseInput(str) {
+    var toks = str.split(/[\s,]+/).filter(Boolean), out = [];
+    for (var i = 0; i < toks.length; i++) {
+      var t = toks[i].toLowerCase();
+      if (t === 'null' || t === 'nil' || t === 'n') out.push(null);
+      else { var v = Number(t); if (isNaN(v)) return { error: '"' + toks[i] + '" is not a number or null.' }; out.push(v); }
+    }
+    return { tokens: out };
+  }
+  function countNodes(n) { return n ? 1 + countNodes(n.left) + countNodes(n.right) : 0; }
+
+  function run() {
+    errBox.textContent = '';
+    var p = parseInput(document.getElementById('tree').value);
+    if (p.error) { errBox.textContent = p.error; return; }
+    var root = parseTree(p.tokens);
+    if (!root) { errBox.textContent = 'The first value is the root, so it cannot be null.'; return; }
+    if (countNodes(root) > 15) { errBox.textContent = 'Please use at most 15 nodes so the picture stays readable.'; return; }
+    var mode = document.getElementById('mode').value;
+    L = layout(root);
+    app.innerHTML = '';
+    stepper = Viz.stepper({ mount: app, code: mode === 'level' ? LEVEL_CODE : codeFor(mode), render: render });
+    stepper.load(mode === 'level' ? genLevel(root) : genRecursive(root, mode));
+  }
+
+  document.getElementById('legend').appendChild(Viz.legend([
+    { cls: 'hit', label: 'current node' }, { cls: 'range', label: 'waiting (on the stack / in the queue)' }, { cls: 'found', label: 'visited' },
+  ]));
+  document.getElementById('go').addEventListener('click', run);
+  document.getElementById('mode').addEventListener('change', run);
+  run();
+})();
+</script>
+</body>
+</html>

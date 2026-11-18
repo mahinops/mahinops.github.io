@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Binary Search</title>
+<meta name="description" content="Sorted list-এ প্রতিবার অর্ধেক বাদ দিয়ে দ্রুত একটা মান খুঁজে বের করার পদ্ধতি।">
+<link rel="stylesheet" href="../../assets/viz.css">
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; সব visual</a> &middot; <a href="../../dsa/binary-search.html">English</a></nav>
+  <h1>Binary Search</h1>
+  <p class="lead"><b>Sorted</b> list-এ একটা মান খুঁজুন, প্রতিবার list-এর অর্ধেক বাদ দিয়ে।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea (like guessing a number)</h2>
+    <p>ধরুন আমি 1 থেকে 100-এর মধ্যে একটা সংখ্যা ভেবেছি। আপনি বললেন 50। আমি বললাম &ldquo;আরও বড়&rdquo;। এখন আপনি জানেন সংখ্যাটা 51&ndash;100-এর মধ্যে, অর্থাৎ এক guess-এই অর্ধেক সংখ্যা বাদ। এরপর 75 বললেন, উত্তর &ldquo;আরও ছোট&rdquo;&hellip; এভাবে মোটামুটি 7 বারের মধ্যেই সবসময় পেয়ে যাবেন। Binary search ঠিক এভাবেই কাজ করে: <b>মাঝখানের মান দেখুন, তারপর যে অর্ধেকে উত্তর থাকতে পারে না সেটা বাদ দিন।</b></p>
+    <p>এটা শুধু <b>sorted</b> list-এ কাজ করে। list-এর size দ্বিগুণ হলে মাত্র <b>এক</b> ধাপ বাড়ে: 1,000,000টা item-এ লাগে প্রায় 20 ধাপ।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+    <label>Sorted সংখ্যা<input id="arr" size="38" value="2, 5, 8, 12, 16, 23, 38, 45, 56, 72, 91"></label>
+    <label>Target<input id="target" value="23" size="6"></label>
+    <button id="go">Run</button>
+  </div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul>
+      <li><code>91</code> (শেষ item) আর <code>2</code> (প্রথম item) খুঁজুন। প্রতিটায় কত ধাপ লাগে?</li>
+      <li>List-এ নেই এমন <code>40</code> খুঁজুন। শেষে <code>lo</code> আর <code>hi</code>-এর মান কী দাঁড়ায়?</li>
+      <li>আরও 10টা সংখ্যা যোগ করুন (sorted রাখুন)। কত ধাপ বাড়ে?</li>
+      <li><i>Unsorted</i> list দিন। কেন ভুল উত্তর আসে?</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul>
+      <li><b>Off-by-one:</b> <code>mid</code> দেখা হয়ে গেলে <code>mid+1</code> বা <code>mid-1</code>-এ যান, <code>mid</code>-এ নয়। নইলে loop কখনো শেষ নাও হতে পারে।</li>
+      <li><b>Overflow:</b> <code>mid := lo + (hi-lo)/2</code> লিখুন, <code>(lo+hi)/2</code> নয়। index অনেক বড় হলে দ্বিতীয়টায় overflow হতে পারে।</li>
+      <li><b>Unsorted input:</b> কোনো error ছাড়াই ভুল উত্তর আসে।</li>
+    </ul>
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script>
+(function () {
+  var CODE = [
+    'func binarySearch(nums []int, target int) int {',
+    '    lo, hi := 0, len(nums)-1',
+    '    for lo <= hi {',
+    '        mid := lo + (hi-lo)/2',
+    '        if nums[mid] == target {',
+    '            return mid',
+    '        } else if nums[mid] < target {',
+    '            lo = mid + 1',
+    '        } else {',
+    '            hi = mid - 1',
+    '        }',
+    '    }',
+    '    return -1',
+    '}',
+  ];
+
+  function buildSteps(nums, target) {
+    var steps = [];
+    var lo = 0, hi = nums.length - 1;
+    steps.push({ nums: nums, lo: lo, hi: hi, mid: null, line: 1, text: 'শুরু: lo হলো প্রথম index (0), hi হলো শেষ index (' + hi + '). পুরো list-এই এখনো উত্তর থাকতে পারে।' });
+    while (lo <= hi) {
+      var mid = lo + Math.floor((hi - lo) / 2);
+      steps.push({ nums: nums, lo: lo, hi: hi, mid: mid, line: 3, text: 'mid = ' + lo + ' + (' + hi + ' - ' + lo + ') / 2 = ' + mid + '। মাঝের মান: ' + nums[mid] + '।' });
+      if (nums[mid] === target) {
+        steps.push({ nums: nums, lo: lo, hi: hi, mid: mid, found: mid, line: [4, 5], text: nums[mid] + ' হলো target ' + target + '। পাওয়া গেছে index ' + mid + '-এ!' });
+        return steps;
+      } else if (nums[mid] < target) {
+        steps.push({ nums: nums, lo: lo, hi: hi, mid: mid, line: [6, 7], text: nums[mid] + ' < ' + target + ', তাই target ডানদিকে আছে। বাঁ অর্ধেক বাদ দিন: lo = mid + 1 = ' + (mid + 1) + '।' });
+        lo = mid + 1;
+      } else {
+        steps.push({ nums: nums, lo: lo, hi: hi, mid: mid, line: [8, 9], text: nums[mid] + ' > ' + target + ', তাই target বাঁদিকে আছে। ডান অর্ধেক বাদ দিন: hi = mid - 1 = ' + (mid - 1) + '।' });
+        hi = mid - 1;
+      }
+    }
+    steps.push({ nums: nums, lo: lo, hi: hi, mid: null, notFound: true, line: 12, text: 'lo (' + lo + ') এখন hi (' + hi + ')-এর চেয়ে বড়, তাই দেখার মতো কিছু বাকি নেই। ' + target + ' list-এ নেই, তাই -1 return করুন।' });
+    return steps;
+  }
+
+  var s = Viz.stepper({
+    mount: '#app',
+    code: CODE,
+    render: function (st, i, body) {
+      var marks = {}, classes = {};
+      function mark(ix, label) { if (ix >= 0 && ix < st.nums.length) marks[ix] = (marks[ix] || []).concat(label); }
+      st.nums.forEach(function (_, ix) { classes[ix] = (ix >= st.lo && ix <= st.hi) ? 'range' : 'dim'; });
+      mark(st.lo, 'lo'); mark(st.hi, 'hi');
+      if (st.mid !== null) { classes[st.mid] = 'hit'; mark(st.mid, 'mid'); }
+      if (st.found !== undefined) classes[st.found] = 'found';
+      body.appendChild(Viz.array(st.nums, { marks: marks, classes: classes, title: 'nums' }));
+      if (st.notFound) body.appendChild(Viz.note('<b>ফলাফল: -1 (পাওয়া যায়নি)</b>'));
+      if (st.found !== undefined) body.appendChild(Viz.note('<b>ফলাফল: index ' + st.found + '</b>'));
+    },
+  });
+  document.getElementById('legend').appendChild(Viz.legend([
+    { cls: 'range', label: 'এখনো সম্ভাব্য' }, { cls: 'hit', label: 'যে মাঝের মান দেখা হচ্ছে' },
+    { cls: 'dim', label: 'বাদ দেওয়া হয়েছে' }, { cls: 'found', label: 'পাওয়া গেছে' },
+  ]));
+
+  function run() {
+    var nums = Viz.parseNums(document.getElementById('arr').value);
+    var target = Number(document.getElementById('target').value);
+    var err = document.getElementById('err');
+    err.textContent = '';
+    if (!nums.length || nums.length > 20) { err.textContent = '1 থেকে 20টার মধ্যে সংখ্যা দিন।'; return; }
+    if (document.getElementById('target').value.trim() === '' || Number.isNaN(target)) { err.textContent = 'Target একটা সংখ্যা হতে হবে।'; return; }
+    s.load(buildSteps(nums, target));
+  }
+  document.getElementById('go').addEventListener('click', run);
+  run();
+})();
+</script>
+</body>
+</html>

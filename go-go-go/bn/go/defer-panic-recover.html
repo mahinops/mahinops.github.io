@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Defer, Panic and Recover</title>
+<meta name="description" content="দেখুন defer stack কীভাবে last-in-first-out ক্রমে run হয়, panic কীভাবে stack unwind করে, আর recover কীভাবে সেটা ধরে ফেলে।">
+<link rel="stylesheet" href="../../assets/viz.css">
+<style>
+.viz-layout{grid-template-columns:minmax(0,1fr)}
+.viz-stage,.viz-code{min-width:0;max-width:100%}
+@media (max-width:760px){.viz-layout.viz-has-code{grid-template-columns:minmax(0,1fr)}}
+body{overflow-x:hidden}
+.viz-svg .ah{fill:var(--accent)}
+.viz-svg .arrow{fill:none;stroke:var(--accent);stroke-width:2.5}
+.viz-svg .arrow.bad{stroke:var(--bad-line)}
+.viz-svg .node.bad{fill:var(--bad);stroke:var(--bad-line)}
+.viz-svg .node.nilp{stroke-dasharray:5 4}
+.viz-svg .nm{font-size:12px;fill:var(--muted)}
+.viz-svg .val{font-size:17px;font-weight:700}
+.viz-svg .ad{font-size:10px;fill:var(--muted)}
+.viz-svg .val.small{font-size:12px}
+.viz-svg .lbl{font-size:12px;fill:var(--accent);font-weight:700}
+.viz-cell.spare{background:transparent;border-style:dashed;color:var(--muted)}
+.hdrs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.chip{border:2px solid var(--cell-line);background:var(--cell);border-radius:10px;padding:4px 10px;font:600 13px var(--mono)}
+.chip.hit{background:var(--hit);border-color:var(--hit-line)}
+.chip.found{background:var(--found);border-color:var(--found-line)}
+.chip.dim{opacity:.45}
+.chip.bad{background:var(--bad);border-color:var(--bad-line)}
+.stackcol{display:flex;flex-direction:column-reverse;gap:6px;max-width:420px}
+.frame{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:6px 10px;font:13px var(--mono)}
+.frame b{display:block;margin-bottom:2px}
+.frame.hit{background:var(--hit);border-color:var(--hit-line)}
+.frame.found{background:var(--found);border-color:var(--found-line)}
+.frame.bad{background:var(--bad);border-color:var(--bad-line)}
+.frame.dim{opacity:.55}
+.out{font:13px var(--mono);background:var(--code-bg);color:var(--code-ink);padding:8px 10px;border-radius:8px;min-height:2.2em;white-space:pre-wrap;margin-top:10px}
+.out i{color:#6b7a90;font-style:normal}
+.row2{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.lane{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:8px 12px;min-width:170px;font:13px var(--mono)}
+.lane h4{margin:0 0 4px;font:700 13px var(--sans)}
+.lane.hit{background:var(--hit);border-color:var(--hit-line)}
+.lane.found{background:var(--found);border-color:var(--found-line)}
+.lane.bad{background:var(--bad);border-color:var(--bad-line)}
+.lane.dim{opacity:.55}
+.slots{display:flex;gap:6px}
+.slot{width:44px;height:44px;border:2px dashed var(--cell-line);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 15px var(--mono)}
+.slot.full{border-style:solid;background:var(--range);border-color:var(--range-line)}
+.iface{display:inline-flex;border:2px solid var(--cell-line);border-radius:10px;overflow:hidden;background:var(--cell);margin:4px 10px 4px 0}
+.iface div{padding:6px 10px;font:600 13px var(--mono)}
+.iface .t{background:var(--dim)}
+.iface.hit{background:var(--hit);border-color:var(--hit-line)}
+.iface.found{background:var(--found);border-color:var(--found-line)}
+.iface.bad{background:var(--bad);border-color:var(--bad-line)}
+.bar{height:20px;border-radius:5px;background:var(--range);border:2px solid var(--range-line);transition:width .3s}
+.bar.hit{background:var(--hit);border-color:var(--hit-line)}
+.bar.found{background:var(--found);border-color:var(--found-line)}
+.bar.dim{background:var(--dim);border-color:transparent}
+.tl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;align-items:center;font:13px var(--mono)}
+.tree{font:13px var(--mono)} .tree .tn{border:2px solid var(--cell-line);border-radius:8px;padding:4px 8px;margin:4px 0;background:var(--cell);display:inline-block}
+.tree .tn.bad{background:var(--bad);border-color:var(--bad-line)} .tree .tn.hit{background:var(--hit);border-color:var(--hit-line)} .tree .tn.found{background:var(--found);border-color:var(--found-line)}
+.tree ul{list-style:none;margin:0;padding-left:26px;border-left:2px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; সব visual</a> · <a href="../../go/defer-panic-recover.html">English</a></nav>
+  <h1>Defer, Panic and Recover</h1>
+  <p class="lead"><code>defer</code> হলো একটা to-do list, যেটা <b>function শেষ হওয়ার সময়</b> run হয়, নতুন item আগে।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা</h2>
+    <p>আপনি বাড়ি থেকে বের হচ্ছেন। যেতে যেতে কয়েকটা কাজের কথা মনে পড়ল: &ldquo;oven বন্ধ করো&rdquo;, তারপর &ldquo;জানালা আটকাও&rdquo;, তারপর &ldquo;দরজায় তালা দাও&rdquo;। বের হওয়ার আগে এগুলো মেটাতে হবে <b>উল্টো ক্রমে</b>: আগে দরজা (সবার শেষে যোগ হয়েছে), তারপর জানালা, তারপর oven। এটাই <code>defer</code>: call-এর একটা <b>last-in, first-out</b> stack, যা আশপাশের function return করার সময় run হয়, এমনকি panic-এর কারণে return হলেও।</p>
+ <p><b>Panic</b> হলো জরুরি অবস্থা: স্বাভাবিক execution থেমে যায় এবং Go stack unwind করতে করতে deferred call গুলো run করে। কোনো deferred function যদি <code>recover()</code> call করে, তাহলে জরুরি অবস্থা বাতিল হয়ে যায় এবং function স্বাভাবিকভাবে return করে। কেউ recover না করলে program crash করে।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+    <label>উদাহরণ<select id="sc"></select></label>
+    <span id="inputs" style="display:contents"></span>
+    <button id="run">Run</button>
+  </div>
+  <p class="viz-note" id="scdesc"></p>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul><li>&ldquo;Panic থেকে recover করা&rdquo; উদাহরণে b = 2 দিন, তারপর b = 0। শেষের output দুটো মিলিয়ে দেখুন।</li><li>&ldquo;defer উল্টো ক্রমে run হয়&rdquo; উদাহরণে মনে মনে আরেকটা defer যোগ করুন: সেটা কোথায় print হবে?</li><li>&ldquo;recover ছাড়া panic&rdquo; উদাহরণে খেয়াল করুন crash-এর বার্তার আগেও <code>cleanup</code> print হয়।</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul><li><code>recover()</code> শুধু তখনই কাজ করে যখন সেটা <b>সরাসরি কোনো deferred function-এর ভেতরে</b> call করা হয়। অন্য জায়গায় এটা nil return করে।</li><li>Loop-এর ভেতরে defer করা: সব deferred call function শেষ হওয়া পর্যন্ত অপেক্ষা করে, iteration শেষ হওয়া পর্যন্ত নয় (এতে file অনেকক্ষণ open থেকে যেতে পারে)।</li><li>Deferred call-এর argument গুলো evaluate হয় যখন <code>defer</code> লাইনটা run হয়, call-টা execute হওয়ার সময় নয়।</li><li>সাধারণ error-এর জন্য panic ব্যবহার করা। এর বদলে একটা <code>error</code> return করুন; panic রাখুন bug আর অসম্ভব অবস্থার জন্য।</li></ul>
+  </div>
+
+  <div class="pagenav"><a href="closures.html">&larr; Closures</a><a href="strings-bytes-runes.html">Strings, Bytes and Runes &rarr;</a></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script>
+(function () {
+
+var E = Viz.el;
+/* ---- scenarios + dynamic inputs ---- */
+function multi(scenarios) {
+  var mount = Viz.$('#app'), sel = Viz.$('#sc'), inputsBox = Viz.$('#inputs'), err = Viz.$('#err'), desc = Viz.$('#scdesc');
+  var cur = 0, store = {}, pendingStep = null;
+  var hm = location.hash.match(/sc=(\d+)(?:&step=(\d+))?/);
+  if (hm && scenarios[+hm[1]]) { cur = +hm[1]; pendingStep = hm[2] ? +hm[2] : null; }
+  window.I = function (id) { var n = document.getElementById('in_' + id); return n ? n.value : ''; };
+  window.N = function (id, lo, hi) {
+    var raw = I(id).trim(); var v = Number(raw);
+    if (raw === '' || isNaN(v)) throw new Error('"' + id + '" অবশ্যই একটা সংখ্যা হতে হবে।');
+    if (lo !== undefined && v < lo) throw new Error('"' + id + '" অন্তত ' + lo + ' হতে হবে।');
+    if (hi !== undefined && v > hi) throw new Error('"' + id + '" সর্বোচ্চ ' + hi + ' পর্যন্ত হতে পারে।');
+    return Math.floor(v) === v ? v : Math.floor(v);
+  };
+  scenarios.forEach(function (sc, i) { sel.appendChild(E('option', { value: String(i), text: sc.name })); });
+  function buildInputs() {
+    inputsBox.innerHTML = '';
+    (scenarios[cur].inputs || []).forEach(function (inp) {
+      var key = cur + ':' + inp.id;
+      var val = store[key] !== undefined ? store[key] : inp.value;
+      var ctl;
+      if (inp.options) {
+        ctl = E('select', { id: 'in_' + inp.id }, inp.options.map(function (o) { return E('option', { value: o[0], text: o[1] }); }));
+        ctl.value = val;
+      } else {
+        ctl = E('input', { id: 'in_' + inp.id, value: val, size: inp.size || 10 });
+      }
+      ctl.addEventListener('change', function () { store[key] = ctl.value; show(); });
+      inputsBox.appendChild(E('label', { text: inp.label }, [ctl]));
+    });
+  }
+  function show() {
+    var sc = scenarios[cur];
+    err.textContent = '';
+    mount.innerHTML = '';
+    desc.textContent = sc.desc || '';
+    var steps;
+    try { steps = sc.steps(); } catch (e) { err.textContent = e.message; return; }
+    var st = Viz.stepper({ mount: mount, code: typeof sc.code === 'function' ? sc.code() : sc.code, render: sc.render });
+    st.load(steps);
+    if (pendingStep !== null) { st.go(pendingStep); pendingStep = null; }
+  }
+  sel.addEventListener('change', function () { cur = +sel.value; buildInputs(); show(); });
+  Viz.$('#run').addEventListener('click', function () { show(); });
+  sel.value = String(cur); buildInputs(); show();
+  if (location.hash === '#test') {
+    var log = [];
+    scenarios.forEach(function (sc, k) {
+      try {
+        cur = k; buildInputs();
+        var steps = sc.steps(), code = typeof sc.code === 'function' ? sc.code() : sc.code, tmp = document.createElement('div');
+        if (!steps.length) throw new Error('no steps');
+        steps.forEach(function (stp, j) {
+          tmp.innerHTML = ''; sc.render(stp, j, tmp);
+          if (!tmp.firstChild) throw new Error('empty render at step ' + j);
+          [].concat(stp.line === undefined ? [] : stp.line).forEach(function (ln) { if (!(ln >= 0 && ln < code.length)) throw new Error('bad line ' + ln + ' at step ' + j); });
+          if (!stp.text) throw new Error('no text at step ' + j);
+        });
+        log.push('OK   ' + sc.name + ' (' + steps.length + ' steps)');
+      } catch (e) { log.push('FAIL ' + sc.name + ': ' + e.message); }
+    });
+    cur = 0; sel.value = '0'; buildInputs(); show();
+    document.body.appendChild(E('pre', { id: 'testresult', text: log.join('\n') }));
+  }
+}
+
+/* ---- memory diagram: boxes + arrows (illustrative addresses) ---- */
+var _mid = 0;
+function mem(body, cells, arrows, o) {
+  o = o || {};
+  var W = 124, H = 70, G = 34, X0 = 12, Y0 = 12, n = Math.max(cells.length, 1), id = 'ah' + (++_mid);
+  var width = X0 * 2 + n * W + (n - 1) * G, hasA = arrows && arrows.length, height = Y0 + H + (hasA ? 92 : 14);
+  var kids = [Viz.s('defs', {}, [Viz.s('marker', { id: id, viewBox: '0 0 10 10', refX: '8', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto' }, [Viz.s('path', { d: 'M0,0L10,5L0,10z', class: 'ah' })])])];
+  cells.forEach(function (c, i) {
+    var x = X0 + i * (W + G);
+    kids.push(Viz.s('rect', { x: x, y: Y0, width: W, height: H, rx: 10, class: 'node ' + (c.cls || '') }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 17, 'text-anchor': 'middle', class: 'nm', text: c.name }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 42, 'text-anchor': 'middle', class: 'val' + (String(c.value).length > 8 ? ' small' : ''), text: String(c.value) }));
+    if (c.addr) kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 62, 'text-anchor': 'middle', class: 'ad', text: c.addr }));
+  });
+  (arrows || []).forEach(function (a) {
+    var x1 = X0 + a.from * (W + G) + W / 2, x2 = X0 + a.to * (W + G) + W / 2, y = Y0 + H, d;
+    if (a.from === a.to) { x1 -= 22; x2 += 22; d = 'M' + x1 + ',' + y + ' C' + (x1 - 10) + ',' + (y + 55) + ' ' + (x2 + 10) + ',' + (y + 55) + ' ' + x2 + ',' + (y + 3); }
+    else d = 'M' + x1 + ',' + y + ' C' + x1 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 4);
+    kids.push(Viz.s('path', { d: d, class: 'arrow ' + (a.cls || ''), 'marker-end': 'url(#' + id + ')' }));
+    if (a.label) kids.push(Viz.s('text', { x: (x1 + x2) / 2, y: y + 66, 'text-anchor': 'middle', class: 'lbl', text: a.label }));
+  });
+  var svgEl = Viz.svg(width, height, kids); svgEl.style.minWidth = Math.min(width, 600) + 'px';
+  body.appendChild(svgEl);
+  if (o.note !== false) body.appendChild(Viz.note('এখানে 0xc000012000-এর মতো address গুলো বোঝানোর জন্য বানানো; আসল address প্রতিবার run করলে আলাদা হয়।'));
+}
+function out(body, lines) {
+  body.appendChild(E('div', { class: 'out', html: lines && lines.length ? lines.map(function (l) { return esc(l); }).join('<br>') : '<i>(প্রোগ্রামের output এখানে আসবে)</i>' }));
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function chips(items) { return E('div', { class: 'hdrs' }, items.map(function (c) { return E('span', { class: 'chip ' + (c.cls || ''), text: c.text }); })); }
+
+document.getElementById('legend').appendChild(Viz.legend([{cls:'hit',label:'এখন run হচ্ছে'},{cls:'bad',label:'panic হচ্ছে'},{cls:'found',label:'recovered / শেষ'},{cls:'dim',label:'অপেক্ষা করছে'}]));
+
+function render(st, i, body) {
+  var left = E('div', {}, [E('div', { class: 'viz-note', text: 'defer stack (ওপরেরটা আগে run হয়)' }),
+    E('div', { class: 'stackcol' }, (st.stack || []).map(function (d) { return E('div', { class: 'frame ' + (d.cls || '') }, [E('div', { text: d.text })]); }))]);
+  var mid = E('div', { class: 'lane ' + (st.scls || '') }, [E('h4', { text: 'status' }), E('div', { text: st.status || '' })]);
+  body.appendChild(E('div', { class: 'row2' }, [left, mid]));
+  if (st.out) out(body, st.out);
+}
+function D(text, cls) { return { text: text, cls: cls }; }
+multi([
+ { name: 'defer উল্টো ক্রমে run হয়', desc: 'Deferred call গুলো একটা stack-এ push করা হয় এবং function return করার সময় last-in, first-out ক্রমে run হয়।',
+   code: ['func main() {', '    defer fmt.Println("one")', '    defer fmt.Println("two")', '    defer fmt.Println("three")', '    fmt.Println("main body")', '}'],
+   render: render,
+   steps: function () {
+     return [
+      { line: 1, text: 'defer শুধু call-টা register করে। এটা এখনই run হয় না: stack-এ রাখা হয়।', stack: [D('Println("one")', 'hit')], status: 'main run হচ্ছে', out: [] },
+      { line: 2, text: 'দ্বিতীয় defer প্রথমটার ওপরে বসে।', stack: [D('Println("one")'), D('Println("two")', 'hit')], status: 'main run হচ্ছে', out: [] },
+      { line: 3, text: 'তৃতীয় defer সবার ওপরে।', stack: [D('Println("one")'), D('Println("two")'), D('Println("three")', 'hit')], status: 'main run হচ্ছে', out: [] },
+      { line: 4, text: 'আগে স্বাভাবিক body run হয়।', stack: [D('Println("one")'), D('Println("two")'), D('Println("three")')], status: 'main-এর body run হচ্ছে', out: ['main body'] },
+      { line: 5, text: 'main এবার return করতে যাচ্ছে, তাই deferred call গুলো ওপর থেকে run হয়: আগে three।', stack: [D('Println("one")', 'dim'), D('Println("two")', 'dim'), D('Println("three")', 'hit')], status: 'deferred call গুলো run হচ্ছে', out: ['main body', 'three'] },
+      { line: 5, text: 'তারপর two।', stack: [D('Println("one")', 'dim'), D('Println("two")', 'hit')], status: 'deferred call গুলো run হচ্ছে', out: ['main body', 'three', 'two'] },
+      { line: 5, text: 'তারপর one। সবার শেষে register হওয়াটা সবার আগে execute হলো।', stack: [D('Println("one")', 'hit')], status: 'deferred call গুলো run হচ্ছে', out: ['main body', 'three', 'two', 'one'] },
+      { line: 5, text: 'Stack খালি: main return করে।', stack: [], status: 'শেষ', scls: 'found', out: ['main body', 'three', 'two', 'one'] }
+     ];
+   } },
+ { name: 'Panic থেকে recover করা', desc: 'b = 0 দিয়ে একটা runtime panic ঘটান এবং দেখুন deferred function কীভাবে সেটা সামলে নেয়।',
+   inputs: [{ id: 'b', label: 'b (যে সংখ্যা দিয়ে ভাগ হবে)', value: '0', size: 5 }],
+   code: function () { return ['func safeDivide(a, b int) (result int, err error) {', '    defer func() {', '        if r := recover(); r != nil {', '            err = fmt.Errorf("recovered: %v", r)', '        }', '    }()', '    return a / b, nil', '}', '', 'func main() {', '    fmt.Println(safeDivide(10, ' + I('b') + '))', '}']; },
+   render: render,
+   steps: function () {
+     var b = N('b', -100, 100), steps = [], fn = 'func() { recover ... }';
+     steps.push({ line: 10, text: 'main call করে safeDivide(10, ' + b + ')।', stack: [], status: 'safeDivide-এর ভেতরে', out: [] });
+     steps.push({ line: 1, text: 'Deferred function register হলো। safeDivide যেভাবেই শেষ হোক, বের হওয়ার সময় এটা run হবে।', stack: [D(fn, 'hit')], status: 'safeDivide-এর ভেতরে', out: [] });
+     if (b !== 0) {
+       var q = Math.trunc(10 / b);
+       steps.push({ line: 6, text: '10 / ' + b + ' = ' + q + '। কোনো সমস্যা নেই: result = ' + q + ', err = nil। Function এবার return করবে।', stack: [D(fn)], status: 'return করছে ' + q + ', nil', out: [] });
+       steps.push({ line: 2, text: 'Deferred function run হয়। কিছুই panic করেনি, তাই recover() nil return করে এবং if-এর body skip হয়।', stack: [D(fn, 'hit')], status: 'deferred func: recover() = nil', out: [] });
+       steps.push({ line: 10, text: 'main ফলাফল print করে।', stack: [], status: 'শেষ', scls: 'found', out: [q + ' <nil>'] });
+     } else {
+       steps.push({ line: 6, text: '10 / 0: integer-কে 0 দিয়ে ভাগ। Go panic করে "runtime error: integer divide by zero" বার্তা দিয়ে। স্বাভাবিক execution এখানেই থেমে যায়।', stack: [D(fn)], status: 'PANIC: runtime error: integer divide by zero', scls: 'bad', out: [] });
+       steps.push({ line: 2, text: 'Stack unwind করার সময় Go deferred function run করে। recover() panic থামিয়ে দেয় এবং panic-এর value return করে।', stack: [D(fn, 'hit')], status: 'deferred func: recover() panic ধরে ফেলেছে', scls: 'hit', out: [] });
+       steps.push({ line: 3, text: 'সমস্যাটা আমরা named result err-এ রেখে দিই। result থাকে 0।', stack: [D(fn, 'hit')], status: 'err = "recovered: runtime error: integer divide by zero"', scls: 'hit', out: [] });
+       steps.push({ line: 10, text: 'Panic শেষ, আর safeDivide স্বাভাবিকভাবে return করে result 0 এবং আমাদের err নিয়ে। Program crash করেনি।', stack: [], status: 'শেষ (recovered)', scls: 'found', out: ['0 recovered: runtime error: integer divide by zero'] });
+     }
+     return steps;
+   } },
+ { name: 'recover ছাড়া panic', desc: 'Deferred call গুলো তবু run হয়, তারপর program crash করে।',
+   code: ['func main() {', '    defer fmt.Println("cleanup")', '    fmt.Println("working")', '    panic("boom")', '}'],
+   render: render,
+   steps: function () {
+     return [
+      { line: 1, text: 'cleanup defer করা হলো।', stack: [D('Println("cleanup")', 'hit')], status: 'run হচ্ছে', out: [] },
+      { line: 2, text: 'স্বাভাবিক কাজ।', stack: [D('Println("cleanup")')], status: 'run হচ্ছে', out: ['working'] },
+      { line: 3, text: 'panic("boom"): স্বাভাবিক flow থেমে যায়। Go stack unwind করা শুরু করে।', stack: [D('Println("cleanup")')], status: 'PANIC: boom', scls: 'bad', out: ['working'] },
+      { line: 1, text: 'Unwind করার সময়ও deferred call গুলো run হয়: cleanup print হয়।', stack: [D('Println("cleanup")', 'hit')], status: 'PANIC: boom (deferred call গুলো run হচ্ছে)', scls: 'bad', out: ['working', 'cleanup'] },
+      { line: 3, text: 'কেউ recover() call করেনি, তাই deferred call গুলোর পর program panic-এর বার্তা print করে এবং status 2 দিয়ে exit করে।', stack: [], status: 'CRASHED', scls: 'bad', out: ['working', 'cleanup', 'panic: boom', '', 'goroutine 1 [running]:', '...', 'exit status 2'] }
+     ];
+   } }
+]);
+
+})();
+</script>
+</body>
+</html>

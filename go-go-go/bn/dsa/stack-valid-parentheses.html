@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stack: Valid Parentheses</title>
+<meta name="description" content="Stack দিয়ে bracket-এর জোড়া ঠিক আছে কিনা check করা: সবশেষে খোলা bracket-টাই আগে বন্ধ হতে হয়।">
+<link rel="stylesheet" href="../../assets/viz.css">
+<style>.pile{display:flex;flex-direction:column-reverse;align-items:center;gap:4px;min-height:60px;margin:6px 0}.plate{width:70px;text-align:center;font:700 18px var(--mono);border:2px solid var(--cell-line);border-radius:8px;padding:4px;background:var(--cell)}.plate.top{background:var(--hit);border-color:var(--hit-line)}.plate.gone{background:var(--found);border-color:var(--found-line);width:auto;white-space:nowrap;padding:4px 10px;font-size:14px}.pilebox{display:flex;gap:18px;align-items:flex-end}.pilebase{border-top:4px solid var(--cell-line);width:100px}.pilewrap{display:flex;flex-direction:column;align-items:center}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; সব visual</a> &middot; <a href="../../dsa/stack-valid-parentheses.html">English</a></nav>
+  <h1>Stack: Valid Parentheses</h1>
+  <p class="lead">Stack মনে রাখে কোন bracket এখনো খোলা আছে, আর সবশেষে খোলা bracket-টাকেই আগে বন্ধ করতে হয়।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা</h2>
+    <p>Stack অনেকটা <b>একটার উপর আরেকটা রাখা প্লেট</b>-এর মতো: নতুন প্লেট শুধু উপরে রাখা যায়, আর নেওয়াও যায় শুধু উপর থেকে (last in, first out)। Bracket check করতে text-এর উপর দিয়ে এক এক করে যান। প্রতিটা <b>opening</b> bracket stack-এ push করুন। প্রতিটা <b>closing</b> bracket-কে <i>উপরের</i> প্লেটের সাথে মিলতে হবে, মিললে সেই প্লেট সরিয়ে ফেলুন। না মিললে (বা stack খালি থাকলে) text invalid। শেষে stack অবশ্যই খালি থাকতে হবে।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+  <label>Bracket ( ) [ ] { }<input id="str" value="{[()]}" size="18"></label>
+  <button id="go">Run</button>
+</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul><li><code>{[()]}</code> run করুন, তারপর <code>{[(])}</code>। দ্বিতীয়টা ঠিক কোথায় fail করে?</li><li><code>(((</code> দিন। প্রতিটা অক্ষর ঠিক আছে, তবু এটা invalid কেন? শেষে stack-টা দেখুন।</li><li>শুধু <code>)</code> দিন। উপরের element দেখার আগে code কী check করে?</li><li><code>()[]{}</code>-এর মতো পাশাপাশি জোড়া দিন। Stack সবচেয়ে বেশি কতটা উঁচু হয়?</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul><li><b>উপরের element পড়ার আগে stack খালি কিনা check না করা:</b> Go-তে এতে crash হয় (index out of range)।</li><li><b>বাকি থাকা element check না করে true return করা:</b> <code>(((</code> loop-এর ভেতরে কখনো fail করে না। শেষের <code>len(stack) == 0</code> check-টা তাই জরুরি।</li><li><b>Stack-এর বদলে bracket গোনা:</b> একটা counter দিয়ে <code>[(])</code> আর <code>[()]</code>-এর পার্থক্য বোঝা যায় না।</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Complexity</h2>
+    <p><b>Time complexity: O(n)</b> &ndash; প্রতিটা অক্ষর একবার push বা pop হয়। <b>Space complexity: O(n)</b> সবচেয়ে খারাপ ক্ষেত্রে (সবগুলোই opening bracket হলে)।</p>
+  </div>
+
+  <div class="pagenav"><a href="prefix-sum.html">&larr; Prefix Sum</a><a href="queue-and-monotonic-stack.html">Queue & Monotonic Stack &rarr;</a></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script id="algo">
+
+function parenSteps(s) {
+  var steps = [], stack = [], pairs = { ')': '(', ']': '[', '}': '{' }, chars = s.split('');
+  function snap(line, text, extra) { steps.push(Object.assign({ chars: chars, stack: stack.slice(), line: line, text: text }, extra || {})); }
+  snap(2, 'খালি stack দিয়ে শুরু।', { i: -1 });
+  for (var i = 0; i < chars.length; i++) {
+    var c = chars[i];
+    if (!(c in pairs)) {
+      stack.push(c);
+      snap(5, '"' + c + '" একটা opening bracket। stack-এ push করি।', { i: i, pushed: true });
+    } else {
+      var open = pairs[c];
+      if (stack.length === 0) {
+        snap([7, 8], '"' + c + '"-এর আগে একটা "' + open + '" থাকা দরকার, কিন্তু stack খালি। Invalid!', { i: i, fail: true, result: false });
+        return steps;
+      }
+      var top = stack[stack.length - 1];
+      if (top !== open) {
+        snap([7, 8], '"' + c + '"-এর আগে একটা "' + open + '" উপরে থাকা দরকার, কিন্তু উপরে আছে "' + top + '"। ক্রম ভুল: invalid!', { i: i, fail: true, result: false });
+        return steps;
+      }
+      stack.pop();
+      snap(10, '"' + c + '" মিলেছে উপরের "' + top + '"-এর সাথে। stack থেকে pop করি।', { i: i, popped: top });
+    }
+  }
+  if (stack.length === 0) snap(13, 'সব অক্ষর পড়া শেষ আর stack খালি: প্রতিটা bracket মিলে গেছে। Valid!', { i: chars.length - 1, done: true, result: true });
+  else snap(13, 'সব অক্ষর পড়া শেষ, কিন্তু ' + stack.length + 'টা opening bracket এখনো stack-এ অপেক্ষা করছে। Invalid!', { i: chars.length - 1, fail: true, result: false });
+  return steps;
+}
+
+</script>
+<script id="ui">
+
+function $id(x) { return document.getElementById(x); }
+function showErr(m) { $id('err').textContent = m || ''; }
+var current = null;
+function mountStepper(opts) {
+  if (current) current.pause();
+  var app = $id('app'); app.innerHTML = ''; app.className = '';
+  current = Viz.stepper(Object.assign({ mount: '#app' }, opts));
+  return current;
+}
+function setLegend(items) { var l = $id('legend'); l.innerHTML = ''; l.appendChild(Viz.legend(items)); }
+function mark(marks, ix, label) { marks[ix] = (marks[ix] || []).concat(label); }
+
+
+var CODE = ['func isValid(s string) bool {',
+"    pairs := map[rune]rune{')': '(', ']': '[', '}': '{'}",
+'    stack := []rune{}',
+'    for _, c := range s {',
+'        if open, ok := pairs[c]; !ok {',
+'            stack = append(stack, c)',
+'        } else {',
+'            if len(stack) == 0 || stack[len(stack)-1] != open {',
+'                return false',
+'            }',
+'            stack = stack[:len(stack)-1]',
+'        }',
+'    }',
+'    return len(stack) == 0',
+'}'];
+function render(st, i, body) {
+  var cls = {}, marks = {};
+  st.chars.forEach(function (_, ix) { cls[ix] = ix < st.i ? 'dim' : 'range'; });
+  if (st.i >= 0) { cls[st.i] = st.fail ? 'bad' : 'hit'; mark(marks, st.i, 'now'); }
+  if (st.done) st.chars.forEach(function (_, ix) { cls[ix] = 'found'; });
+  body.appendChild(Viz.array(st.chars, { marks: marks, classes: cls, title: 'text' }));
+  var pile = Viz.el('div', { class: 'pile' }, st.stack.map(function (c, ix) {
+    return Viz.el('div', { class: 'plate' + (ix === st.stack.length - 1 ? ' top' : ''), text: c });
+  }));
+  var side = [];
+  if (st.popped) side.push(Viz.el('div', { class: 'plate gone', text: st.popped + ' ← সরানো হলো' }));
+  body.appendChild(Viz.el('div', { class: 'viz-array-title', text: 'stack (উপরেরটা highlight করা)' }));
+  body.appendChild(Viz.el('div', { class: 'pilebox' }, [Viz.el('div', { class: 'pilewrap' }, [pile, Viz.el('div', { class: 'pilebase' })])].concat(side)));
+  if (st.result !== undefined) body.appendChild(Viz.note('<b>ফলাফল: ' + st.result + '</b>'));
+}
+function run() {
+  showErr('');
+  var s = $id('str').value.replace(/\s+/g, '');
+  if (!s.length || s.length > 16) { showErr('1 থেকে 16টা bracket দিন।'); return; }
+  if (/[^()\[\]{}]/.test(s)) { showErr('শুধু এই অক্ষরগুলো দেওয়া যাবে: ( ) [ ] { }'); return; }
+  setLegend([{ cls: 'hit', label: 'যে অক্ষর পড়া হচ্ছে' }, { cls: 'range', label: 'এখনো পড়া হয়নি' }, { cls: 'dim', label: 'পড়া হয়ে গেছে' }, { cls: 'bad', label: 'যেখানে মেলেনি' }, { cls: 'found', label: 'valid' }]);
+  mountStepper({ code: CODE, render: render }).load(parenSteps(s));
+}
+$id('go').addEventListener('click', run);
+run();
+
+</script>
+</body>
+</html>

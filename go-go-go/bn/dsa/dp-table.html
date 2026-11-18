@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Dynamic programming-এ ছোট সমস্যার উত্তর table-এর cell-এ লিখে কীভাবে বড় সমস্যার উত্তর বের করা হয়, তা stairs, LCS ও knapsack-এ step by step দেখুন।">
+<title>Dynamic Programming Table</title>
+<link rel="stylesheet" href="../../assets/viz.css">
+<style>
+  .dp { border-collapse: separate; border-spacing: 3px; margin: 6px 0 10px; }
+  .dp th { font: 600 12px var(--mono); color: var(--muted); padding: 2px 6px; text-align: center; white-space: nowrap; }
+  .dp th.rowh { text-align: right; }
+  .dp th.hit { color: var(--hit-line); }
+  .dp td { width: 34px; height: 34px; text-align: center; font: 600 14px var(--mono); border: 2px solid var(--cell-line); border-radius: 8px; background: var(--cell); transition: background .25s, border-color .25s; }
+  .dp td.hit { background: var(--hit); border-color: var(--hit-line); }
+  .dp td.found { background: var(--found); border-color: var(--found-line); }
+  .dp td.empty { background: transparent; border-style: dashed; border-color: var(--line); color: transparent; }
+  .modehint { color: var(--muted); font-size: .9rem; margin: 2px 0 8px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">← সব visual</a> · <a href="../../dsa/dp-table.html">English</a></nav>
+  <h1>Dynamic Programming: Fill the Table</h1>
+  <p class="lead">বড় সমস্যা সমাধানের আগে তার ছোট ছোট version সমাধান করুন এবং উত্তরগুলো একটি table-এ লিখে রাখুন।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা (একই homework বারবার করবেন না)</h2>
+    <p>ধরুন আপনাকে জিজ্ঞেস করা হলো, "একবারে 1 বা 2 ধাপ করে উঠলে 30টি সিঁড়ি কত উপায়ে ওঠা যায়?" শুরু থেকে আবার গুনতে না গিয়ে খেয়াল করুন: 30 নম্বর সিঁড়িতে দাঁড়াতে হলে আপনি এসেছেন 29 বা 28 নম্বর সিঁড়ি থেকে। তাই <b>ways(30) = ways(29) + ways(28)</b>। প্রতিটি উত্তর প্রথমবার বের করেই table-এ লিখে রাখলে, পরের প্রতিটি cell হলো আগে থেকে থাকা cell গুলোর একটা দ্রুত look-up মাত্র।</p>
+    <p>প্রতিটি DP problem-এর recipe একই:</p>
+    <ol>
+      <li><b>State</b>: একটি cell-এর মানে কী? (যেমন "dp[i] = i সংখ্যক সিঁড়ি ওঠার উপায়")।</li>
+      <li><b>Base case</b>: যে cell গুলোর মান না ভেবেই জানা।</li>
+      <li><b>Transition</b>: আগের cell থেকে একটি cell বানানোর formula। <b>ছবিতে হলুদ cell গুলোই হলো সেই cell, যেগুলো formula পড়ে।</b></li>
+      <li><b>Order</b>: এমনভাবে fill করুন যাতে প্রয়োজনীয় cell গুলো সবসময় আগে থেকেই তৈরি থাকে।</li>
+      <li><b>Answer</b>: সাধারণত শেষ cell।</li>
+    </ol>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+    <label>Problem
+      <select id="mode">
+        <option value="climb">1D: Climbing stairs</option>
+        <option value="lcs">2D: Longest common subsequence</option>
+        <option value="knap">2D: 0/1 knapsack</option>
+      </select>
+    </label>
+    <span id="in-climb" class="inputs" style="margin:0"><label>Stairs n (1 থেকে 15)<input id="n" value="7" size="4"></label></span>
+    <span id="in-lcs" class="inputs" style="margin:0"><label>String A<input id="sa" value="ABCDE" size="10"></label><label>String B<input id="sb" value="ACE" size="10"></label></span>
+    <span id="in-knap" class="inputs" style="margin:0"><label>Weights<input id="kw" value="1, 3, 4, 5" size="14"></label><label>Values<input id="kv" value="1, 4, 5, 7" size="14"></label><label>Capacity<input id="kc" value="7" size="4"></label></span>
+    <button id="go">Run</button>
+  </div>
+  <div class="modehint" id="hint"></div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul>
+      <li><b>Stairs:</b> n = 10 দিয়ে দেখুন। table-টা আসলে ছদ্মবেশে Fibonacci sequence।</li>
+      <li><b>LCS:</b> <code>AGGTAB</code> আর <code>GXTXAYB</code> তুলনা করুন। দুটি অক্ষর মিলে গেলে cell কোন neighbor পড়ে?</li>
+      <li><b>LCS:</b> একেবারে কোনো মিল নেই এমন দুটি string নিন। table কেমন দেখায়?</li>
+      <li><b>Knapsack:</b> capacity বাড়ান এবং দেখুন item ঢুকে গেলে ("নিন") আর না ঢুকলে উপরের row-এর কোন cell গুলো ব্যবহার হয়।</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul>
+      <li><b>Table-এর size-এ off-by-one।</b> <code>n+1</code> by <code>m+1</code> বানান, যাতে "খালি" row/column 0 থাকে, আর মনে রাখুন row <code>i</code>-এর অক্ষর হলো <code>a[i-1]</code>।</li>
+      <li><b>ভুল fill order।</b> একটি cell শুধু সেই cell গুলো পড়বে যেগুলো আগেই fill করা হয়েছে।</li>
+      <li><b>Knapsack-এ "take" আর "skip" গুলিয়ে ফেলা।</b> Item i নিলে উপরের row-এর <code>c - weight</code> cell পড়তে হয়, একই row নয় (একই row পড়লে একটি item দুইবার ব্যবহার করা যেত)।</li>
+      <li><b>Overlapping problem-এ সাধারণ recursion ব্যবহার করা।</b> table বা memo ছাড়া একই sub-problem বারবার সমাধান হয়, যা exponential সময় নিতে পারে।</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, সহজ ভাষায়:</b> কাজ cell-এর সংখ্যার সমান, প্রতিটি cell fill হয় constant সময়ে। Stairs: <code>O(n)</code>। LCS: <code>O(m &times; n)</code>। Knapsack: <code>O(items &times; capacity)</code>। table ছাড়া একই recursion exponential হারে ধীর হতে পারে।
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var CLIMB_CODE = [
+  'func climbStairs(n int) int {',          // 0
+  '    if n <= 2 {',                        // 1
+  '        return n',                       // 2
+  '    }',                                  // 3
+  '    dp := make([]int, n+1)',             // 4
+  '    dp[1], dp[2] = 1, 2',                // 5
+  '    for i := 3; i <= n; i++ {',          // 6
+  '        dp[i] = dp[i-1] + dp[i-2]',      // 7
+  '    }',                                  // 8
+  '    return dp[n]',                       // 9
+  '}',                                      // 10
+];
+var LCS_CODE = [
+  'func lcs(a, b string) int {',                                // 0
+  '    dp := make([][]int, len(a)+1)',                          // 1
+  '    for i := range dp {',                                    // 2
+  '        dp[i] = make([]int, len(b)+1)',                      // 3
+  '    }',                                                      // 4
+  '    for i := 1; i <= len(a); i++ {',                         // 5
+  '        for j := 1; j <= len(b); j++ {',                     // 6
+  '            if a[i-1] == b[j-1] {',                          // 7
+  '                dp[i][j] = dp[i-1][j-1] + 1',                // 8
+  '            } else {',                                       // 9
+  '                dp[i][j] = max(dp[i-1][j], dp[i][j-1])',     // 10
+  '            }',                                              // 11
+  '        }',                                                  // 12
+  '    }',                                                      // 13
+  '    return dp[len(a)][len(b)]',                              // 14
+  '}',                                                          // 15
+];
+var KNAP_CODE = [
+  'func knapsack(w, v []int, capacity int) int {',              // 0
+  '    n := len(w)',                                            // 1
+  '    dp := make([][]int, n+1)',                               // 2
+  '    for i := range dp {',                                    // 3
+  '        dp[i] = make([]int, capacity+1)',                    // 4
+  '    }',                                                      // 5
+  '    for i := 1; i <= n; i++ {',                              // 6
+  '        for c := 0; c <= capacity; c++ {',                   // 7
+  '            dp[i][c] = dp[i-1][c] // skip the item',         // 8
+  '            if w[i-1] <= c {',                               // 9
+  '                take := dp[i-1][c-w[i-1]] + v[i-1]',         // 10
+  '                dp[i][c] = max(dp[i][c], take)',             // 11
+  '            }',                                              // 12
+  '        }',                                                  // 13
+  '    }',                                                      // 14
+  '    return dp[n][capacity]',                                 // 15
+  '}',                                                          // 16
+];
+
+function genClimb(n) {
+  var steps = [], dp = [], i;
+  for (i = 0; i <= n; i++) dp.push(null);
+  function snap(text, line, src, tgt) { steps.push({ kind: '1d', dp: dp.slice(), src: src || [], tgt: tgt || [], text: text, line: line }); }
+  if (n <= 2) {
+    dp[n] = n;
+    snap('n হলো ' + n + ' (2 বা তার কম), তাই উত্তর সরাসরি n = ' + n + ': 1টি সিঁড়িতে 1 উপায়, 2টি সিঁড়িতে 2 উপায়।', [1, 2], [], [n]);
+    return { steps: steps, result: n };
+  }
+  snap('dp table বানান, n+1 = ' + (n + 1) + 'টি ঘর। dp[i]-তে থাকবে i সংখ্যক সিঁড়ি ওঠার উপায়। 0 নম্বর ঘর ব্যবহার হবে না।', 4);
+  dp[1] = 1; dp[2] = 2;
+  snap('Base case, যেগুলো না ভেবেই জানা: 1টি সিঁড়িতে 1 উপায়; 2টি সিঁড়িতে 2 উপায় (1+1 বা 2)।', 5, [], [1, 2]);
+  for (i = 3; i <= n; i++) {
+    dp[i] = dp[i - 1] + dp[i - 2];
+    snap('dp[' + i + '] = dp[' + (i - 1) + '] + dp[' + (i - 2) + '] = ' + dp[i - 1] + ' + ' + dp[i - 2] + ' = ' + dp[i] + '। সিঁড়ি ' + i + '-এ পৌঁছানো যায় সিঁড়ি ' + (i - 1) + ' থেকে (এক ধাপে) বা সিঁড়ি ' + (i - 2) + ' থেকে (দুই ধাপে)।', [6, 7], [i - 1, i - 2], [i]);
+  }
+  snap('উত্তর dp[' + n + '] = ' + dp[n] + ' উপায়।', 9, [], [n]);
+  return { steps: steps, result: dp[n] };
+}
+
+function genLCS(a, b) {
+  var m = a.length, nn = b.length, dp = [], steps = [], i, j;
+  for (i = 0; i <= m; i++) { dp.push([]); for (j = 0; j <= nn; j++) dp[i].push(i === 0 || j === 0 ? 0 : null); }
+  var rows = ['∅'].concat(a.split('')), cols = ['∅'].concat(b.split('')), CORNER = 'A \u2193  B \u2192';
+  function snap(text, line, src, tgt, rowHL, colHL) {
+    steps.push({ kind: '2d', corner: CORNER, dp: dp.map(function (r) { return r.slice(); }), rows: rows, cols: cols, src: src || [], tgt: tgt || null, rowHL: rowHL === undefined ? -1 : rowHL, colHL: colHL === undefined ? -1 : colHL, text: text, line: line });
+  }
+  snap('একটি table বানান: ' + (m + 1) + 'টি row আর ' + (nn + 1) + 'টি column। Row 0 আর column 0 মানে "একটি string খালি", তাই তাদের উত্তর 0। বাকি cell গুলো এখনো অজানা। Cell (i, j) = A-র প্রথম i অক্ষর আর B-র প্রথম j অক্ষরের LCS-এর length।', [1, 2, 3, 4]);
+  for (i = 1; i <= m; i++) {
+    for (j = 1; j <= nn; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+        snap('A[' + (i - 1) + '] = "' + a[i - 1] + '" আর B[' + (j - 1) + '] = "' + b[j - 1] + '" মিলে গেছে! ছোট string-গুলোর সেরা উত্তরকে (diagonal cell) বাড়ান: ' + dp[i - 1][j - 1] + ' + 1 = ' + dp[i][j] + '।', [7, 8], [[i - 1, j - 1]], [i, j], i, j);
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+        snap('A[' + (i - 1) + '] = "' + a[i - 1] + '" আর B[' + (j - 1) + '] = "' + b[j - 1] + '" আলাদা। দুটির সেরাটা নিন: A-র একটি অক্ষর বাদ দিন (উপরের cell = ' + dp[i - 1][j] + ') অথবা B-র একটি অক্ষর বাদ দিন (বাঁয়ের cell = ' + dp[i][j - 1] + '). সেরা মান ' + dp[i][j] + '।', [9, 10], [[i - 1, j], [i, j - 1]], [i, j], i, j);
+      }
+    }
+  }
+  var out = [];
+  i = m; j = nn;
+  while (i > 0 && j > 0) {
+    if (a[i - 1] === b[j - 1]) { out.push(a[i - 1]); i--; j--; }
+    else if (dp[i - 1][j] >= dp[i][j - 1]) i--; else j--;
+  }
+  var seq = out.reverse().join('');
+  snap('উত্তর হলো শেষ cell: dp[' + m + '][' + nn + '] = ' + dp[m][nn] + '। (Table-এ পেছনে হেঁটে এলে একটি longest common subsequence পাওয়া যায়, যা উপরের code-এর অংশ নয়: "' + seq + '")।', 14, [], [m, nn]);
+  return { steps: steps, result: dp[m][nn], seq: seq };
+}
+
+function genKnap(w, v, cap) {
+  var n = w.length, dp = [], steps = [], i, c;
+  for (i = 0; i <= n; i++) { dp.push([]); for (c = 0; c <= cap; c++) dp[i].push(i === 0 ? 0 : null); }
+  var cols = [], rows = ['item নেই'], CORNER = 'capacity \u2192';
+  for (c = 0; c <= cap; c++) cols.push(String(c));
+  for (i = 0; i < n; i++) rows.push('item ' + (i + 1) + ' (w' + w[i] + ',v' + v[i] + ')');
+  function snap(text, line, src, tgt, rowHL, colHL) {
+    steps.push({ kind: '2d', corner: CORNER, dp: dp.map(function (r) { return r.slice(); }), rows: rows, cols: cols, src: src || [], tgt: tgt || null, rowHL: rowHL === undefined ? -1 : rowHL, colHL: colHL === undefined ? -1 : colHL, text: text, line: line });
+  }
+  snap('Cell (i, c) = প্রথম i টি item নিয়ে, যে bag-এ weight c পর্যন্ত রাখা যায় তাতে পাওয়া সর্বোচ্চ মোট value। Row 0 (কোনো item নেই) পুরোটাই 0। বাকি cell গুলো এখনো অজানা।', [1, 2, 3, 4, 5]);
+  for (i = 1; i <= n; i++) {
+    for (c = 0; c <= cap; c++) {
+      var skip = dp[i - 1][c];
+      dp[i][c] = skip;
+      if (w[i - 1] <= c) {
+        var take = dp[i - 1][c - w[i - 1]] + v[i - 1];
+        dp[i][c] = Math.max(skip, take);
+        snap('Item ' + i + ' (weight ' + w[i - 1] + ', value ' + v[i - 1] + ') capacity ' + c + '-এ ঢোকে। Skip করলে: ' + skip + ' (উপরের cell)। Take করলে: ' + dp[i - 1][c - w[i - 1]] + ' (বাকি ' + (c - w[i - 1]) + ' জায়গার সেরা মান) + ' + v[i - 1] + ' = ' + take + '। সেরা মান ' + dp[i][c] + '।', [8, 9, 10, 11], [[i - 1, c], [i - 1, c - w[i - 1]]], [i, c], i, c);
+      } else {
+        snap('Item ' + i + ' (weight ' + w[i - 1] + ') capacity ' + c + '-এর জন্য বেশি ভারী, তাই নেওয়া যাবে না। উপরের cell copy করুন: ' + skip + '।', [8, 9], [[i - 1, c]], [i, c], i, c);
+      }
+    }
+  }
+  snap('উত্তর হলো শেষ cell: dp[' + n + '][' + cap + '] = ' + dp[n][cap] + ' (bag-এ ধরে এমন সেরা value)।', 15, [], [n, cap]);
+  return { steps: steps, result: dp[n][cap] };
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+  var $ = function (id) { return document.getElementById(id); };
+  var HINTS = {
+    climb: 'State: dp[i] = i সংখ্যক সিঁড়ি ওঠার উপায়। Transition: dp[i] = dp[i-1] + dp[i-2]।',
+    lcs: 'State: cell (i, j) = A-র প্রথম i অক্ষর আর B-র প্রথম j অক্ষরের longest common subsequence-এর length।',
+    knap: 'State: cell (i, c) = c capacity-র bag-এ প্রথম i টি item নিয়ে পাওয়া সেরা value। প্রতিটি item সর্বোচ্চ একবার নেওয়া যায়।',
+  };
+
+  function render(st, i, body) {
+    if (st.kind === '1d') {
+      var cls = {};
+      st.dp.forEach(function (v, k) { if (v === null) cls[k] = 'dim'; });
+      st.src.forEach(function (k) { cls[k] = 'hit'; });
+      st.tgt.forEach(function (k) { cls[k] = 'found'; });
+      body.appendChild(Viz.array(st.dp, { title: 'dp  (index = সিঁড়ির সংখ্যা)', classes: cls }));
+      return;
+    }
+    var table = Viz.el('table', { class: 'dp' });
+    var head = Viz.el('tr', null, [Viz.el('th', { class: 'rowh', text: st.corner || '' })]);
+    st.cols.forEach(function (c, j) { head.appendChild(Viz.el('th', { class: j === st.colHL ? 'hit' : '', text: c })); });
+    table.appendChild(head);
+    st.dp.forEach(function (row, r) {
+      var tr = Viz.el('tr', null, [Viz.el('th', { class: 'rowh' + (r === st.rowHL ? ' hit' : ''), text: st.rows[r] })]);
+      row.forEach(function (v, c) {
+        var cls2 = v === null ? 'empty' : '';
+        if (st.src.some(function (s) { return s[0] === r && s[1] === c; })) cls2 = 'hit';
+        if (st.tgt && st.tgt[0] === r && st.tgt[1] === c) cls2 = 'found';
+        tr.appendChild(Viz.el('td', { class: cls2, text: v === null ? '' : String(v) }));
+      });
+      table.appendChild(tr);
+    });
+    var wrap = Viz.el('div', { style: { overflowX: 'auto' } }, [table]);
+    body.appendChild(wrap);
+  }
+
+  function listInts(str, lo, hi) {
+    var parts = str.split(/[\s,]+/).filter(Boolean), out = [];
+    for (var i = 0; i < parts.length; i++) {
+      if (!/^\d+$/.test(parts[i]) || +parts[i] < lo || +parts[i] > hi) return null;
+      out.push(+parts[i]);
+    }
+    return out;
+  }
+
+  function run() {
+    errBox.textContent = '';
+    var mode = $('mode').value, steps, code;
+    ['climb', 'lcs', 'knap'].forEach(function (m) { $('in-' + m).style.display = m === mode ? '' : 'none'; });
+    $('hint').textContent = HINTS[mode];
+    if (mode === 'climb') {
+      var nStr = $('n').value.trim();
+      if (!/^\d+$/.test(nStr) || +nStr < 1 || +nStr > 15) { errBox.textContent = 'n অবশ্যই 1 থেকে 15-এর মধ্যে একটি integer হতে হবে।'; return; }
+      steps = genClimb(+nStr).steps; code = CLIMB_CODE;
+    } else if (mode === 'lcs') {
+      var a = $('sa').value.trim(), b = $('sb').value.trim();
+      if (!/^[A-Za-z0-9]{1,7}$/.test(a) || !/^[A-Za-z0-9]{1,7}$/.test(b)) { errBox.textContent = 'প্রতিটি string 1 থেকে 7টি অক্ষর বা digit-এর হতে হবে, কোনো space ছাড়া।'; return; }
+      steps = genLCS(a, b).steps; code = LCS_CODE;
+    } else {
+      var w = listInts($('kw').value, 1, 10), v = listInts($('kv').value, 0, 99), cs = $('kc').value.trim();
+      if (!w || !v || w.length < 1 || w.length > 5 || w.length !== v.length) { errBox.textContent = '1 থেকে 5টি weight (1 থেকে 10) দিন এবং একই সংখ্যক value (0 থেকে 99) দিন।'; return; }
+      if (!/^\d+$/.test(cs) || +cs < 1 || +cs > 10) { errBox.textContent = 'Capacity অবশ্যই 1 থেকে 10-এর মধ্যে একটি integer হতে হবে।'; return; }
+      steps = genKnap(w, v, +cs).steps; code = KNAP_CODE;
+    }
+    app.innerHTML = '';
+    var st = Viz.stepper({ mount: app, code: code, render: render });
+    st.load(steps);
+  }
+
+  $('legend').appendChild(Viz.legend([
+    { cls: 'hit', label: 'formula যে cell গুলো পড়ে' }, { cls: 'found', label: 'যে cell fill হচ্ছে' }, { cls: 'dim', label: 'এখনো হিসাব হয়নি' },
+  ]));
+  $('go').addEventListener('click', run);
+  $('mode').addEventListener('change', run);
+  run();
+})();
+</script>
+</body>
+</html>

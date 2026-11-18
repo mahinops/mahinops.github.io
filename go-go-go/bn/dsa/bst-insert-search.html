@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="BST-তে সংখ্যা insert ও search করার সময় প্রতিটি ধাপে left বা right বেছে নেওয়ার পথটি run করে দেখুন।">
+<title>Binary Search Tree: Insert and Search</title>
+<link rel="stylesheet" href="../../assets/viz.css">
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">← সব visual</a> · <a href="../../dsa/bst-insert-search.html">English</a></nav>
+  <h1>Binary Search Tree: Insert and Search</h1>
+  <p class="lead">যে tree সংখ্যাগুলো সাজিয়ে রাখে, যাতে left বা right-এ গিয়ে যেকোনো সংখ্যা খুঁজে পাওয়া যায়।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা (tree আকারে সাজানো phone book)</h2>
+    <p><b>Binary search tree</b> (BST) প্রতিটি node-এ একটি নিয়ম মানে: <b>left subtree-র সবকিছু ছোট, right subtree-র সবকিছু বড়।</b> এটা আসলে binary search-কে একটা আকার দেওয়া: প্রতিটি node-এ আপনি জিজ্ঞেস করেন "আমার সংখ্যাটা কি ছোট, না বড়?" এবং বাকিটার অর্ধেক বাদ দেন।</p>
+    <ul>
+      <li><b>Search</b>: root থেকে শুরু করুন। সমান? পেয়ে গেছেন। ছোট? left-এ যান। বড়? right-এ যান। খালি জায়গা (nil) পেলে বুঝবেন সংখ্যাটা নেই।</li>
+      <li><b>Insert</b>: একই পথে হাঁটুন। যে খালি জায়গায় পৌঁছান, নতুন মানটা সেখানেই বসবে।</li>
+    </ul>
+    <p>Tree balanced থাকলে প্রতিটি ধাপে সমস্যা অর্ধেক হয়, তাই lookup দ্রুত হয়। কিন্তু <b>insert-এর order গুরুত্বপূর্ণ</b>: আগে থেকে sorted সংখ্যা insert করে দেখুন tree-র আকার কী হয়।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+    <label>Insert করার মান, ক্রমানুসারে (1 থেকে 10টি সংখ্যা, 0 থেকে 99)<input id="vals" value="50, 30, 70, 20, 40, 60, 80" size="36"></label>
+    <label>তারপর যা খুঁজবেন<input id="target" value="60" size="5"></label>
+    <button id="go">Run</button>
+  </div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul>
+      <li><code>10, 20, 30, 40, 50</code> insert করুন (আগে থেকেই sorted)। কেমন আকার পেলেন? 50 খুঁজতে কয়টি comparison লাগে?</li>
+      <li>একই সংখ্যাগুলো <code>30, 20, 40, 10, 50</code> order-এ insert করুন। আকার আর search-এর খরচ তুলনা করুন।</li>
+      <li><code>55</code>-এর মতো এমন মান খুঁজুন যা tree-তে নেই। search কোথায় শেষ হয়?</li>
+      <li><code>30, 30</code>-এর মতো duplicate insert করুন। এই code সেটাকে কীভাবে সামলায়?</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul>
+      <li><b>শুধু সরাসরি child দেখা।</b> নিয়মটা <i>পুরো</i> subtree-র জন্য, শুধু পরের level-এর জন্য নয়।</li>
+      <li><b>nil case ভুলে যাওয়া।</b> <code>if root == nil</code> ছাড়া recursion tree-র বাইরে পৌঁছে যায় এবং nil pointer-এ panic করে।</li>
+      <li><b>ধরে নেওয়া যে এটা সবসময় দ্রুত।</b> Sorted order-এ insert করলে tree একটা লম্বা chain-এর মতো হয়ে যায়, আর প্রতিটি search সেই chain ধরে ধীরে নামে।</li>
+      <li><b>duplicate-এর নিয়ম অস্পষ্ট রাখা।</b> আগেই ঠিক করে নিন duplicate ignore হবে, count হবে, নাকি এক পাশে যাবে। এই page-এ ignore করা হয়।</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, সহজ ভাষায়:</b> search বা insert root থেকে একটা path ধরে যায়, তাই খরচ প্রায় tree-র height-এর সমান। 1,000,000 মানের balanced tree-র height প্রায় 20 (<code>O(log n)</code>); chain-এর মতো tree-র height n (<code>O(n)</code>)।
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var CODE = [
+  'func insert(root *TreeNode, val int) *TreeNode {',   // 0
+  '    if root == nil {',                               // 1
+  '        return &TreeNode{Val: val}',                 // 2
+  '    }',                                              // 3
+  '    if val < root.Val {',                            // 4
+  '        root.Left = insert(root.Left, val)',         // 5
+  '    } else if val > root.Val {',                     // 6
+  '        root.Right = insert(root.Right, val)',       // 7
+  '    }',                                              // 8
+  '    return root',                                    // 9
+  '}',                                                  // 10
+  '',                                                   // 11
+  'func search(root *TreeNode, target int) *TreeNode {',// 12
+  '    if root == nil || root.Val == target {',         // 13
+  '        return root',                                // 14
+  '    }',                                              // 15
+  '    if target < root.Val {',                         // 16
+  '        return search(root.Left, target)',           // 17
+  '    }',                                              // 18
+  '    return search(root.Right, target)',              // 19
+  '}',                                                  // 20
+];
+
+function genBST(vals, target) {
+  var root = null, nid = 0, steps = [], phase = '';
+  function clone(n) { return n ? { id: n.id, val: n.val, left: clone(n.left), right: clone(n.right) } : null; }
+  function snap(text, line, cur, path, mark) {
+    steps.push({ root: clone(root), text: text, line: line, cur: cur === undefined ? -1 : cur, path: path.slice(), mark: mark === undefined ? -1 : mark, phase: phase });
+  }
+  function mk(v) { return { id: nid++, val: v, left: null, right: null }; }
+  function insert(v) {
+    phase = 'Insert ' + v;
+    if (!root) { root = mk(v); snap('Tree খালি, তাই ' + v + ' হলো root।', [1, 2], -1, [], root.id); return; }
+    var n = root, path = [];
+    while (true) {
+      path.push(n.id);
+      if (v === n.val) { snap(v + ' ও ' + n.val + ' সমান: এটি আগে থেকেই tree-তে আছে। এই code duplicate ignore করে, তাই কিছু বদলায় না।', [4, 6, 9], n.id, path); return; }
+      if (v < n.val) {
+        snap('তুলনা: ' + v + ' আর ' + n.val + ': ' + v + ' < ' + n.val + ', তাই এটি left subtree-তে যাবে।', [4, 5], n.id, path);
+        if (!n.left) { n.left = mk(v); snap('Left জায়গা খালি (nil), তাই এখানে নতুন node ' + v + ' তৈরি হলো।', [1, 2], -1, path, n.left.id); return; }
+        n = n.left;
+      } else {
+        snap('তুলনা: ' + v + ' আর ' + n.val + ': ' + v + ' > ' + n.val + ', তাই এটি right subtree-তে যাবে।', [6, 7], n.id, path);
+        if (!n.right) { n.right = mk(v); snap('Right জায়গা খালি (nil), তাই এখানে নতুন node ' + v + ' তৈরি হলো।', [1, 2], -1, path, n.right.id); return; }
+        n = n.right;
+      }
+    }
+  }
+  function search(t) {
+    phase = 'Search ' + t;
+    var n = root, path = [];
+    snap('এবার root থেকে শুরু করে ' + t + ' খুঁজুন।', 12, -1, []);
+    while (true) {
+      if (!n) { snap('Tree-র বাইরে পৌঁছে গেছি (nil): ' + t + ' tree-তে নেই।', [13, 14], -1, path); return false; }
+      path.push(n.id);
+      if (n.val === t) { snap('তুলনা: ' + t + ' আর ' + n.val + ': সমান। পেয়ে গেছি!', [13, 14], -1, path, n.id); return true; }
+      if (t < n.val) { snap('তুলনা: ' + t + ' আর ' + n.val + ': ' + t + ' < ' + n.val + ', তাই left subtree-তে খুঁজুন।', [16, 17], n.id, path); n = n.left; }
+      else { snap('তুলনা: ' + t + ' আর ' + n.val + ': ' + t + ' > ' + n.val + ', তাই right subtree-তে খুঁজুন।', 19, n.id, path); n = n.right; }
+    }
+  }
+  vals.forEach(insert);
+  var found = search(target);
+  return { steps: steps, root: root, found: found };
+}
+
+function layout(root) {
+  var pos = new Map(), xi = 0, maxd = 0;
+  (function walk(n, d) {
+    if (!n) return;
+    walk(n.left, d + 1);
+    pos.set(n, { x: xi++, d: d });
+    if (d > maxd) maxd = d;
+    walk(n.right, d + 1);
+  })(root, 0);
+  return { pos: pos, w: xi, h: maxd + 1 };
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+
+  function drawTree(st) {
+    var L = layout(st.root), dx = 46, dy = 60, r = 18, pad = 10;
+    var W = Math.max(L.w * dx + pad * 2, 140), H = L.h * dy + pad, parts = [];
+    function cx(n) { return pad + L.pos.get(n).x * dx + dx / 2; }
+    function cy(n) { return pad + L.pos.get(n).d * dy + r; }
+    L.pos.forEach(function (_, n) {
+      [n.left, n.right].forEach(function (c) { if (c) parts.push(Viz.s('line', { class: 'edge' + (st.path.indexOf(c.id) !== -1 ? ' hit' : ''), x1: cx(n), y1: cy(n), x2: cx(c), y2: cy(c) })); });
+    });
+    L.pos.forEach(function (_, n) {
+      var cls = 'node';
+      if (n.id === st.mark) cls += ' found'; else if (n.id === st.cur) cls += ' hit'; else if (st.path.indexOf(n.id) !== -1) cls += ' range';
+      parts.push(Viz.s('circle', { class: cls, cx: cx(n), cy: cy(n), r: r }));
+      parts.push(Viz.s('text', { x: cx(n), y: cy(n) + 5, 'text-anchor': 'middle', 'font-size': 14, 'font-weight': 700, text: String(n.val) }));
+    });
+    return Viz.svg(W, H, parts);
+  }
+
+  function render(st, i, body) {
+    body.appendChild(Viz.note('<b>' + st.phase + '</b>'));
+    body.appendChild(drawTree(st));
+  }
+
+  function run() {
+    errBox.textContent = '';
+    var toks = document.getElementById('vals').value.split(/[\s,]+/).filter(Boolean), vals = [];
+    for (var i = 0; i < toks.length; i++) {
+      if (!/^\d{1,2}$/.test(toks[i])) { errBox.textContent = '"' + toks[i] + '" 0 থেকে 99-এর মধ্যে integer নয়।'; return; }
+      vals.push(+toks[i]);
+    }
+    if (vals.length < 1 || vals.length > 10) { errBox.textContent = '1 থেকে 10টির মধ্যে মান দিন।'; return; }
+    var t = document.getElementById('target').value.trim();
+    if (!/^\d{1,2}$/.test(t)) { errBox.textContent = 'খোঁজার মান অবশ্যই 0 থেকে 99-এর মধ্যে একটি integer হতে হবে।'; return; }
+    app.innerHTML = '';
+    var st = Viz.stepper({ mount: app, code: CODE, render: render });
+    st.load(genBST(vals, +t).steps);
+  }
+
+  document.getElementById('legend').appendChild(Viz.legend([
+    { cls: 'hit', label: 'যে node-এর সাথে তুলনা হচ্ছে' }, { cls: 'range', label: 'এ পর্যন্ত যে path ধরে এসেছি' }, { cls: 'found', label: 'নতুন node / পাওয়া গেছে' },
+  ]));
+  document.getElementById('go').addEventListener('click', run);
+  run();
+})();
+</script>
+</body>
+</html>

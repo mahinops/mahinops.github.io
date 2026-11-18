@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="See numbers as rows of bits and watch AND, OR, XOR, shifts, n&(n-1), counting set bits and the XOR single-number trick work column by column.">
+<title>Bit Manipulation - visual</title>
+<link rel="stylesheet" href="../assets/viz.css">
+<style>.viz-cell { width: 42px; height: 42px; } .viz-col { min-width: 42px; } .rowtitle { font: 600 13px var(--sans); color: var(--muted); margin: 8px 0 3px; }</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/bit-manipulation.html">বাংলা</a></nav>
+  <h1>Bit Manipulation</h1>
+  <p class="lead">Every number is a row of on/off switches. Bit tricks flip those switches directly.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea (a row of light switches)</h2>
+    <p>Inside the computer a number is stored in <b>binary</b>: a row of switches, each either 0 (off) or 1 (on). Each switch has a <b>place value</b>: from the right they are 1, 2, 4, 8, 16, 32, 64, 128. Add up the values of the switches that are on. For example <code>00001100</code> is 8 + 4 = 12. This page uses 8 switches (Go&rsquo;s <code>uint8</code>, numbers 0 to 255).</p>
+    <ul>
+      <li><b>AND (<code>&amp;</code>)</b>: a column is 1 only if <i>both</i> numbers have 1 there. Great for checking or keeping bits.</li>
+      <li><b>OR (<code>|</code>)</b>: 1 if <i>either</i> has 1. Great for turning bits on.</li>
+      <li><b>XOR (<code>^</code>)</b>: 1 if the bits are <i>different</i>. Doing it twice with the same value undoes it, so equal numbers cancel to 0.</li>
+      <li><b>Shift (<code>&lt;&lt;</code> / <code>&gt;&gt;</code>)</b>: slide all switches left or right. Left by 1 doubles the number; right by 1 halves it.</li>
+    </ul>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Operation
+      <select id="op">
+        <option value="and">a &amp; b (AND)</option>
+        <option value="or">a | b (OR)</option>
+        <option value="xor">a ^ b (XOR)</option>
+        <option value="shl">a &lt;&lt; n (shift left)</option>
+        <option value="shr">a &gt;&gt; n (shift right)</option>
+        <option value="clear">n &amp; (n-1) (clear lowest 1 bit)</option>
+        <option value="count">Count the 1 bits</option>
+        <option value="single">Single number via XOR</option>
+      </select>
+    </label>
+    <label id="la">a (0 to 255)<input id="a" value="12" size="6"></label>
+    <label id="lb">b (0 to 255)<input id="b" value="10" size="6"></label>
+    <label id="ll">Numbers (each appears twice except one)<input id="list" value="4, 1, 2, 1, 2" size="22"></label>
+    <button id="go">Run</button>
+  </div>
+  <div class="viz-note" id="hint"></div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul>
+      <li>AND, OR and XOR the same pair (12 and 10). Compare the three result rows column by column.</li>
+      <li>Shift 1 left by 7, then try 3 left by 7. What happens to the bit that falls off the left edge?</li>
+      <li><b>n &amp; (n-1)</b> on 8, 12, 255. Why does a power of two (like 8) become 0?</li>
+      <li><b>Count the 1 bits</b> of 255 and of 128. How many loop steps does each need?</li>
+      <li><b>Single number</b>: reorder the list. Does the answer change? Why not?</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul>
+      <li><b>Confusing <code>&amp;</code> with <code>&amp;&amp;</code>.</b> <code>&amp;</code> works on bits of numbers; <code>&amp;&amp;</code> works on true/false values.</li>
+      <li><b>Operator precedence.</b> In Go, <code>&amp;</code> binds tighter than <code>==</code>, so <code>a &amp; b == 0</code> means <code>(a &amp; b) == 0</code>. In C and some other languages it is the other way round, so add parentheses when in doubt.</li>
+      <li><b>Overflow when shifting.</b> Bits shifted past the type&rsquo;s width are lost. A <code>uint8</code> cannot hold <code>1 &lt;&lt; 8</code>.</li>
+      <li><b>Signed shifts.</b> Right-shifting a negative <code>int</code> keeps the sign bit; this page uses unsigned numbers to keep things simple.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, in plain English:</b> AND, OR, XOR and shifts are single machine instructions (<code>O(1)</code>). Counting bits with <code>n &amp; (n-1)</code> loops once per 1 bit, not once per bit position. The single-number trick scans the list once and needs no extra memory.
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var CODES = {
+  and: ['func and(a, b uint8) uint8 {', '    return a & b', '}'],
+  or: ['func or(a, b uint8) uint8 {', '    return a | b', '}'],
+  xor: ['func xor(a, b uint8) uint8 {', '    return a ^ b', '}'],
+  shl: ['func shiftLeft(a uint8, n uint) uint8 {', '    return a << n', '}'],
+  shr: ['func shiftRight(a uint8, n uint) uint8 {', '    return a >> n', '}'],
+  clear: ['func clearLowestBit(n uint8) uint8 {', '    return n & (n - 1)', '}'],
+  count: [
+    'func countBits(n uint8) int {',   // 0
+    '    count := 0',                   // 1
+    '    for n != 0 {',                 // 2
+    '        n &= n - 1',               // 3
+    '        count++',                  // 4
+    '    }',                            // 5
+    '    return count',                 // 6
+    '}',                                // 7
+  ],
+  single: [
+    'func singleNumber(nums []uint8) uint8 {',   // 0
+    '    var result uint8',                       // 1
+    '    for _, n := range nums {',               // 2
+    '        result ^= n',                        // 3
+    '    }',                                      // 4
+    '    return result',                          // 5
+    '}',                                          // 6
+  ],
+};
+var HEADER = ['128', '64', '32', '16', '8', '4', '2', '1'];
+
+function bits(x) { var o = []; for (var k = 7; k >= 0; k--) o.push((x >> k) & 1); return o; }
+function bin(x) { return bits(x).join(''); }
+function lowestSet(x) { for (var k = 0; k < 8; k++) if ((x >> k) & 1) return 7 - k; return -1; }
+
+function genBit(op, p) {
+  var steps = [], result = 0, i, c;
+  function row(title, b, cls) { return { title: title, bits: b, cls: cls || {} }; }
+  function snap(rows, text, line) { steps.push({ rows: rows, text: text, line: line }); }
+  function hl(col, base) { var o = {}; for (var k in base) o[k] = base[k]; o[col] = 'hit'; return o; }
+
+  if (op === 'and' || op === 'or' || op === 'xor') {
+    var a = p.a, b = p.b, ba = bits(a), bb = bits(b);
+    var fn = { and: function (x, y) { return x & y; }, or: function (x, y) { return x | y; }, xor: function (x, y) { return x ^ y; } }[op];
+    var sym = { and: '&', or: '|', xor: '^' }[op];
+    var rule = { and: 'AND gives 1 only when both bits are 1', or: 'OR gives 1 when at least one bit is 1', xor: 'XOR gives 1 when the two bits are different' }[op];
+    result = fn(a, b);
+    var rb = bits(result), shown = [null, null, null, null, null, null, null, null];
+    snap([row('a = ' + a + '  (' + bin(a) + ')', ba), row('b = ' + b + '  (' + bin(b) + ')', bb), row('a ' + sym + ' b = ?', shown.slice())],
+      'Write both numbers in binary. Each column is one switch, with its place value above it. We combine each column on its own. Rule: ' + rule + '.', 1);
+    var cls = {};
+    for (c = 0; c < 8; c++) {
+      shown[c] = rb[c]; cls[c] = 'found';
+      snap([row('a = ' + a, ba, hl(c, {})), row('b = ' + b, bb, hl(c, {})), row('a ' + sym + ' b = ?', shown.slice(), hl(c, cls))],
+        'Column ' + HEADER[c] + ': ' + ba[c] + ' ' + sym + ' ' + bb[c] + ' = ' + rb[c] + '.', 1);
+    }
+    var all = {}; for (c = 0; c < 8; c++) all[c] = 'found';
+    snap([row('a = ' + a, ba), row('b = ' + b, bb), row('a ' + sym + ' b = ' + result + '  (' + bin(result) + ')', rb, all)],
+      'Done: ' + a + ' ' + sym + ' ' + b + ' = ' + result + '. Add the place values of the 1s in the last row to check: it is ' + result + '.', 1);
+  } else if (op === 'shl' || op === 'shr') {
+    var left = op === 'shl', cur = p.a, n = p.b, lbl = left ? '<<' : '>>';
+    snap([row('a = ' + cur + '  (' + bin(cur) + ')', bits(cur))], 'Start with a = ' + cur + '. We will slide every bit ' + (left ? 'left' : 'right') + ' by ' + n + ' place' + (n === 1 ? '' : 's') + ', one place at a time.', 1);
+    for (i = 1; i <= n; i++) {
+      var lost = left ? (cur >> 7) & 1 : cur & 1;
+      cur = left ? (cur << 1) & 255 : cur >> 1;
+      var cl = {}; cl[left ? 7 : 0] = 'hit';
+      snap([row('after ' + i + ' shift' + (i === 1 ? '' : 's') + ' = ' + cur + '  (' + bin(cur) + ')', bits(cur), cl)],
+        'Shift ' + i + ': every bit moves one place ' + (left ? 'left' : 'right') + '. A 0 enters on the ' + (left ? 'right' : 'left') + '. The bit pushed off the ' + (left ? 'left' : 'right') + ' edge (' + lost + ') is lost.', 1);
+    }
+    result = cur;
+    var allc = {}; for (c = 0; c < 8; c++) allc[c] = 'found';
+    snap([row('a ' + lbl + ' ' + n + ' = ' + result + '  (' + bin(result) + ')', bits(result), allc)],
+      'Done: ' + p.a + ' ' + lbl + ' ' + n + ' = ' + result + (left ? '. That is ' + p.a + ' x 2^' + n + ' = ' + (p.a * Math.pow(2, n)) + (p.a * Math.pow(2, n) > 255 ? ', which does not fit in 8 bits, so only the low 8 bits remain (' + result + ')' : '') + '.' : '. That is ' + p.a + ' divided by 2^' + n + ', rounded down.'), 1);
+  } else if (op === 'clear') {
+    var v = p.a, v1 = v - 1, low = lowestSet(v), lowCls = {}, flip = {};
+    lowCls[low] = 'hit'; for (c = low; c < 8; c++) flip[c] = 'hit';
+    result = v & v1;
+    snap([row('n = ' + v + '  (' + bin(v) + ')', bits(v), lowCls)], 'Start with n = ' + v + '. Its lowest 1 bit (the right-most 1) is highlighted.', 1);
+    snap([row('n = ' + v, bits(v), lowCls), row('n - 1 = ' + v1 + '  (' + bin(v1) + ')', bits(v1), flip)],
+      'Subtracting 1 turns that lowest 1 into 0 and every 0 to its right into 1 (like 1000 - 1 = 0111). Everything left of it is unchanged. The changed columns are highlighted.', 1);
+    var allk = {}; for (c = 0; c < 8; c++) allk[c] = 'found';
+    snap([row('n = ' + v, bits(v), lowCls), row('n - 1 = ' + v1, bits(v1), flip), row('n & (n-1) = ' + result + '  (' + bin(result) + ')', bits(result), allk)],
+      'AND keeps a 1 only where both rows have 1. In the changed columns the two rows disagree, so they all become 0. Result: the lowest 1 bit is gone. ' + (result === 0 ? 'Only one bit was on (n is a power of two), so the result is 0.' : ''), 1);
+  } else if (op === 'count') {
+    var m = p.a, count = 0;
+    snap([row('n = ' + m + '  (' + bin(m) + ')', bits(m))], 'We want to count the 1 bits of n = ' + m + '. Start with count = 0.', 1);
+    while (m !== 0) {
+      var lw = lowestSet(m), cc = {}; cc[lw] = 'hit';
+      var before = m;
+      m = m & (m - 1); count++;
+      snap([row('n was ' + before + '  (' + bin(before) + ')', bits(before), cc)],
+        'n is not 0, so loop. n &= n - 1 clears the lowest 1 bit (highlighted); n becomes ' + m + '. count = ' + count + '.', [2, 3, 4]);
+    }
+    result = count;
+    snap([row('n = 0  (00000000)', bits(0))], 'n is now 0, so the loop stops. The number of 1 bits is count = ' + count + '. The loop ran once per 1 bit, not once per bit position.', 6);
+  } else {
+    var list = p.list, acc = 0;
+    snap([row('result = 0  (00000000)', bits(0))], 'result starts at 0. XOR-ing a number with itself gives 0, so numbers that appear twice will cancel out. XOR is also order-independent.', 1);
+    list.forEach(function (x) {
+      var nacc = acc ^ x, bx = bits(x), flips = {};
+      for (var k = 0; k < 8; k++) if (bx[k]) flips[k] = 'hit';
+      snap([row('result (before) = ' + acc + '  (' + bin(acc) + ')', bits(acc), flips), row('n = ' + x + '  (' + bin(x) + ')', bx, flips), row('result ^ n = ' + nacc + '  (' + bin(nacc) + ')', bits(nacc), flips)],
+        'result ^= n: ' + acc + ' ^ ' + x + ' = ' + nacc + '. Wherever n has a 1, that column of result flips.', [2, 3]);
+      acc = nacc;
+    });
+    result = acc;
+    snap([row('result = ' + acc + '  (' + bin(acc) + ')', bits(acc), (function () { var o = {}; for (var k = 0; k < 8; k++) o[k] = 'found'; return o; })())],
+      'Every number that appeared twice cancelled itself out, leaving the one that appeared once: ' + acc + '.', 5);
+  }
+  return { steps: steps, result: result };
+}
+
+function parseList(str) {
+  var toks = str.split(/[\s,]+/).filter(Boolean), out = [], i, counts = {}, odd = [];
+  for (i = 0; i < toks.length; i++) {
+    if (!/^\d+$/.test(toks[i]) || +toks[i] > 255) return { error: '"' + toks[i] + '" is not a whole number from 0 to 255.' };
+    out.push(+toks[i]); counts[+toks[i]] = (counts[+toks[i]] || 0) + 1;
+  }
+  if (out.length < 3 || out.length > 9 || out.length % 2 === 0) return { error: 'Use an odd number of values, from 3 to 9.' };
+  for (var k in counts) { if (counts[k] === 1) odd.push(k); else if (counts[k] !== 2) return { error: 'Every number must appear exactly twice, except one number that appears once.' }; }
+  if (odd.length !== 1) return { error: 'Exactly one number must appear once; all others must appear exactly twice.' };
+  return { list: out };
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+  var $ = function (id) { return document.getElementById(id); };
+  var HINTS = {
+    and: 'AND: a column of the result is 1 only if both a and b have a 1 there.',
+    or: 'OR: a column of the result is 1 if a or b (or both) has a 1 there.',
+    xor: 'XOR: a column of the result is 1 if a and b have different bits there.',
+    shl: 'Left shift by n: slide the bits left n places, filling with zeros. Bits pushed off the left edge disappear.',
+    shr: 'Right shift by n: slide the bits right n places. Bits pushed off the right edge disappear.',
+    clear: 'n & (n-1) removes the right-most 1 bit. A classic building block for counting bits and detecting powers of two.',
+    count: 'Brian Kernighan\'s method: clear the lowest 1 bit repeatedly and count how many times you did it.',
+    single: 'Every value appears twice except one. XOR them all: pairs cancel, the loner remains.',
+  };
+
+  function render(st, i, body) {
+    body.appendChild(Viz.array(HEADER, { title: 'place value', indexes: false, classes: (function () { var o = {}; for (var k = 0; k < 8; k++) o[k] = 'dim'; return o; })() }));
+    st.rows.forEach(function (r) {
+      body.appendChild(Viz.array(r.bits, { title: r.title, indexes: false, classes: (function () { var o = {}; r.bits.forEach(function (b, k) { if (b === null) o[k] = 'dim'; }); for (var k2 in r.cls) o[k2] = r.cls[k2]; return o; })() }));
+    });
+  }
+
+  function syncFields() {
+    var op = $('op').value;
+    $('la').style.display = op === 'single' ? 'none' : '';
+    $('lb').style.display = (op === 'clear' || op === 'count' || op === 'single') ? 'none' : '';
+    $('ll').style.display = op === 'single' ? '' : 'none';
+    $('la').firstChild.textContent = (op === 'clear' || op === 'count') ? 'n (' + (op === 'clear' ? '1' : '0') + ' to 255)' : 'a (0 to 255)';
+    $('lb').firstChild.textContent = (op === 'shl' || op === 'shr') ? 'n, shift amount (0 to 7)' : 'b (0 to 255)';
+    $('hint').textContent = HINTS[op];
+  }
+
+  function run() {
+    errBox.textContent = '';
+    var op = $('op').value, p = {};
+    syncFields();
+    function num(id, lo, hi, name) {
+      var s = $(id).value.trim();
+      if (!/^\d+$/.test(s) || +s < lo || +s > hi) { errBox.textContent = name + ' must be a whole number from ' + lo + ' to ' + hi + '.'; return null; }
+      return +s;
+    }
+    if (op === 'single') {
+      var l = parseList($('list').value);
+      if (l.error) { errBox.textContent = l.error; return; }
+      p.list = l.list;
+    } else {
+      p.a = num('a', op === 'clear' ? 1 : 0, 255, op === 'clear' || op === 'count' ? 'n' : 'a');
+      if (p.a === null) return;
+      if (op === 'and' || op === 'or' || op === 'xor') { p.b = num('b', 0, 255, 'b'); if (p.b === null) return; }
+      if (op === 'shl' || op === 'shr') { p.b = num('b', 0, 7, 'The shift amount'); if (p.b === null) return; }
+    }
+    app.innerHTML = '';
+    var st = Viz.stepper({ mount: app, code: CODES[op], render: render });
+    st.load(genBit(op, p).steps);
+  }
+
+  $('legend').appendChild(Viz.legend([
+    { cls: 'hit', label: 'column being looked at / bit that changes' }, { cls: 'found', label: 'result bits' }, { cls: 'dim', label: 'place value / not known yet' },
+  ]));
+  $('go').addEventListener('click', run);
+  $('op').addEventListener('change', run);
+  run();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Closures - Go visual</title>
+<meta name="description" content="See how a Go closure carries its own captured variables, and how the Go 1.22 loop variable change fixed a classic bug.">
+<link rel="stylesheet" href="../assets/viz.css">
+<style>
+.viz-layout{grid-template-columns:minmax(0,1fr)}
+.viz-stage,.viz-code{min-width:0;max-width:100%}
+@media (max-width:760px){.viz-layout.viz-has-code{grid-template-columns:minmax(0,1fr)}}
+body{overflow-x:hidden}
+.viz-svg .ah{fill:var(--accent)}
+.viz-svg .arrow{fill:none;stroke:var(--accent);stroke-width:2.5}
+.viz-svg .arrow.bad{stroke:var(--bad-line)}
+.viz-svg .node.bad{fill:var(--bad);stroke:var(--bad-line)}
+.viz-svg .node.nilp{stroke-dasharray:5 4}
+.viz-svg .nm{font-size:12px;fill:var(--muted)}
+.viz-svg .val{font-size:17px;font-weight:700}
+.viz-svg .ad{font-size:10px;fill:var(--muted)}
+.viz-svg .val.small{font-size:12px}
+.viz-svg .lbl{font-size:12px;fill:var(--accent);font-weight:700}
+.viz-cell.spare{background:transparent;border-style:dashed;color:var(--muted)}
+.hdrs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.chip{border:2px solid var(--cell-line);background:var(--cell);border-radius:10px;padding:4px 10px;font:600 13px var(--mono)}
+.chip.hit{background:var(--hit);border-color:var(--hit-line)}
+.chip.found{background:var(--found);border-color:var(--found-line)}
+.chip.dim{opacity:.45}
+.chip.bad{background:var(--bad);border-color:var(--bad-line)}
+.stackcol{display:flex;flex-direction:column-reverse;gap:6px;max-width:420px}
+.frame{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:6px 10px;font:13px var(--mono)}
+.frame b{display:block;margin-bottom:2px}
+.frame.hit{background:var(--hit);border-color:var(--hit-line)}
+.frame.found{background:var(--found);border-color:var(--found-line)}
+.frame.bad{background:var(--bad);border-color:var(--bad-line)}
+.frame.dim{opacity:.55}
+.out{font:13px var(--mono);background:var(--code-bg);color:var(--code-ink);padding:8px 10px;border-radius:8px;min-height:2.2em;white-space:pre-wrap;margin-top:10px}
+.out i{color:#6b7a90;font-style:normal}
+.row2{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.lane{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:8px 12px;min-width:170px;font:13px var(--mono)}
+.lane h4{margin:0 0 4px;font:700 13px var(--sans)}
+.lane.hit{background:var(--hit);border-color:var(--hit-line)}
+.lane.found{background:var(--found);border-color:var(--found-line)}
+.lane.bad{background:var(--bad);border-color:var(--bad-line)}
+.lane.dim{opacity:.55}
+.slots{display:flex;gap:6px}
+.slot{width:44px;height:44px;border:2px dashed var(--cell-line);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 15px var(--mono)}
+.slot.full{border-style:solid;background:var(--range);border-color:var(--range-line)}
+.iface{display:inline-flex;border:2px solid var(--cell-line);border-radius:10px;overflow:hidden;background:var(--cell);margin:4px 10px 4px 0}
+.iface div{padding:6px 10px;font:600 13px var(--mono)}
+.iface .t{background:var(--dim)}
+.iface.hit{background:var(--hit);border-color:var(--hit-line)}
+.iface.found{background:var(--found);border-color:var(--found-line)}
+.iface.bad{background:var(--bad);border-color:var(--bad-line)}
+.bar{height:20px;border-radius:5px;background:var(--range);border:2px solid var(--range-line);transition:width .3s}
+.bar.hit{background:var(--hit);border-color:var(--hit-line)}
+.bar.found{background:var(--found);border-color:var(--found-line)}
+.bar.dim{background:var(--dim);border-color:transparent}
+.tl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;align-items:center;font:13px var(--mono)}
+.tree{font:13px var(--mono)} .tree .tn{border:2px solid var(--cell-line);border-radius:8px;padding:4px 8px;margin:4px 0;background:var(--cell);display:inline-block}
+.tree .tn.bad{background:var(--bad);border-color:var(--bad-line)} .tree .tn.hit{background:var(--hit);border-color:var(--hit-line)} .tree .tn.found{background:var(--found);border-color:var(--found-line)}
+.tree ul{list-style:none;margin:0;padding-left:26px;border-left:2px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/go/closures.html">বাংলা</a></nav>
+  <h1>Closures</h1>
+  <p class="lead">A closure is a function that <b>remembers the variables around it</b>, even after the outer function has finished.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea</h2>
+    <p>Imagine handing someone a <b>sealed envelope with a calculator inside</b> that also has a tiny notepad attached. Each time they press &ldquo;+1&rdquo; it updates <i>its own</i> notepad. Give a second envelope to someone else and they get a second, separate notepad.</p>
+ <p>In Go a function literal can use variables from the function that created it. Those variables are kept alive for as long as the closure exists. Each call to <code>counter()</code> creates a new variable <code>n</code>, so every closure counts independently.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Example<select id="sc"></select></label>
+    <span id="inputs" style="display:contents"></span>
+    <button id="run">Run</button>
+  </div>
+  <p class="viz-note" id="scdesc"></p>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul><li>In &ldquo;Counter&rdquo; follow the arrows: does <code>a()</code> ever change <code>b</code>&rsquo;s counter?</li><li>In &ldquo;Loop variable&rdquo; switch between the two Go versions and compare the arrows and the printed numbers.</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul><li>Before Go 1.22 (go.mod older than 1.22) all closures created in a <code>for i := ...</code> loop shared ONE <code>i</code>, so they printed the final value. Modern Go gives each iteration its own <code>i</code>.</li><li>Capturing a variable and changing it later: the closure sees the latest value, not the value at creation time.</li><li>Goroutines started in a loop that capture the loop variable were the classic victim of the old behaviour; check your go.mod version.</li></ul>
+  </div>
+
+  <div class="pagenav"><a href="functions-and-call-stack.html">&larr; Functions and the Call Stack</a><a href="defer-panic-recover.html">Defer, Panic and Recover &rarr;</a></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+
+var E = Viz.el;
+/* ---- scenarios + dynamic inputs ---- */
+function multi(scenarios) {
+  var mount = Viz.$('#app'), sel = Viz.$('#sc'), inputsBox = Viz.$('#inputs'), err = Viz.$('#err'), desc = Viz.$('#scdesc');
+  var cur = 0, store = {}, pendingStep = null;
+  var hm = location.hash.match(/sc=(\d+)(?:&step=(\d+))?/);
+  if (hm && scenarios[+hm[1]]) { cur = +hm[1]; pendingStep = hm[2] ? +hm[2] : null; }
+  window.I = function (id) { var n = document.getElementById('in_' + id); return n ? n.value : ''; };
+  window.N = function (id, lo, hi) {
+    var raw = I(id).trim(); var v = Number(raw);
+    if (raw === '' || isNaN(v)) throw new Error('"' + id + '" must be a number.');
+    if (lo !== undefined && v < lo) throw new Error('"' + id + '" must be at least ' + lo + '.');
+    if (hi !== undefined && v > hi) throw new Error('"' + id + '" must be at most ' + hi + '.');
+    return Math.floor(v) === v ? v : Math.floor(v);
+  };
+  scenarios.forEach(function (sc, i) { sel.appendChild(E('option', { value: String(i), text: sc.name })); });
+  function buildInputs() {
+    inputsBox.innerHTML = '';
+    (scenarios[cur].inputs || []).forEach(function (inp) {
+      var key = cur + ':' + inp.id;
+      var val = store[key] !== undefined ? store[key] : inp.value;
+      var ctl;
+      if (inp.options) {
+        ctl = E('select', { id: 'in_' + inp.id }, inp.options.map(function (o) { return E('option', { value: o[0], text: o[1] }); }));
+        ctl.value = val;
+      } else {
+        ctl = E('input', { id: 'in_' + inp.id, value: val, size: inp.size || 10 });
+      }
+      ctl.addEventListener('change', function () { store[key] = ctl.value; show(); });
+      inputsBox.appendChild(E('label', { text: inp.label }, [ctl]));
+    });
+  }
+  function show() {
+    var sc = scenarios[cur];
+    err.textContent = '';
+    mount.innerHTML = '';
+    desc.textContent = sc.desc || '';
+    var steps;
+    try { steps = sc.steps(); } catch (e) { err.textContent = e.message; return; }
+    var st = Viz.stepper({ mount: mount, code: typeof sc.code === 'function' ? sc.code() : sc.code, render: sc.render });
+    st.load(steps);
+    if (pendingStep !== null) { st.go(pendingStep); pendingStep = null; }
+  }
+  sel.addEventListener('change', function () { cur = +sel.value; buildInputs(); show(); });
+  Viz.$('#run').addEventListener('click', function () { show(); });
+  sel.value = String(cur); buildInputs(); show();
+  if (location.hash === '#test') {
+    var log = [];
+    scenarios.forEach(function (sc, k) {
+      try {
+        cur = k; buildInputs();
+        var steps = sc.steps(), code = typeof sc.code === 'function' ? sc.code() : sc.code, tmp = document.createElement('div');
+        if (!steps.length) throw new Error('no steps');
+        steps.forEach(function (stp, j) {
+          tmp.innerHTML = ''; sc.render(stp, j, tmp);
+          if (!tmp.firstChild) throw new Error('empty render at step ' + j);
+          [].concat(stp.line === undefined ? [] : stp.line).forEach(function (ln) { if (!(ln >= 0 && ln < code.length)) throw new Error('bad line ' + ln + ' at step ' + j); });
+          if (!stp.text) throw new Error('no text at step ' + j);
+        });
+        log.push('OK   ' + sc.name + ' (' + steps.length + ' steps)');
+      } catch (e) { log.push('FAIL ' + sc.name + ': ' + e.message); }
+    });
+    cur = 0; sel.value = '0'; buildInputs(); show();
+    document.body.appendChild(E('pre', { id: 'testresult', text: log.join('\n') }));
+  }
+}
+
+/* ---- memory diagram: boxes + arrows (illustrative addresses) ---- */
+var _mid = 0;
+function mem(body, cells, arrows, o) {
+  o = o || {};
+  var W = 124, H = 70, G = 34, X0 = 12, Y0 = 12, n = Math.max(cells.length, 1), id = 'ah' + (++_mid);
+  var width = X0 * 2 + n * W + (n - 1) * G, hasA = arrows && arrows.length, height = Y0 + H + (hasA ? 92 : 14);
+  var kids = [Viz.s('defs', {}, [Viz.s('marker', { id: id, viewBox: '0 0 10 10', refX: '8', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto' }, [Viz.s('path', { d: 'M0,0L10,5L0,10z', class: 'ah' })])])];
+  cells.forEach(function (c, i) {
+    var x = X0 + i * (W + G);
+    kids.push(Viz.s('rect', { x: x, y: Y0, width: W, height: H, rx: 10, class: 'node ' + (c.cls || '') }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 17, 'text-anchor': 'middle', class: 'nm', text: c.name }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 42, 'text-anchor': 'middle', class: 'val' + (String(c.value).length > 8 ? ' small' : ''), text: String(c.value) }));
+    if (c.addr) kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 62, 'text-anchor': 'middle', class: 'ad', text: c.addr }));
+  });
+  (arrows || []).forEach(function (a) {
+    var x1 = X0 + a.from * (W + G) + W / 2, x2 = X0 + a.to * (W + G) + W / 2, y = Y0 + H, d;
+    if (a.from === a.to) { x1 -= 22; x2 += 22; d = 'M' + x1 + ',' + y + ' C' + (x1 - 10) + ',' + (y + 55) + ' ' + (x2 + 10) + ',' + (y + 55) + ' ' + x2 + ',' + (y + 3); }
+    else d = 'M' + x1 + ',' + y + ' C' + x1 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 4);
+    kids.push(Viz.s('path', { d: d, class: 'arrow ' + (a.cls || ''), 'marker-end': 'url(#' + id + ')' }));
+    if (a.label) kids.push(Viz.s('text', { x: (x1 + x2) / 2, y: y + 66, 'text-anchor': 'middle', class: 'lbl', text: a.label }));
+  });
+  var svgEl = Viz.svg(width, height, kids); svgEl.style.minWidth = Math.min(width, 600) + 'px';
+  body.appendChild(svgEl);
+  if (o.note !== false) body.appendChild(Viz.note('Addresses like 0xc000012000 are made up for illustration; real addresses differ on every run.'));
+}
+function out(body, lines) {
+  body.appendChild(E('div', { class: 'out', html: lines && lines.length ? lines.map(function (l) { return esc(l); }).join('<br>') : '<i>(program output appears here)</i>' }));
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function chips(items) { return E('div', { class: 'hdrs' }, items.map(function (c) { return E('span', { class: 'chip ' + (c.cls || ''), text: c.text }); })); }
+
+document.getElementById('legend').appendChild(Viz.legend([{cls:'range',label:'closure / function value'},{cls:'hit',label:'variable being read or changed'},{cls:'found',label:'result'}]));
+
+function render(st, i, body) { mem(body, st.cells, st.arrows || [], { note: false }); if (st.out) out(body, st.out); }
+function cell(name, value, cls) { return { name: name, value: value, cls: cls || '' }; }
+multi([
+ { name: 'Counter', desc: 'Each call to counter() makes a new n. Each closure keeps its own.',
+   code: ['func counter() func() int {', '    n := 0', '    return func() int {', '        n++', '        return n', '    }', '}', '', 'func main() {', '    a := counter()', '    b := counter()', '    a()  // 1', '    a()  // 2', '    b()  // 1', '    a()  // 3', '}'],
+   render: render,
+   steps: function () {
+     function view(na, nb, hitA, hitB, hasB) {
+       var cells = [cell('a (func)', 'closure', 'range')], arrows = [];
+       if (hasB) cells.push(cell('b (func)', 'closure', 'range'));
+       cells.push(cell('n captured by a', na, hitA ? 'hit' : ''));
+       if (hasB) cells.push(cell('n captured by b', nb, hitB ? 'hit' : ''));
+       arrows.push({ from: 0, to: hasB ? 2 : 1 });
+       if (hasB) arrows.push({ from: 1, to: 3 });
+       return { cells: cells, arrows: arrows };
+     }
+     var o = [], steps = [];
+     function push(line, text, v, extra) { steps.push(Object.assign({ line: line, text: text, cells: v.cells, arrows: v.arrows, out: o.slice() }, extra || {})); }
+     push(9, 'a := counter(): counter creates a fresh n = 0 and returns a function that uses it. n would normally die when counter returns, but the closure keeps it alive.', view(0, 0, true, false, false));
+     push(10, 'b := counter(): a SECOND call creates a SECOND n. b\'s function has its own private counter.', view(0, 0, false, true, true));
+     o.push('1'); push(11, 'a() runs n++ on a\'s n: it becomes 1 and is returned.', view(1, 0, true, false, true));
+     o.push('2'); push(12, 'a() again: a\'s n becomes 2. The value survived between calls.', view(2, 0, true, false, true));
+     o.push('1'); push(13, 'b() uses b\'s own n: 0 becomes 1. a\'s counter is untouched.', view(2, 1, false, true, true));
+     o.push('3'); push(14, 'a() continues from where a left off: 3.', view(3, 1, true, false, true));
+     return steps;
+   } },
+ { name: 'Loop variable (Go 1.22 change)', desc: 'Pick which Go behaviour to watch. Your go.mod decides which one you get.',
+   inputs: [{ id: 'ver', label: 'language version', value: 'new', options: [['new', 'go 1.22 or newer (per-iteration i)'], ['old', 'before go 1.22 (one shared i)']] }],
+   code: ['var funcs []func() int', 'for i := 0; i < 3; i++ {', '    funcs = append(funcs, func() int { return i })', '}', 'for _, f := range funcs {', '    fmt.Print(f(), " ")', '}'],
+   render: render,
+   steps: function () {
+     var isNew = I('ver') === 'new', steps = [], o = [];
+     function fcells(n) { var c = []; for (var k = 0; k < n; k++) c.push(cell('funcs[' + k + ']', 'closure', 'range')); return c; }
+     function build(nf, ivals, hit, hitI) {
+       var cells = fcells(nf).concat(ivals.map(function (v, k) { return cell(isNew ? 'i (iter ' + k + ')' : 'i (shared)', v, hitI === k ? 'hit' : ''); }));
+       var arrows = [];
+       for (var k = 0; k < nf; k++) arrows.push({ from: k, to: nf + (isNew ? k : 0), cls: hit === k ? '' : '' });
+       return { cells: cells, arrows: arrows };
+     }
+     function push(line, text, v) { steps.push({ line: line, text: text, cells: v.cells, arrows: v.arrows, out: o.slice() }); }
+     if (isNew) {
+       push(2, 'Iteration 0: this iteration has its OWN i (= 0). funcs[0] captures it.', build(1, [0], -1, 0));
+       push(2, 'Iteration 1: Go makes a NEW i for this iteration (= 1). funcs[1] captures that one.', build(2, [0, 1], -1, 1));
+       push(2, 'Iteration 2: another new i (= 2) for funcs[2].', build(3, [0, 1, 2], -1, 2));
+       for (var k = 0; k < 3; k++) { o.push(String(k)); push(5, 'funcs[' + k + ']() reads its own i: ' + k + '.', build(3, [0, 1, 2], k, k)); }
+       push(6, 'Prints 0 1 2, which is what most people expect.', build(3, [0, 1, 2], -1, -1));
+     } else {
+       push(2, 'Iteration 0: there is ONE i for the whole loop (= 0). funcs[0] captures it.', build(1, [0], -1, 0));
+       push(2, 'i++ changes the same box to 1. funcs[1] captures the same box.', build(2, [1], -1, 0));
+       push(2, 'i becomes 2. funcs[2] points at the same box too.', build(3, [2], -1, 0));
+       push(1, 'i++ makes i = 3, the condition fails and the loop ends. Three closures, ONE box, now holding 3.', build(3, [3], -1, 0));
+       for (var j = 0; j < 3; j++) { o.push('3'); push(5, 'funcs[' + j + ']() reads the shared i: 3.', build(3, [3], j, 0)); }
+       push(6, 'Prints 3 3 3, the classic old surprise.', build(3, [3], -1, -1));
+     }
+     return steps;
+   } }
+]);
+
+})();
+</script>
+</body>
+</html>

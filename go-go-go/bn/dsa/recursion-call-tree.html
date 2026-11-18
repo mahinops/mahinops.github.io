@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recursion Call Tree</title>
+<meta name="description" content="Recursion-এর call tree আর memoization কীভাবে একই sub-problem বারবার হিসাব করা থামায়, fib দিয়ে দেখুন।">
+<link rel="stylesheet" href="../../assets/viz.css">
+<style>.viz-svg .halo{paint-order:stroke;stroke:var(--card);stroke-width:4px;stroke-linejoin:round}.viz-svg .node.memo{fill:#7048e8;stroke:#b197fc}.viz-svg text.memo{fill:#fff}.stat{font:14px var(--mono);margin:4px 0}.stackbox{font:13px var(--mono);margin:6px 0}.frame{display:inline-block;border:2px solid var(--cell-line);border-radius:6px;padding:1px 7px;margin:2px;background:var(--cell)}.frame.top{background:var(--hit);border-color:var(--hit-line)}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; সব visual</a> &middot; <a href="../../dsa/recursion-call-tree.html">English</a></nav>
+  <h1>Recursion Call Tree</h1>
+  <p class="lead">Recursion হলো এমন function যে নিজেই নিজেকে ছোট ছোট অংশের উপর call করে একটা সমস্যার সমাধান করে।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা</h2>
+    <p>রাশিয়ান nesting doll-এর কথা ভাবুন: সবচেয়ে বড় doll-এর ভেতরে কী আছে জানতে আপনি সেটা খোলেন, একটা ছোট doll পান, আর একই প্রশ্ন আবার করেন। সবচেয়ে ছোট doll-এ (<b>base case</b>) উত্তর জানা থাকে, আর সেখান থেকে উত্তরগুলো ওপরের দিকে return হতে শুরু করে।</p>
+<p><code>fib(n)</code> = <code>fib(n-1) + fib(n-2)</code>, যেখানে <code>fib(0) = 0</code> আর <code>fib(1) = 1</code>। প্রতিটা call একটা <b>call tree</b>-র node। দেখবেন <i>একই</i> sub-problem (যেমন <code>fib(3)</code>) বারবার হিসাব হচ্ছে। <b>Memoization</b> মানে প্রতিটা উত্তর প্রথমবার একটা খাতায় লিখে রাখা, যাতে পরে একই call এলে আর branch না করে খাতা থেকে পড়ে নেওয়া যায়।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+  <label>Version<select id="mode"><option value="naive">সাধারণ recursion</option><option value="memo">Memoization সহ</option></select></label>
+  <label>n (0 থেকে 7)<input id="n" value="5" size="4"></label>
+  <button id="go">Run</button>
+</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul><li>সাধারণ recursion <code>n = 5</code> দিয়ে run করুন, তারপর <code>7</code> দিয়ে। call-এর সংখ্যা কত দ্রুত বাড়ে?</li><li>একই <code>n</code> দিয়ে memoization-এ যান। কোন node-গুলো বেগুনি হয়, আর সেগুলোর কোনো child নেই কেন?</li><li>দুই version-এর শেষ ধাপে &ldquo;মোট call&rdquo;-এর সংখ্যা মিলিয়ে দেখুন।</li><li><b>call stack</b> লাইনটা দেখুন: এটা এমন call-এর chain যারা উত্তরের জন্য অপেক্ষা করছে। এটা সবচেয়ে বেশি কত গভীর হয়?</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul><li><b>Base case না থাকা</b> (বা এমন base case যেখানে কখনো পৌঁছানো যায় না): function নিজেকে call করতেই থাকে, শেষে Go stack overflow হয়ে crash করে।</li><li><b>একই sub-problem বারবার হিসাব করা</b>: সাধারণ fib exponential। Memoize করুন (অথবা loop দিয়ে bottom-up উত্তর বানান)।</li><li><b>return করার আগে memo map-এ result store করতে ভুলে যাওয়া।</b></li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Complexity</h2>
+    <p><b>সাধারণ fib: প্রায় O(2<sup>n</sup>)</b> time complexity, কারণ call tree-র প্রতিটা level-এ call মোটামুটি দ্বিগুণ হয়। <b>Memoized: O(n)</b> time complexity, কারণ প্রতিটা মান একবারই হিসাব হয়, আর memo map ও call stack-এর জন্য O(n) space complexity।</p>
+  </div>
+
+  <div class="pagenav"><a href="sorting.html">&larr; Sorting</a><a href="backtracking.html">Backtracking &rarr;</a></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script id="algo">
+
+function fibSteps(n, useMemo) {
+  var nodes = [], steps = [], memo = {}, stackIds = [], calls = 0, active = null;
+  function snap(line, text, extra) {
+    steps.push(Object.assign({
+      nodes: nodes, line: line, text: text, calls: calls, n: n, useMemo: useMemo,
+      states: nodes.map(function (nd) { return stackIds.indexOf(nd.id) !== -1 ? (nd.id === active ? 'active' : 'wait') : nd.fin; }),
+      vals: nodes.map(function (nd) { return nd.val; }),
+      stack: stackIds.map(function (id) { return nodes[id].k; }),
+      memo: Object.keys(memo).map(Number).sort(function (a, b) { return a - b; }).map(function (k) { return [k, memo[k]]; }),
+    }, extra || {}));
+  }
+  function call(k, parent) {
+    var nd = { id: nodes.length, k: k, kids: [], parent: parent, val: null, fin: '', edge: parent === null ? '' : (nodes[parent].kids.length === 0 ? 'n-1' : 'n-2') };
+    nodes.push(nd); if (parent !== null) nodes[parent].kids.push(nd.id);
+    stackIds.push(nd.id); calls++; active = nd.id;
+    snap(0, 'Call করি fib(' + k + ')।' + (parent === null ? '' : ' (এটা দরকার হয়েছিল fib(' + nodes[parent].k + ')-এর জন্য।)'));
+    if (k <= 1) {
+      nd.val = k; nd.fin = 'done';
+      snap([1, 2], 'fib(' + k + ') হলো base case: return করি ' + k + ' সরাসরি, আর কোনো call নেই।');
+      stackIds.pop(); active = parent; return k;
+    }
+    if (useMemo && Object.prototype.hasOwnProperty.call(memo, k)) {
+      nd.val = memo[k]; nd.fin = 'memo';
+      snap([4, 5], 'fib(' + k + ') memo খাতায় আগেই আছে: সাথে সাথে return করি ' + memo[k] + '। এই পুরো branch বাদ!');
+      stackIds.pop(); active = parent; return memo[k];
+    }
+    var a = call(k - 1, nd.id); active = nd.id;
+    snap(useMemo ? 7 : 4, 'fib(' + (k - 1) + ') return করেছে ' + a + '। আবার fib(' + k + '): এবার দরকার fib(' + (k - 2) + ')।');
+    var b = call(k - 2, nd.id); active = nd.id;
+    nd.val = a + b; nd.fin = 'done'; if (useMemo) memo[k] = nd.val;
+    snap(useMemo ? [7, 8] : 4, 'fib(' + k + ') = ' + a + ' + ' + b + ' = ' + nd.val + (useMemo ? ', আর এটা memo-তে লেখা হলো।' : '।'));
+    stackIds.pop(); active = parent; return nd.val;
+  }
+  var v = call(n, null);
+  snap(useMemo ? 8 : 4, 'শেষ: fib(' + n + ') = ' + v + '। মোট call: ' + calls + '।', { done: true, result: v });
+  return steps;
+}
+function countFibCalls(n, useMemo) {
+  var memo = {}, c = 0;
+  (function f(k) { c++; if (k <= 1) return k; if (useMemo && k in memo) return memo[k]; var r = f(k - 1) + f(k - 2); if (useMemo) memo[k] = r; return r; })(n);
+  return c;
+}
+
+</script>
+<script id="ui">
+
+function $id(x) { return document.getElementById(x); }
+function showErr(m) { $id('err').textContent = m || ''; }
+var current = null;
+function mountStepper(opts) {
+  if (current) current.pause();
+  var app = $id('app'); app.innerHTML = ''; app.className = '';
+  current = Viz.stepper(Object.assign({ mount: '#app' }, opts));
+  return current;
+}
+function setLegend(items) { var l = $id('legend'); l.innerHTML = ''; l.appendChild(Viz.legend(items)); }
+function mark(marks, ix, label) { marks[ix] = (marks[ix] || []).concat(label); }
+
+
+var _layoutCache = null;
+function layoutTree(nodes, dx, dy) {
+  if (_layoutCache && _layoutCache.nodes === nodes && _layoutCache.dx === dx) return _layoutCache.L;
+  var slot = 0, pos = {}, maxD = 0;
+  function visit(id, d) {
+    var nd = nodes[id]; maxD = Math.max(maxD, d);
+    if (!nd.kids.length) { pos[id] = { x: slot * dx + dx / 2, y: d * dy + 30 }; slot++; }
+    else {
+      nd.kids.forEach(function (k) { visit(k, d + 1); });
+      pos[id] = { x: (pos[nd.kids[0]].x + pos[nd.kids[nd.kids.length - 1]].x) / 2, y: d * dy + 30 };
+    }
+  }
+  visit(0, 0);
+  var L = { pos: pos, width: slot * dx, height: maxD * dy + 80 };
+  _layoutCache = { nodes: nodes, dx: dx, L: L };
+  return L;
+}
+var STATE_CLASS = { '': 'dim', wait: 'range', active: 'hit', done: 'found', memo: 'memo' };
+function drawTree(body, nodes, st, o) {
+  var L = layoutTree(nodes, o.dx, o.dy), W = Math.max(L.width, 220), kids = [];
+  nodes.forEach(function (nd) {
+    nd.kids.forEach(function (k) {
+      var a = L.pos[nd.id], b = L.pos[k], stt = st.states[k], seen = stt !== undefined && stt !== '';
+      kids.push(Viz.s('line', { x1: a.x, y1: a.y + 15, x2: b.x, y2: b.y - 15, class: 'edge' + (stt === 'active' ? ' hit' : seen ? ' found' : ''), style: seen ? '' : 'opacity:.2' }));
+      if (nodes[k].edge && seen) kids.push(Viz.s('text', { x: (a.x + b.x) / 2 + (b.x < a.x ? -16 : 16), y: (a.y + b.y) / 2 + 3, 'text-anchor': 'middle', class: 'halo', style: 'font-size:10px', text: nodes[k].edge }));
+    });
+  });
+  nodes.forEach(function (nd) {
+    var p = L.pos[nd.id], stt = st.states[nd.id] || '', cls = STATE_CLASS[stt];
+    kids.push(Viz.s('rect', { x: p.x - o.w / 2, y: p.y - 15, width: o.w, height: 30, rx: 8, class: 'node ' + cls, style: stt === '' ? 'opacity:.35' : '' }));
+    kids.push(Viz.s('text', { x: p.x, y: p.y + 4, 'text-anchor': 'middle', class: stt === 'memo' ? 'memo' : '', style: 'font-size:12px;font-weight:700' + (stt === '' ? ';opacity:.4' : ''), text: o.label(nd) }));
+    var sub = stt === '' ? '' : o.sub(nd, st);
+    if (sub) kids.push(Viz.s('text', { x: p.x, y: p.y + 31, 'text-anchor': 'middle', class: 'halo', style: 'font-size:11px', text: sub }));
+  });
+  var svg = Viz.svg(W, L.height, kids);
+  svg.style.maxWidth = 'none'; svg.style.width = W + 'px'; svg.setAttribute('width', W);
+  body.appendChild(svg);
+}
+
+var NAIVE_CODE = ['func fib(n int) int {',
+'    if n <= 1 {',
+'        return n',
+'    }',
+'    return fib(n-1) + fib(n-2)',
+'}'];
+var MEMO_CODE = ['func fib(n int, memo map[int]int) int {',
+'    if n <= 1 {',
+'        return n',
+'    }',
+'    if v, ok := memo[n]; ok {',
+'        return v',
+'    }',
+'    memo[n] = fib(n-1, memo) + fib(n-2, memo)',
+'    return memo[n]',
+'}'];
+function render(st, i, body) {
+  drawTree(body, st.nodes, st, {
+    dx: 62, dy: 70, w: 56,
+    label: function (nd) { return 'fib(' + nd.k + ')'; },
+    sub: function (nd, s) { return s.vals[nd.id] === null || s.vals[nd.id] === undefined ? '' : '= ' + s.vals[nd.id]; },
+  });
+  body.appendChild(Viz.el('div', { class: 'stackbox' }, [Viz.el('span', { text: 'call stack: ' })].concat(
+    st.stack.length ? st.stack.map(function (k, ix) { return Viz.el('span', { class: 'frame' + (ix === st.stack.length - 1 ? ' top' : ''), text: 'fib(' + k + ')' }); }) : [Viz.el('span', { text: '(খালি)' })])));
+  if (st.useMemo) body.appendChild(Viz.el('div', { class: 'stackbox' }, [Viz.el('span', { text: 'memo: ' })].concat(
+    st.memo.length ? st.memo.map(function (kv) { return Viz.el('span', { class: 'frame', text: kv[0] + '→' + kv[1] }); }) : [Viz.el('span', { text: '(খালি)' })])));
+  body.appendChild(Viz.el('div', { class: 'stat', html: 'এ পর্যন্ত call: <b>' + st.calls + '</b>' + (st.done ? ' &nbsp; (সাধারণ version-এ লাগত ' + countFibCalls(st.n, false) + ', memoized-এ লাগে ' + countFibCalls(st.n, true) + ')' : '') }));
+}
+function run() {
+  showErr('');
+  var n = Number($id('n').value), memo = $id('mode').value === 'memo';
+  if ($id('n').value.trim() === '' || !Number.isInteger(n) || n < 0 || n > 7) { showErr('n একটা integer হতে হবে, 0 থেকে 7-এর মধ্যে।'); return; }
+  setLegend([{ cls: 'hit', label: 'এখন run হচ্ছে' }, { cls: 'range', label: 'child call-এর জন্য অপেক্ষায়' }, { cls: 'found', label: 'শেষ (উত্তর দেখানো আছে)' }, { cls: 'dim', label: 'এখনো call হয়নি' }].concat(memo ? [{ cls: 'memo', label: 'memo থেকে পড়া উত্তর' }] : []));
+  mountStepper({ code: memo ? MEMO_CODE : NAIVE_CODE, render: render }).load(fibSteps(n, memo));
+}
+$id('mode').addEventListener('change', run);
+$id('go').addEventListener('click', run);
+run();
+
+</script>
+</body>
+</html>

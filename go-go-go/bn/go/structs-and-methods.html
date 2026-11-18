@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Structs and Methods</title>
+<meta name="description" content="দেখুন value receiver একটা copy বদলায় আর pointer receiver আসলটা বদলায়, এবং range কেন struct element-এর copy নেয়।">
+<link rel="stylesheet" href="../../assets/viz.css">
+<style>
+.viz-layout{grid-template-columns:minmax(0,1fr)}
+.viz-stage,.viz-code{min-width:0;max-width:100%}
+@media (max-width:760px){.viz-layout.viz-has-code{grid-template-columns:minmax(0,1fr)}}
+body{overflow-x:hidden}
+.viz-svg .ah{fill:var(--accent)}
+.viz-svg .arrow{fill:none;stroke:var(--accent);stroke-width:2.5}
+.viz-svg .arrow.bad{stroke:var(--bad-line)}
+.viz-svg .node.bad{fill:var(--bad);stroke:var(--bad-line)}
+.viz-svg .node.nilp{stroke-dasharray:5 4}
+.viz-svg .nm{font-size:12px;fill:var(--muted)}
+.viz-svg .val{font-size:17px;font-weight:700}
+.viz-svg .ad{font-size:10px;fill:var(--muted)}
+.viz-svg .val.small{font-size:12px}
+.viz-svg .lbl{font-size:12px;fill:var(--accent);font-weight:700}
+.viz-cell.spare{background:transparent;border-style:dashed;color:var(--muted)}
+.hdrs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.chip{border:2px solid var(--cell-line);background:var(--cell);border-radius:10px;padding:4px 10px;font:600 13px var(--mono)}
+.chip.hit{background:var(--hit);border-color:var(--hit-line)}
+.chip.found{background:var(--found);border-color:var(--found-line)}
+.chip.dim{opacity:.45}
+.chip.bad{background:var(--bad);border-color:var(--bad-line)}
+.stackcol{display:flex;flex-direction:column-reverse;gap:6px;max-width:420px}
+.frame{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:6px 10px;font:13px var(--mono)}
+.frame b{display:block;margin-bottom:2px}
+.frame.hit{background:var(--hit);border-color:var(--hit-line)}
+.frame.found{background:var(--found);border-color:var(--found-line)}
+.frame.bad{background:var(--bad);border-color:var(--bad-line)}
+.frame.dim{opacity:.55}
+.out{font:13px var(--mono);background:var(--code-bg);color:var(--code-ink);padding:8px 10px;border-radius:8px;min-height:2.2em;white-space:pre-wrap;margin-top:10px}
+.out i{color:#6b7a90;font-style:normal}
+.row2{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.lane{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:8px 12px;min-width:170px;font:13px var(--mono)}
+.lane h4{margin:0 0 4px;font:700 13px var(--sans)}
+.lane.hit{background:var(--hit);border-color:var(--hit-line)}
+.lane.found{background:var(--found);border-color:var(--found-line)}
+.lane.bad{background:var(--bad);border-color:var(--bad-line)}
+.lane.dim{opacity:.55}
+.slots{display:flex;gap:6px}
+.slot{width:44px;height:44px;border:2px dashed var(--cell-line);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 15px var(--mono)}
+.slot.full{border-style:solid;background:var(--range);border-color:var(--range-line)}
+.iface{display:inline-flex;border:2px solid var(--cell-line);border-radius:10px;overflow:hidden;background:var(--cell);margin:4px 10px 4px 0}
+.iface div{padding:6px 10px;font:600 13px var(--mono)}
+.iface .t{background:var(--dim)}
+.iface.hit{background:var(--hit);border-color:var(--hit-line)}
+.iface.found{background:var(--found);border-color:var(--found-line)}
+.iface.bad{background:var(--bad);border-color:var(--bad-line)}
+.bar{height:20px;border-radius:5px;background:var(--range);border:2px solid var(--range-line);transition:width .3s}
+.bar.hit{background:var(--hit);border-color:var(--hit-line)}
+.bar.found{background:var(--found);border-color:var(--found-line)}
+.bar.dim{background:var(--dim);border-color:transparent}
+.tl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;align-items:center;font:13px var(--mono)}
+.tree{font:13px var(--mono)} .tree .tn{border:2px solid var(--cell-line);border-radius:8px;padding:4px 8px;margin:4px 0;background:var(--cell);display:inline-block}
+.tree .tn.bad{background:var(--bad);border-color:var(--bad-line)} .tree .tn.hit{background:var(--hit);border-color:var(--hit-line)} .tree .tn.found{background:var(--found);border-color:var(--found-line)}
+.tree ul{list-style:none;margin:0;padding-left:26px;border-left:2px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; সব visual</a> · <a href="../../go/structs-and-methods.html">English</a></nav>
+  <h1>Structs and Methods</h1>
+  <p class="lead">Struct কয়েকটা field-কে একটা box-এ জড়ো করে। Method হলো সেই box-এর সাথে জোড়া একটা function।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা</h2>
+    <p>Struct হলো <b>নাম-লেখা ফাঁকা ঘরওয়ালা একটা ফর্ম</b> (Name, Age, ...)। Method হলো পূরণ করা ফর্মের ওপর করা যায় এমন একটা কাজ, যেমন <code>form.Submit()</code>।</p>
+ <p>প্রতিটা method নিয়ে আসল প্রশ্ন হলো: <b>সে কি আসল ফর্মটা পায়, নাকি একটা ফটোকপি?</b> <b>Value receiver</b> <code>(c Counter)</code> পায় একটা <b>ফটোকপি</b>, তাই পরিবর্তন হারিয়ে যায়। <b>Pointer receiver</b> <code>(c *Counter)</code> পায় আসল ফর্মের <b>address</b>, তাই পরিবর্তন থেকে যায়।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+    <label>উদাহরণ<select id="sc"></select></label>
+    <span id="inputs" style="display:contents"></span>
+    <button id="run">Run</button>
+  </div>
+  <p class="viz-note" id="scdesc"></p>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul><li>&ldquo;Value vs pointer receiver&rdquo; উদাহরণে দেখুন দুটো method call-এর মধ্যে কোনটা main-এর <code>c</code> বদলায়।</li><li>&ldquo;range copies struct elements&rdquo; উদাহরণে প্রথম loop (কিছু বদলায় না) আর দ্বিতীয় loop (element বদলায়) মিলিয়ে দেখুন।</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul><li>যে method-এর struct বদলানোর কথা, সে যদি value receiver ব্যবহার করে, তাহলে সে চুপচাপ একটা copy বদলায়।</li><li><code>for _, c := range items { c.n++ }</code> লিখলে loop-এর copy বদলায়, slice-এর element নয়। <code>items[i]</code> ব্যবহার করুন বা pointer-এর slice নিন।</li><li>একই type-এ value আর pointer receiver মেশানো যায়, কিন্তু এতে বিভ্রান্তি হয়; কোনো method value বদলাতে চাইলে, বা struct বড় হলে, pointer receiver বেছে নিন।</li><li><code>sync.Mutex</code> আছে এমন struct copy করলে lock-টাও copy হয়ে যায়। pointer pass করুন।</li></ul>
+  </div>
+
+  <div class="pagenav"><a href="strings-bytes-runes.html">&larr; Strings, Bytes and Runes</a><a href="interfaces.html">Interfaces &rarr;</a></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script>
+(function () {
+
+var E = Viz.el;
+/* ---- scenarios + dynamic inputs ---- */
+function multi(scenarios) {
+  var mount = Viz.$('#app'), sel = Viz.$('#sc'), inputsBox = Viz.$('#inputs'), err = Viz.$('#err'), desc = Viz.$('#scdesc');
+  var cur = 0, store = {}, pendingStep = null;
+  var hm = location.hash.match(/sc=(\d+)(?:&step=(\d+))?/);
+  if (hm && scenarios[+hm[1]]) { cur = +hm[1]; pendingStep = hm[2] ? +hm[2] : null; }
+  window.I = function (id) { var n = document.getElementById('in_' + id); return n ? n.value : ''; };
+  window.N = function (id, lo, hi) {
+    var raw = I(id).trim(); var v = Number(raw);
+    if (raw === '' || isNaN(v)) throw new Error('"' + id + '" অবশ্যই একটা সংখ্যা হতে হবে।');
+    if (lo !== undefined && v < lo) throw new Error('"' + id + '" অন্তত ' + lo + ' হতে হবে।');
+    if (hi !== undefined && v > hi) throw new Error('"' + id + '" সর্বোচ্চ ' + hi + ' পর্যন্ত হতে পারে।');
+    return Math.floor(v) === v ? v : Math.floor(v);
+  };
+  scenarios.forEach(function (sc, i) { sel.appendChild(E('option', { value: String(i), text: sc.name })); });
+  function buildInputs() {
+    inputsBox.innerHTML = '';
+    (scenarios[cur].inputs || []).forEach(function (inp) {
+      var key = cur + ':' + inp.id;
+      var val = store[key] !== undefined ? store[key] : inp.value;
+      var ctl;
+      if (inp.options) {
+        ctl = E('select', { id: 'in_' + inp.id }, inp.options.map(function (o) { return E('option', { value: o[0], text: o[1] }); }));
+        ctl.value = val;
+      } else {
+        ctl = E('input', { id: 'in_' + inp.id, value: val, size: inp.size || 10 });
+      }
+      ctl.addEventListener('change', function () { store[key] = ctl.value; show(); });
+      inputsBox.appendChild(E('label', { text: inp.label }, [ctl]));
+    });
+  }
+  function show() {
+    var sc = scenarios[cur];
+    err.textContent = '';
+    mount.innerHTML = '';
+    desc.textContent = sc.desc || '';
+    var steps;
+    try { steps = sc.steps(); } catch (e) { err.textContent = e.message; return; }
+    var st = Viz.stepper({ mount: mount, code: typeof sc.code === 'function' ? sc.code() : sc.code, render: sc.render });
+    st.load(steps);
+    if (pendingStep !== null) { st.go(pendingStep); pendingStep = null; }
+  }
+  sel.addEventListener('change', function () { cur = +sel.value; buildInputs(); show(); });
+  Viz.$('#run').addEventListener('click', function () { show(); });
+  sel.value = String(cur); buildInputs(); show();
+  if (location.hash === '#test') {
+    var log = [];
+    scenarios.forEach(function (sc, k) {
+      try {
+        cur = k; buildInputs();
+        var steps = sc.steps(), code = typeof sc.code === 'function' ? sc.code() : sc.code, tmp = document.createElement('div');
+        if (!steps.length) throw new Error('no steps');
+        steps.forEach(function (stp, j) {
+          tmp.innerHTML = ''; sc.render(stp, j, tmp);
+          if (!tmp.firstChild) throw new Error('empty render at step ' + j);
+          [].concat(stp.line === undefined ? [] : stp.line).forEach(function (ln) { if (!(ln >= 0 && ln < code.length)) throw new Error('bad line ' + ln + ' at step ' + j); });
+          if (!stp.text) throw new Error('no text at step ' + j);
+        });
+        log.push('OK   ' + sc.name + ' (' + steps.length + ' steps)');
+      } catch (e) { log.push('FAIL ' + sc.name + ': ' + e.message); }
+    });
+    cur = 0; sel.value = '0'; buildInputs(); show();
+    document.body.appendChild(E('pre', { id: 'testresult', text: log.join('\n') }));
+  }
+}
+
+/* ---- memory diagram: boxes + arrows (illustrative addresses) ---- */
+var _mid = 0;
+function mem(body, cells, arrows, o) {
+  o = o || {};
+  var W = 124, H = 70, G = 34, X0 = 12, Y0 = 12, n = Math.max(cells.length, 1), id = 'ah' + (++_mid);
+  var width = X0 * 2 + n * W + (n - 1) * G, hasA = arrows && arrows.length, height = Y0 + H + (hasA ? 92 : 14);
+  var kids = [Viz.s('defs', {}, [Viz.s('marker', { id: id, viewBox: '0 0 10 10', refX: '8', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto' }, [Viz.s('path', { d: 'M0,0L10,5L0,10z', class: 'ah' })])])];
+  cells.forEach(function (c, i) {
+    var x = X0 + i * (W + G);
+    kids.push(Viz.s('rect', { x: x, y: Y0, width: W, height: H, rx: 10, class: 'node ' + (c.cls || '') }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 17, 'text-anchor': 'middle', class: 'nm', text: c.name }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 42, 'text-anchor': 'middle', class: 'val' + (String(c.value).length > 8 ? ' small' : ''), text: String(c.value) }));
+    if (c.addr) kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 62, 'text-anchor': 'middle', class: 'ad', text: c.addr }));
+  });
+  (arrows || []).forEach(function (a) {
+    var x1 = X0 + a.from * (W + G) + W / 2, x2 = X0 + a.to * (W + G) + W / 2, y = Y0 + H, d;
+    if (a.from === a.to) { x1 -= 22; x2 += 22; d = 'M' + x1 + ',' + y + ' C' + (x1 - 10) + ',' + (y + 55) + ' ' + (x2 + 10) + ',' + (y + 55) + ' ' + x2 + ',' + (y + 3); }
+    else d = 'M' + x1 + ',' + y + ' C' + x1 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 4);
+    kids.push(Viz.s('path', { d: d, class: 'arrow ' + (a.cls || ''), 'marker-end': 'url(#' + id + ')' }));
+    if (a.label) kids.push(Viz.s('text', { x: (x1 + x2) / 2, y: y + 66, 'text-anchor': 'middle', class: 'lbl', text: a.label }));
+  });
+  var svgEl = Viz.svg(width, height, kids); svgEl.style.minWidth = Math.min(width, 600) + 'px';
+  body.appendChild(svgEl);
+  if (o.note !== false) body.appendChild(Viz.note('এখানে 0xc000012000-এর মতো address গুলো বোঝানোর জন্য বানানো; আসল address প্রতিবার run করলে আলাদা হয়।'));
+}
+function out(body, lines) {
+  body.appendChild(E('div', { class: 'out', html: lines && lines.length ? lines.map(function (l) { return esc(l); }).join('<br>') : '<i>(প্রোগ্রামের output এখানে আসবে)</i>' }));
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function chips(items) { return E('div', { class: 'hdrs' }, items.map(function (c) { return E('span', { class: 'chip ' + (c.cls || ''), text: c.text }); })); }
+
+document.getElementById('legend').appendChild(Viz.legend([{cls:'hit',label:'যেটা বদলানো হচ্ছে'},{cls:'range',label:'receiver / loop-এর copy'},{cls:'found',label:'ইচ্ছে করেই অপরিবর্তিত'}]));
+
+function cell(name, value, addr, cls) { return { name: name, value: value, addr: addr, cls: cls || '' }; }
+function render(st, i, body) { mem(body, st.cells, st.arrows || []); if (st.out) out(body, st.out); }
+multi([
+ { name: 'Value vs pointer receiver', desc: 'একই body (c.n++), আলাদা receiver, একদম আলাদা ফল।',
+   code: ['type Counter struct{ n int }', '', 'func (c Counter) IncValue()    { c.n++ }', 'func (c *Counter) IncPointer() { c.n++ }', '', 'func main() {', '    c := Counter{}', '    c.IncValue()', '    c.IncPointer()', '}'],
+   render: render,
+   steps: function () {
+     var CA = '0xc000014000';
+     return [
+      { line: 6, text: 'c একটা Counter, যার n = 0।', cells: [cell('c (Counter)', 'n = 0', CA, 'hit')] },
+      { line: 7, text: 'c.IncValue(): receiver এখানে একটা value, তাই Go c-এর একটা COPY বানিয়ে সেটা method-কে দেয়।', cells: [cell('c (main)', 'n = 0', CA), cell('c (IncValue-এর ভেতরের copy)', 'n = 0', '0xc000014020', 'range')] },
+      { line: 2, text: 'Method-এর ভেতরে c.n++ শুধু copy-টাকে বদলায়।', cells: [cell('c (main)', 'n = 0', CA, 'found'), cell('c (IncValue-এর ভেতরের copy)', 'n = 1', '0xc000014020', 'hit')] },
+      { line: 7, text: 'Method return করে এবং copy-টা ফেলে দেওয়া হয়। caller-এর c.n এখনো 0: বাড়ানোটা হারিয়ে গেল।', cells: [cell('c (main)', 'n = 0', CA, 'found')] },
+      { line: 8, text: 'c.IncPointer(): receiver এখানে একটা pointer। Go নিজেই &c (আসল c-এর address) pass করে; আপনাকে & লিখতে হয়নি।', cells: [cell('c (main)', 'n = 0', CA), cell('c (IncPointer-এর *Counter)', CA, '0xc000014020', 'range')], arrows: [{ from: 1, to: 0 }] },
+      { line: 3, text: 'c.n++ তীর ধরে গিয়ে আসল c-কে বদলায়।', cells: [cell('c (main)', 'n = 1', CA, 'hit'), cell('c (IncPointer-এর *Counter)', CA, '0xc000014020', 'range')], arrows: [{ from: 1, to: 0 }] },
+      { line: 8, text: 'ফলাফল: শুধু pointer-receiver-এর call-টাই c বদলেছে। কোনো method struct বদলাতে চাইলে pointer receiver ব্যবহার করুন।', cells: [cell('c (main)', 'n = 1', CA, 'found')] }
+     ];
+   } },
+ { name: 'range copies struct elements', desc: '"for _, c := range"-এর loop variable প্রতিটা element-এর একটা copy।',
+   code: ['type Counter struct{ n int }', 'counters := []Counter{{1}, {2}}', 'for _, c := range counters {', '    c.n++            // changes the copy', '}', 'for i := range counters {', '    counters[i].n++  // changes the element', '}'],
+   render: render,
+   steps: function () {
+     function E3(a, b, c, ca, cb, cc) { var cells = [cell('counters[0]', 'n = ' + a, '0xc000016000', ca || ''), cell('counters[1]', 'n = ' + b, '0xc000016008', cb || '')]; if (c !== null) cells.push(cell('c (loop-এর copy)', 'n = ' + c, '0xc000012080', cc || 'range')); return cells; }
+     return [
+      { line: 1, text: 'দুটো Counter struct-এর একটা slice: n = 1 আর n = 2।', cells: E3(1, 2, null) },
+      { line: 2, text: 'প্রথম loop, iteration 1: c হলো counters[0]-এর COPY।', cells: E3(1, 2, 1) },
+      { line: 3, text: 'c.n++ শুধু copy-টাকে বদলায় (n = 2)। counters[0] এখনো 1।', cells: E3(1, 2, 2, 'found', '', 'hit') },
+      { line: 2, text: 'Iteration 2: c-এর ওপর counters[1]-এর copy বসে যায়।', cells: E3(1, 2, 2) },
+      { line: 3, text: 'c.n++ আবারও copy-টাকে বদলায় (n = 3)। slice অপরিবর্তিত।', cells: E3(1, 2, 3, '', 'found', 'hit') },
+      { line: 4, text: 'প্রথম loop কিছুই বদলায়নি: slice-এ এখনো 1 আর 2।', cells: E3(1, 2, null, 'found', 'found') },
+      { line: 6, text: 'দ্বিতীয় loop: counters[i] আসল element-টাকে বোঝায়, তাই counters[0].n++ সেটাকে 2 করে দেয়।', cells: E3(2, 2, null, 'hit', '') },
+      { line: 6, text: 'আর counters[1].n++ সেটাকে 3 করে দেয়। element বদলাতে হলে slice-এ index করুন (বা pointer-এর slice ব্যবহার করুন)।', cells: E3(2, 3, null, '', 'hit') }
+     ];
+   } }
+]);
+
+})();
+</script>
+</body>
+</html>

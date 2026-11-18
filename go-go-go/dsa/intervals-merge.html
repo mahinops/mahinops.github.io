@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Merge overlapping intervals on a number line: sort by start, then sweep and extend or start a new interval.">
+<title>Merge Intervals - visual</title>
+<link rel="stylesheet" href="../assets/viz.css">
+<style>.bar { stroke-width: 2; } .bar.todo { fill: var(--range); stroke: var(--range-line); } .bar.cur { fill: var(--hit); stroke: var(--hit-line); } .bar.done { fill: var(--dim); stroke: var(--cell-line); } .bar.merged { fill: var(--found); stroke: var(--found-line); }</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/intervals-merge.html">বাংলা</a></nav>
+  <h1>Merge Intervals</h1>
+  <p class="lead">Combine time ranges that overlap into the fewest ranges possible.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea (calendar meetings)</h2>
+    <p>You have meetings at 1&ndash;3, 2&ndash;6 and 8&ndash;10. The first two overlap, so your calendar really shows one busy block from 1 to 6, plus 8&ndash;10. Merging intervals does that for any list.</p>
+    <p>The trick is to <b>sort by start time first</b>. Then overlapping ranges become neighbors, and one left-to-right sweep is enough:</p>
+    <ul>
+      <li>Keep a list <b>merged</b>. Start it with the first interval.</li>
+      <li>For each next interval, compare its <b>start</b> with the <b>end of the last merged interval</b>.</li>
+      <li>If start &le; that end, they overlap: <b>stretch</b> the last interval&rsquo;s end to the larger of the two ends.</li>
+      <li>Otherwise there is a gap: <b>start a new</b> merged interval.</li>
+    </ul>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Intervals (start-end), 1 to 8 of them, numbers 0 to 30<input id="iv" value="8-10, 1-3, 15-18, 2-6" size="36"></label>
+    <button id="go">Run</button>
+  </div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul>
+      <li>Type the intervals in a jumbled order (the default is). Does the sort make the sweep work?</li>
+      <li>Try <code>1-10, 2-3, 4-5</code>. When the new interval is completely <i>inside</i> the last one, why must we use <code>max</code> for the end?</li>
+      <li>Try <code>1-3, 3-5</code>. They only touch at 3. Does this code merge them?</li>
+      <li>Try intervals with gaps everywhere, like <code>1-2, 4-5, 7-8</code>.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul>
+      <li><b>Forgetting to sort.</b> Overlapping intervals might not be neighbors, and the sweep silently gives a wrong answer.</li>
+      <li><b>Setting the end to <code>cur[1]</code> instead of <code>max(last[1], cur[1])</code>.</b> An interval nested inside another would shrink the result.</li>
+      <li><b>Off-by-one on touching ranges.</b> Whether <code>[1,3]</code> and <code>[3,5]</code> merge depends on <code>&lt;=</code> versus <code>&lt;</code>. Read the problem statement.</li>
+      <li><b>Empty input.</b> <code>intervals[0]</code> panics on an empty slice, so check the length first.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, in plain English:</b> sorting costs the most, about n&nbsp;log&nbsp;n steps (<code>O(n log n)</code>). The sweep afterwards is a single pass (<code>O(n)</code>).
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var CODE = [
+  'func merge(intervals [][]int) [][]int {',                // 0
+  '    sort.Slice(intervals, func(i, j int) bool {',        // 1
+  '        return intervals[i][0] < intervals[j][0]',       // 2
+  '    })',                                                 // 3
+  '    merged := [][]int{intervals[0]}',                    // 4
+  '    for _, cur := range intervals[1:] {',                // 5
+  '        last := merged[len(merged)-1]',                  // 6
+  '        if cur[0] <= last[1] {',                         // 7
+  '            last[1] = max(last[1], cur[1])',             // 8
+  '        } else {',                                       // 9
+  '            merged = append(merged, cur)',               // 10
+  '        }',                                              // 11
+  '    }',                                                  // 12
+  '    return merged',                                      // 13
+  '}',                                                      // 14
+];
+
+function parseIntervals(str) {
+  var parts = str.split(',').map(function (s) { return s.trim(); }).filter(Boolean), out = [], m;
+  if (!parts.length) return { error: 'Type at least one interval, for example: 1-3' };
+  if (parts.length > 8) return { error: 'Please use at most 8 intervals.' };
+  for (var i = 0; i < parts.length; i++) {
+    m = /^(\d+)\s*-\s*(\d+)$/.exec(parts[i]);
+    if (!m) return { error: 'I do not understand "' + parts[i] + '". Write intervals like 1-3.' };
+    var a = +m[1], b = +m[2];
+    if (a > 30 || b > 30) return { error: 'Please keep numbers between 0 and 30.' };
+    if (a > b) return { error: 'In "' + parts[i] + '" the start is bigger than the end.' };
+    out.push([a, b]);
+  }
+  return { intervals: out };
+}
+
+function genMerge(input) {
+  var steps = [], rows = input.map(function (iv) { return [iv[0], iv[1]]; }), merged = [], i;
+  function snap(text, line, cur, doneUpTo) {
+    steps.push({
+      text: text, line: line,
+      rows: rows.map(function (r) { return [r[0], r[1]]; }),
+      merged: merged.map(function (r) { return [r[0], r[1]]; }),
+      cur: cur === undefined ? -1 : cur,
+      done: doneUpTo === undefined ? -1 : doneUpTo,
+    });
+  }
+  snap('These are the intervals exactly as given. Notice they are not in order.', 0);
+  rows.sort(function (x, y) { return x[0] - y[0] || x[1] - y[1]; });
+  snap('Sort them by start. Now any intervals that overlap must be next to each other.', [1, 2, 3]);
+  merged.push([rows[0][0], rows[0][1]]);
+  snap('Start the merged list with the first interval [' + rows[0][0] + ', ' + rows[0][1] + '].', 4, 0, 0);
+  for (i = 1; i < rows.length; i++) {
+    var cur = rows[i], last = merged[merged.length - 1];
+    if (cur[0] <= last[1]) {
+      var oldEnd = last[1], newEnd = Math.max(last[1], cur[1]);
+      snap('Look at [' + cur[0] + ', ' + cur[1] + ']. Its start ' + cur[0] + ' is <= the end of the last merged interval (' + last[1] + '), so they overlap.', [5, 6, 7], i, i - 1);
+      last[1] = newEnd;
+      snap('Stretch the last interval: its end becomes max(' + oldEnd + ', ' + cur[1] + ') = ' + newEnd + '. The merged interval is now [' + last[0] + ', ' + last[1] + '].', 8, i, i);
+    } else {
+      snap('Look at [' + cur[0] + ', ' + cur[1] + ']. Its start ' + cur[0] + ' is > the end of the last merged interval (' + last[1] + '): there is a gap, so no overlap.', [5, 6, 7], i, i - 1);
+      merged.push([cur[0], cur[1]]);
+      snap('Start a new merged interval [' + cur[0] + ', ' + cur[1] + '].', [9, 10], i, i);
+    }
+  }
+  snap('Done. The result has ' + merged.length + ' interval' + (merged.length === 1 ? '' : 's') + ': ' + merged.map(function (m) { return '[' + m[0] + ', ' + m[1] + ']'; }).join(', ') + '.', 13, -1, rows.length - 1);
+  return { steps: steps, merged: merged };
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+  var MAXV = 30;
+
+  function chart(st) {
+    var u = 17, padL = 12, padT = 10, rowH = 26, k = st.rows.length;
+    var W = padL * 2 + MAXV * u + 20, H = padT + (k + 1) * rowH + 70, parts = [], x;
+    function X(v) { return padL + v * u; }
+    for (x = 0; x <= MAXV; x++) {
+      parts.push(Viz.s('line', { x1: X(x), y1: padT, x2: X(x), y2: H - 30, style: 'stroke:var(--line);stroke-width:' + (x % 5 === 0 ? 1.5 : 0.5) + 'px' }));
+      if (x % 5 === 0) parts.push(Viz.s('text', { x: X(x), y: H - 14, 'text-anchor': 'middle', 'font-size': 11, text: String(x) }));
+    }
+    st.rows.forEach(function (r, i) {
+      var cls = 'todo';
+      if (i === st.cur) cls = 'cur'; else if (i <= st.done) cls = 'done';
+      parts.push(Viz.s('rect', { class: 'bar ' + cls, x: X(r[0]), y: padT + i * rowH + 3, width: Math.max((r[1] - r[0]) * u, 8), height: rowH - 8, rx: 6 }));
+      parts.push(Viz.s('text', { x: X(r[0]) + 5, y: padT + i * rowH + 17, 'font-size': 11, text: r[0] + '-' + r[1] }));
+    });
+    parts.push(Viz.s('line', { x1: padL, y1: padT + k * rowH + 2, x2: W - padL, y2: padT + k * rowH + 2, style: 'stroke:var(--cell-line);stroke-width:1px;stroke-dasharray:4 3' }));
+    st.merged.forEach(function (r) {
+      parts.push(Viz.s('rect', { class: 'bar merged', x: X(r[0]), y: padT + k * rowH + 8, width: Math.max((r[1] - r[0]) * u, 8), height: rowH - 8, rx: 6 }));
+      parts.push(Viz.s('text', { x: X(r[0]) + 5, y: padT + k * rowH + 22, 'font-size': 11, text: r[0] + '-' + r[1] }));
+    });
+    parts.push(Viz.s('text', { x: padL, y: padT + (k + 1) * rowH + 22, 'font-size': 12, 'font-weight': 700, text: 'merged result (below the dashed line)' }));
+    return Viz.svg(W, H, parts);
+  }
+
+  function render(st, i, body) {
+    body.appendChild(chart(st));
+    body.appendChild(Viz.note('Top rows: the input intervals. Bottom row: the merged result so far.'));
+  }
+
+  function run() {
+    errBox.textContent = '';
+    var p = parseIntervals(document.getElementById('iv').value);
+    if (p.error) { errBox.textContent = p.error; return; }
+    app.innerHTML = '';
+    var st = Viz.stepper({ mount: app, code: CODE, render: render });
+    st.load(genMerge(p.intervals).steps);
+  }
+
+  document.getElementById('legend').appendChild(Viz.legend([
+    { cls: 'range', label: 'waiting to be looked at' }, { cls: 'hit', label: 'interval being compared' }, { cls: 'dim', label: 'already handled' }, { cls: 'found', label: 'merged result' },
+  ]));
+  document.getElementById('go').addEventListener('click', run);
+  run();
+})();
+</script>
+</body>
+</html>

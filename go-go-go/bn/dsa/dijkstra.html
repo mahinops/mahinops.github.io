@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Dijkstra কীভাবে priority queue ব্যবহার করে রাস্তার দৈর্ঘ্য মেনে সবচেয়ে কম খরচের path খুঁজে পায়, তা step by step দেখুন।">
+<title>Dijkstra's Shortest Path</title>
+<link rel="stylesheet" href="../../assets/viz.css">
+<style>.viz-cell { width: auto; min-width: 46px; padding: 0 8px; } .viz-col { min-width: 46px; }</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">← সব visual</a> · <a href="../../dsa/dijkstra.html">English</a></nav>
+  <h1>Dijkstra&rsquo;s Shortest Path</h1>
+  <p class="lead">রাস্তার দৈর্ঘ্য আলাদা হলে এক জায়গা থেকে বাকি সব জায়গায় যাওয়ার সবচেয়ে কম খরচের পথ।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা (GPS)</h2>
+    <p>BFS সবচেয়ে কম রাস্তা দিয়ে যাওয়া path খুঁজে পায়, কিন্তু বাস্তবে রাস্তার দৈর্ঘ্য আলাদা আলাদা। Dijkstra খুঁজে পায় সবচেয়ে কম <b>মোট দৈর্ঘ্যের</b> path। এটা প্রতিটি জায়গার <b>এখন পর্যন্ত জানা সেরা distance</b> একটি খাতায় লিখে রাখে, শুরুতে start ছাড়া সব জায়গায় &infin; (অজানা), আর start-এ 0।</p>
+    <ol>
+      <li>যে জায়গার কাজ এখনো শেষ হয়নি, তার মধ্যে <b>সবচেয়ে ছোট</b> জানা distance যার, সেটা বেছে নিন। এর চেয়ে ভালো কিছু হতে পারে না, কারণ অন্য যেকোনো route-কে এমন একটি জায়গা দিয়ে আসতে হবে যা ইতিমধ্যে আরও দূরে। তাই এর distance <b>final</b>।</li>
+      <li>সেখান থেকে প্রতিটি রাস্তা try করুন: <i>এখন পর্যন্ত distance + রাস্তার দৈর্ঘ্য</i> কি neighbor-এর জন্য খাতায় লেখা মানের চেয়ে ছোট? হলে edge-টি <b>relax</b> করুন, অর্থাৎ খাতা update করুন।</li>
+      <li>কিছু বাকি না থাকা পর্যন্ত বারবার করুন।</li>
+    </ol>
+    <p>"সবচেয়ে ছোটটা বেছে নেওয়া" ধাপটা একটি <b>priority queue</b> (min-heap, heap page দেখুন)। এর জন্য প্রতিটি রাস্তার দৈর্ঘ্য অবশ্যই <b>positive</b> হতে হবে।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+    <label>রাস্তা (a-b:দৈর্ঘ্য)<input id="edges" value="0-1:4, 0-2:1, 2-1:2, 1-3:1, 2-3:5, 3-4:3" size="44"></label>
+    <label>Start node<input id="start" value="0" size="4"></label>
+    <button id="go">Run</button>
+  </div>
+  <div class="viz-note">রাস্তা দুই দিকেই কাজ করে। Node গুলোর নম্বর 0, 1, 2, ... এভাবে, ফাঁক ছাড়া (সর্বোচ্চ 10টি node, 15টি রাস্তা)। দৈর্ঘ্য 1 থেকে 99-এর মধ্যে integer।</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul>
+      <li>Default graph দেখুন। সরাসরি রাস্তা 0&ndash;1-এর দৈর্ঘ্য 4, কিন্তু node 1-এর উত্তর 3। কোন route জিতছে?</li>
+      <li><code>0-1:4</code> বদলে <code>0-1:2</code> করুন এবং আবার run করুন। কী বদলায়?</li>
+      <li>বাকিদের সাথে রাস্তা নেই এমন node রাখুন, যেমন <code>0-1:1, 2-3:1</code> (start 0)। 2 আর 3-এর distance কী থাকে?</li>
+      <li>"stale entry" ধাপটা খেয়াল করুন: যে node আগেই ভালো distance পেয়ে গেছে, তার জন্য queue-তে পুরনো, বড় distance-এর entry থেকে যেতে পারে।</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul>
+      <li><b>Negative রাস্তার দৈর্ঘ্য।</b> Dijkstra ধরে নেয় যে শেষ হয়ে যাওয়া node-এর distance আর কমানো যাবে না। Negative edge এই ধারণা ভেঙে দেয় (এর বদলে Bellman-Ford ব্যবহার করুন)।</li>
+      <li><b>stale check ভুলে যাওয়া।</b> <code>if cur.dist &gt; dist[cur.node] { continue }</code> না থাকলে পুরনো queue entry-র জন্য একই কাজ আবার করতে হয়।</li>
+      <li><b>সাধারণ queue ব্যবহার করা।</b> এটাকে সবসময় <i>সবচেয়ে ছোট</i> distance ফেরত দিতে হবে, সবচেয়ে পুরনো entry নয়।</li>
+      <li><b>0-কে "infinity" ধরা।</b> অজানা distance-এর জন্য খুব বড় একটি সংখ্যা (অথবা presence check সহ map) ব্যবহার করুন।</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, সহজ ভাষায়:</b> প্রতিটি রাস্তা priority queue-তে সর্বোচ্চ একটি entry যোগ করতে পারে, আর প্রতিটি queue operation-এর খরচ প্রায় log(entry-সংখ্যা)। তাই time complexity প্রায় <code>O((V + E) log V)</code>। বড় map-এও এটা দ্রুত, তবে distance আর queue-র জন্য memory লাগে।
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var CODE = [
+  'func dijkstra(graph map[int][]Edge, start int) map[int]int {',   // 0
+  '    dist := map[int]int{start: 0}',                              // 1
+  '    pq := &PriorityQueue{{node: start, dist: 0}}',               // 2
+  '    for pq.Len() > 0 {',                                         // 3
+  '        cur := heap.Pop(pq).(Item)',                             // 4
+  '        if cur.dist > dist[cur.node] {',                         // 5
+  '            continue // stale entry',                            // 6
+  '        }',                                                      // 7
+  '        for _, e := range graph[cur.node] {',                    // 8
+  '            nd := cur.dist + e.weight',                          // 9
+  '            if d, ok := dist[e.to]; !ok || nd < d {',            // 10
+  '                dist[e.to] = nd',                                // 11
+  '                heap.Push(pq, Item{node: e.to, dist: nd})',      // 12
+  '            }',                                                  // 13
+  '        }',                                                      // 14
+  '    }',                                                          // 15
+  '    return dist',                                                // 16
+  '}',                                                              // 17
+];
+
+function parseWGraph(str) {
+  var parts = str.split(',').map(function (s) { return s.trim(); }).filter(Boolean), edges = [], seen = {}, ids = {}, maxId = -1, m;
+  if (!parts.length) return { error: 'অন্তত একটি রাস্তা লিখুন, যেমন: 0-1:4' };
+  if (parts.length > 15) return { error: 'সর্বোচ্চ 15টি রাস্তা ব্যবহার করুন।' };
+  for (var i = 0; i < parts.length; i++) {
+    m = /^(\d+)\s*-\s*(\d+)\s*:\s*(\d+)$/.exec(parts[i]);
+    if (!m) return { error: 'বুঝতে পারছি না: "' + parts[i] + '"। রাস্তা এভাবে লিখুন: 0-1:4 (node 0 আর 1, দৈর্ঘ্য 4)।' };
+    var a = +m[1], b = +m[2], w = +m[3];
+    if (a === b) return { error: 'রাস্তা "' + parts[i] + '" একটি node-কে তার নিজের সাথেই জোড়া লাগিয়েছে। এটি সরিয়ে দিন।' };
+    if (a > 9 || b > 9) return { error: 'Node-এর নম্বর 0 থেকে 9-এর মধ্যে হতে হবে।' };
+    if (w < 1 || w > 99) return { error: 'রাস্তার দৈর্ঘ্য 1 থেকে 99-এর মধ্যে হতে হবে (Dijkstra-র জন্য positive দৈর্ঘ্য লাগে)।' };
+    var key = Math.min(a, b) + '-' + Math.max(a, b);
+    if (seen[key]) return { error: 'রাস্তা ' + key + ' দুইবার দেওয়া হয়েছে। একটি রাখুন।' };
+    seen[key] = true; ids[a] = ids[b] = true; maxId = Math.max(maxId, a, b);
+    edges.push({ a: a, b: b, w: w });
+  }
+  for (var k = 0; k <= maxId; k++) if (!ids[k]) return { error: 'Node ' + k + ' পাওয়া যাচ্ছে না। Node গুলোর নম্বর 0, 1, 2, ... এভাবে, ফাঁক ছাড়া হতে হবে।' };
+  var n = maxId + 1, adj = [];
+  for (var j = 0; j < n; j++) adj.push([]);
+  edges.forEach(function (e) { adj[e.a].push({ to: e.b, w: e.w }); adj[e.b].push({ to: e.a, w: e.w }); });
+  adj.forEach(function (l) { l.sort(function (x, y) { return x.to - y.to; }); });
+  return { n: n, adj: adj, edges: edges };
+}
+
+function genDijkstra(n, adj, start) {
+  var INF = Infinity, dist = [], fin = [], pq = [], steps = [], i;
+  for (i = 0; i < n; i++) { dist.push(INF); fin.push(false); }
+  function snap(text, line, cur, edge, changed) {
+    steps.push({ text: text, line: line, cur: cur === undefined ? null : cur, edge: edge || null, changed: changed === undefined ? -1 : changed, dist: dist.slice(), fin: fin.slice(), pq: pq.map(function (p) { return { d: p.d, node: p.node }; }) });
+  }
+  function pushPQ(d, node) {
+    pq.push({ d: d, node: node });
+    pq.sort(function (x, y) { return x.d - y.d || x.node - y.node; });
+  }
+  dist[start] = 0; pushPQ(0, start);
+  snap('সব distance শুরুতে ∞ (অজানা), শুধু start node ' + start + '-এর distance 0। Priority queue-তে (distance 0, node ' + start + ') রাখুন।', [1, 2], start, null, start);
+  while (pq.length) {
+    var cur = pq.shift();
+    if (cur.d > dist[cur.node]) {
+      snap('Pop (' + cur.d + ', node ' + cur.node + ') priority queue থেকে pop করা হলো। কিন্তু node ' + cur.node + '-এর আরও ভালো distance (' + dist[cur.node] + ') আগে থেকেই আছে, তাই এই entry stale। Skip করুন।', [4, 5, 6], cur.node);
+      continue;
+    }
+    fin[cur.node] = true;
+    snap('সবচেয়ে ছোট entry pop করুন: node ' + cur.node + ', distance ' + cur.d + '। অন্য কোনো route এটাকে হারাতে পারে না, তাই ' + cur.d + ' হলো node ' + cur.node + '-এর final distance। এবার এখান থেকে বেরোনো প্রতিটি রাস্তা try করুন।', 4, cur.node);
+    adj[cur.node].forEach(function (e) {
+      var nd = cur.d + e.w, old = dist[e.to];
+      var edge = [cur.node, e.to];
+      if (nd < old) {
+        dist[e.to] = nd; pushPQ(nd, e.to);
+        snap('রাস্তা ' + cur.node + '→' + e.to + ' (দৈর্ঘ্য ' + e.w + '): ' + cur.d + ' + ' + e.w + ' = ' + nd + (old === INF ? ', ∞-এর চেয়ে ভালো' : ', ছোট হয়েছে; আগে ছিল ' + old) + '। Update করুন: dist[' + e.to + '] = ' + nd + ', আর queue-তে যোগ করুন (' + nd + ', node ' + e.to + ')।', [8, 9, 10, 11, 12], cur.node, edge, e.to);
+      } else {
+        snap('রাস্তা ' + cur.node + '→' + e.to + ' (দৈর্ঘ্য ' + e.w + '): ' + cur.d + ' + ' + e.w + ' = ' + nd + ', যা বর্তমান ' + old + '-এর চেয়ে ভালো নয়। ' + old + ' থাকবে।', [8, 9, 10], cur.node, edge);
+      }
+    });
+  }
+  snap('Queue খালি। Distance গুলো এখন final।' + (dist.some(function (d) { return d === INF; }) ? ' যে node গুলো এখনো ∞, সেগুলোতে start থেকে পৌঁছানো যায় না।' : ''), 16, null);
+  return { steps: steps, dist: dist };
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+  var G = null;
+  function show(d) { return d === Infinity ? '∞' : String(d); }
+
+  function graphSvg(st) {
+    var n = G.n, W = 420, H = 330, cx0 = 210, cy0 = 165, R = n === 1 ? 0 : 115, r = 20, parts = [];
+    function pos(i) { var ang = -Math.PI / 2 + (2 * Math.PI * i) / n; return { x: cx0 + R * Math.cos(ang), y: cy0 + R * Math.sin(ang) }; }
+    G.edges.forEach(function (e) {
+      var p = pos(e.a), q = pos(e.b);
+      var hl = st.edge && ((st.edge[0] === e.a && st.edge[1] === e.b) || (st.edge[0] === e.b && st.edge[1] === e.a));
+      parts.push(Viz.s('line', { class: 'edge' + (hl ? ' hit' : ''), x1: p.x, y1: p.y, x2: q.x, y2: q.y }));
+    });
+    G.edges.forEach(function (e) {
+      var p = pos(e.a), q = pos(e.b), mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2;
+      var dx = q.x - p.x, dy = q.y - p.y, len = Math.sqrt(dx * dx + dy * dy) || 1;
+      parts.push(Viz.s('text', { x: mx - dy / len * 9, y: my + dx / len * 9 + 4, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 700, style: 'paint-order:stroke;stroke:var(--card);stroke-width:4px', text: String(e.w) }));
+    });
+    var inPQ = st.pq.map(function (x) { return x.node; });
+    for (var i = 0; i < n; i++) {
+      var p2 = pos(i), cls = 'node';
+      if (i === st.cur) cls += ' hit'; else if (st.fin[i]) cls += ' found'; else if (inPQ.indexOf(i) !== -1) cls += ' range';
+      parts.push(Viz.s('circle', { class: cls, cx: p2.x, cy: p2.y, r: r }));
+      parts.push(Viz.s('text', { x: p2.x, y: p2.y + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, text: String(i) }));
+      parts.push(Viz.s('text', { x: p2.x, y: p2.y + r + 15, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 700, style: 'paint-order:stroke;stroke:var(--card);stroke-width:4px', text: 'd=' + show(st.dist[i]) }));
+    }
+    return Viz.svg(W, H, parts);
+  }
+
+  function render(st, i, body) {
+    body.appendChild(graphSvg(st));
+    var cls = {};
+    st.dist.forEach(function (_, k) { if (st.fin[k]) cls[k] = 'found'; });
+    if (st.changed >= 0) cls[st.changed] = 'hit';
+    body.appendChild(Viz.array(st.dist.map(show), { title: 'dist[node]  (start থেকে এখন পর্যন্ত জানা সেরা distance)', classes: cls }));
+    var pqc = {}, pqm = {};
+    if (st.pq.length) { pqc[0] = 'hit'; pqm[0] = 'next out'; }
+    body.appendChild(Viz.array(st.pq.map(function (p) { return '(' + p.d + ',' + p.node + ')'; }), { title: 'priority queue  (distance, node), ছোটটা আগে', indexes: false, classes: pqc, marks: pqm }));
+    if (!st.pq.length) body.appendChild(Viz.note('(queue খালি)'));
+  }
+
+  function run() {
+    errBox.textContent = '';
+    var g = parseWGraph(document.getElementById('edges').value);
+    if (g.error) { errBox.textContent = g.error; return; }
+    var sv = document.getElementById('start').value.trim();
+    if (!/^\d+$/.test(sv) || +sv >= g.n) { errBox.textContent = 'Start node অবশ্যই 0 থেকে ' + (g.n - 1) + '-এর মধ্যে একটি integer হতে হবে।'; return; }
+    G = g;
+    app.innerHTML = '';
+    var st = Viz.stepper({ mount: app, code: CODE, render: render });
+    st.load(genDijkstra(g.n, g.adj, +sv).steps);
+  }
+
+  document.getElementById('legend').appendChild(Viz.legend([
+    { cls: 'hit', label: 'যে node-এ কাজ হচ্ছে / এইমাত্র update হয়েছে' }, { cls: 'range', label: 'priority queue-তে আছে' }, { cls: 'found', label: 'distance final' },
+  ]));
+  document.getElementById('go').addEventListener('click', run);
+  run();
+})();
+</script>
+</body>
+</html>

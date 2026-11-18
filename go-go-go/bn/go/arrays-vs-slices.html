@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arrays vs Slices</title>
+<meta name="description" content="Slice-কে একটা ছোট header (pointer, length, capacity) হিসেবে দেখুন, যা একটা backing array-র ওপর বসানো: append, growth, aliasing আর 3-index slice।">
+<link rel="stylesheet" href="../../assets/viz.css">
+<style>
+.viz-layout{grid-template-columns:minmax(0,1fr)}
+.viz-stage,.viz-code{min-width:0;max-width:100%}
+@media (max-width:760px){.viz-layout.viz-has-code{grid-template-columns:minmax(0,1fr)}}
+body{overflow-x:hidden}
+.viz-svg .ah{fill:var(--accent)}
+.viz-svg .arrow{fill:none;stroke:var(--accent);stroke-width:2.5}
+.viz-svg .arrow.bad{stroke:var(--bad-line)}
+.viz-svg .node.bad{fill:var(--bad);stroke:var(--bad-line)}
+.viz-svg .node.nilp{stroke-dasharray:5 4}
+.viz-svg .nm{font-size:12px;fill:var(--muted)}
+.viz-svg .val{font-size:17px;font-weight:700}
+.viz-svg .ad{font-size:10px;fill:var(--muted)}
+.viz-svg .val.small{font-size:12px}
+.viz-svg .lbl{font-size:12px;fill:var(--accent);font-weight:700}
+.viz-cell.spare{background:transparent;border-style:dashed;color:var(--muted)}
+.hdrs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.chip{border:2px solid var(--cell-line);background:var(--cell);border-radius:10px;padding:4px 10px;font:600 13px var(--mono)}
+.chip.hit{background:var(--hit);border-color:var(--hit-line)}
+.chip.found{background:var(--found);border-color:var(--found-line)}
+.chip.dim{opacity:.45}
+.chip.bad{background:var(--bad);border-color:var(--bad-line)}
+.stackcol{display:flex;flex-direction:column-reverse;gap:6px;max-width:420px}
+.frame{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:6px 10px;font:13px var(--mono)}
+.frame b{display:block;margin-bottom:2px}
+.frame.hit{background:var(--hit);border-color:var(--hit-line)}
+.frame.found{background:var(--found);border-color:var(--found-line)}
+.frame.bad{background:var(--bad);border-color:var(--bad-line)}
+.frame.dim{opacity:.55}
+.out{font:13px var(--mono);background:var(--code-bg);color:var(--code-ink);padding:8px 10px;border-radius:8px;min-height:2.2em;white-space:pre-wrap;margin-top:10px}
+.out i{color:#6b7a90;font-style:normal}
+.row2{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.lane{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:8px 12px;min-width:170px;font:13px var(--mono)}
+.lane h4{margin:0 0 4px;font:700 13px var(--sans)}
+.lane.hit{background:var(--hit);border-color:var(--hit-line)}
+.lane.found{background:var(--found);border-color:var(--found-line)}
+.lane.bad{background:var(--bad);border-color:var(--bad-line)}
+.lane.dim{opacity:.55}
+.slots{display:flex;gap:6px}
+.slot{width:44px;height:44px;border:2px dashed var(--cell-line);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 15px var(--mono)}
+.slot.full{border-style:solid;background:var(--range);border-color:var(--range-line)}
+.iface{display:inline-flex;border:2px solid var(--cell-line);border-radius:10px;overflow:hidden;background:var(--cell);margin:4px 10px 4px 0}
+.iface div{padding:6px 10px;font:600 13px var(--mono)}
+.iface .t{background:var(--dim)}
+.iface.hit{background:var(--hit);border-color:var(--hit-line)}
+.iface.found{background:var(--found);border-color:var(--found-line)}
+.iface.bad{background:var(--bad);border-color:var(--bad-line)}
+.bar{height:20px;border-radius:5px;background:var(--range);border:2px solid var(--range-line);transition:width .3s}
+.bar.hit{background:var(--hit);border-color:var(--hit-line)}
+.bar.found{background:var(--found);border-color:var(--found-line)}
+.bar.dim{background:var(--dim);border-color:transparent}
+.tl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;align-items:center;font:13px var(--mono)}
+.tree{font:13px var(--mono)} .tree .tn{border:2px solid var(--cell-line);border-radius:8px;padding:4px 8px;margin:4px 0;background:var(--cell);display:inline-block}
+.tree .tn.bad{background:var(--bad);border-color:var(--bad-line)} .tree .tn.hit{background:var(--hit);border-color:var(--hit-line)} .tree .tn.found{background:var(--found);border-color:var(--found-line)}
+.tree ul{list-style:none;margin:0;padding-left:26px;border-left:2px solid var(--line)}
+.arrrow{margin:6px 0 14px}.cap{font:12px var(--mono);color:var(--muted)}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; সব visual</a> · <a href="../../go/arrays-vs-slices.html">English</a></nav>
+  <h1>Arrays vs Slices</h1>
+  <p class="lead">Slice হলো একটা ছোট <b>জানালা</b> (pointer, length, capacity), যা অন্য কোথাও থাকা একটা array-র দিকে তাকিয়ে আছে।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা</h2>
+    <p><b>Array</b> হলো locker-এর একটা fixed সারি: <code>[3]int</code> মানে ঠিক 3 টা locker, সবসময়ের জন্য। আর copy করলে ভেতরের সবকিছু copy হয়।</p>
+ <p><b>Slice</b> হলো locker-এর সারির ওপর বসানো একটা স্বচ্ছ ফ্রেম। ফ্রেমটা তিনটা জিনিস মনে রাখে: <b>কোথায় শুরু</b> (ptr), <b>কতগুলো locker দেখা যায়</b> (len), আর <b>শুরু থেকে সারির শেষ পর্যন্ত মোট কতগুলো locker আছে</b> (cap)। দুটো ফ্রেম একই সারির ওপর বসতে পারে, তাই একটার মাধ্যমে বদলালে অন্যটাতেও সেটা দেখা যায়। <code>append</code>-এর জায়গা শেষ হয়ে গেলে Go একটা বড় সারি বানায়, সবকিছু সেখানে copy করে এবং ফ্রেমটাকে নতুন সারিতে সরিয়ে দেয়।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+    <label>উদাহরণ<select id="sc"></select></label>
+    <span id="inputs" style="display:contents"></span>
+    <button id="run">Run</button>
+  </div>
+  <p class="viz-note" id="scdesc"></p>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul><li>&ldquo;append আর growth&rdquo; উদাহরণে <code>cap = len</code> দিয়ে শুরু করুন আর একবার append করুন: নতুন array তৈরি হতে দেখুন।</li><li>&ldquo;Aliasing&rdquo; উদাহরণে কিছু না বদলিয়ে ধাপে ধাপে দেখুন, আর খুঁজে বের করুন কোন ধাপে <code>a</code> বদলে যায়, অথচ আমরা শুধু <code>b</code>-তে হাত দিয়েছি।</li><li>&ldquo;Full slice expression&rdquo; উদাহরণটা aliasing-এর সাথে মিলিয়ে দেখুন: এবার <code>a</code> কেন বদলায় না?</li><li>append-এর সংখ্যা 9 করুন আর capacity গুলো পড়ুন। প্রতিবারই কি বাড়ে?</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul><li>ভাবা যে <code>b := a[1:3]</code> data copy করে। আসলে করে না; এটা একই array share করে।</li><li>Sub-slice-এ append করলে আসল slice-এর পরের element গুলো চুপচাপ overwrite হয়ে যেতে পারে (Aliasing উদাহরণ দেখুন)।</li><li><code>s = append(s, x)</code> লিখতে ভুলে যাওয়া: append নতুন slice return করে; সেটা ধরে না রাখলে ফলাফল হারিয়ে যায়।</li><li>ঠিক কত capacity হবে তার ওপর নির্ভর করা। ছোট slice-এ আজকাল দ্বিগুণ হতে দেখা যায়, কিন্তু এটা runtime-এর ভেতরের ব্যাপার, Go-র এক version থেকে আরেক version-এ বদলে যেতে পারে।</li></ul>
+  </div>
+
+  <div class="pagenav"><a href="pointers.html">&larr; Pointers</a><a href="maps.html">Maps &rarr;</a></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script>
+(function () {
+
+var E = Viz.el;
+/* ---- scenarios + dynamic inputs ---- */
+function multi(scenarios) {
+  var mount = Viz.$('#app'), sel = Viz.$('#sc'), inputsBox = Viz.$('#inputs'), err = Viz.$('#err'), desc = Viz.$('#scdesc');
+  var cur = 0, store = {}, pendingStep = null;
+  var hm = location.hash.match(/sc=(\d+)(?:&step=(\d+))?/);
+  if (hm && scenarios[+hm[1]]) { cur = +hm[1]; pendingStep = hm[2] ? +hm[2] : null; }
+  window.I = function (id) { var n = document.getElementById('in_' + id); return n ? n.value : ''; };
+  window.N = function (id, lo, hi) {
+    var raw = I(id).trim(); var v = Number(raw);
+    if (raw === '' || isNaN(v)) throw new Error('"' + id + '" অবশ্যই একটা সংখ্যা হতে হবে।');
+    if (lo !== undefined && v < lo) throw new Error('"' + id + '" অন্তত ' + lo + ' হতে হবে।');
+    if (hi !== undefined && v > hi) throw new Error('"' + id + '" সর্বোচ্চ ' + hi + ' পর্যন্ত হতে পারে।');
+    return Math.floor(v) === v ? v : Math.floor(v);
+  };
+  scenarios.forEach(function (sc, i) { sel.appendChild(E('option', { value: String(i), text: sc.name })); });
+  function buildInputs() {
+    inputsBox.innerHTML = '';
+    (scenarios[cur].inputs || []).forEach(function (inp) {
+      var key = cur + ':' + inp.id;
+      var val = store[key] !== undefined ? store[key] : inp.value;
+      var ctl;
+      if (inp.options) {
+        ctl = E('select', { id: 'in_' + inp.id }, inp.options.map(function (o) { return E('option', { value: o[0], text: o[1] }); }));
+        ctl.value = val;
+      } else {
+        ctl = E('input', { id: 'in_' + inp.id, value: val, size: inp.size || 10 });
+      }
+      ctl.addEventListener('change', function () { store[key] = ctl.value; show(); });
+      inputsBox.appendChild(E('label', { text: inp.label }, [ctl]));
+    });
+  }
+  function show() {
+    var sc = scenarios[cur];
+    err.textContent = '';
+    mount.innerHTML = '';
+    desc.textContent = sc.desc || '';
+    var steps;
+    try { steps = sc.steps(); } catch (e) { err.textContent = e.message; return; }
+    var st = Viz.stepper({ mount: mount, code: typeof sc.code === 'function' ? sc.code() : sc.code, render: sc.render });
+    st.load(steps);
+    if (pendingStep !== null) { st.go(pendingStep); pendingStep = null; }
+  }
+  sel.addEventListener('change', function () { cur = +sel.value; buildInputs(); show(); });
+  Viz.$('#run').addEventListener('click', function () { show(); });
+  sel.value = String(cur); buildInputs(); show();
+  if (location.hash === '#test') {
+    var log = [];
+    scenarios.forEach(function (sc, k) {
+      try {
+        cur = k; buildInputs();
+        var steps = sc.steps(), code = typeof sc.code === 'function' ? sc.code() : sc.code, tmp = document.createElement('div');
+        if (!steps.length) throw new Error('no steps');
+        steps.forEach(function (stp, j) {
+          tmp.innerHTML = ''; sc.render(stp, j, tmp);
+          if (!tmp.firstChild) throw new Error('empty render at step ' + j);
+          [].concat(stp.line === undefined ? [] : stp.line).forEach(function (ln) { if (!(ln >= 0 && ln < code.length)) throw new Error('bad line ' + ln + ' at step ' + j); });
+          if (!stp.text) throw new Error('no text at step ' + j);
+        });
+        log.push('OK   ' + sc.name + ' (' + steps.length + ' steps)');
+      } catch (e) { log.push('FAIL ' + sc.name + ': ' + e.message); }
+    });
+    cur = 0; sel.value = '0'; buildInputs(); show();
+    document.body.appendChild(E('pre', { id: 'testresult', text: log.join('\n') }));
+  }
+}
+
+/* ---- memory diagram: boxes + arrows (illustrative addresses) ---- */
+var _mid = 0;
+function mem(body, cells, arrows, o) {
+  o = o || {};
+  var W = 124, H = 70, G = 34, X0 = 12, Y0 = 12, n = Math.max(cells.length, 1), id = 'ah' + (++_mid);
+  var width = X0 * 2 + n * W + (n - 1) * G, hasA = arrows && arrows.length, height = Y0 + H + (hasA ? 92 : 14);
+  var kids = [Viz.s('defs', {}, [Viz.s('marker', { id: id, viewBox: '0 0 10 10', refX: '8', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto' }, [Viz.s('path', { d: 'M0,0L10,5L0,10z', class: 'ah' })])])];
+  cells.forEach(function (c, i) {
+    var x = X0 + i * (W + G);
+    kids.push(Viz.s('rect', { x: x, y: Y0, width: W, height: H, rx: 10, class: 'node ' + (c.cls || '') }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 17, 'text-anchor': 'middle', class: 'nm', text: c.name }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 42, 'text-anchor': 'middle', class: 'val' + (String(c.value).length > 8 ? ' small' : ''), text: String(c.value) }));
+    if (c.addr) kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 62, 'text-anchor': 'middle', class: 'ad', text: c.addr }));
+  });
+  (arrows || []).forEach(function (a) {
+    var x1 = X0 + a.from * (W + G) + W / 2, x2 = X0 + a.to * (W + G) + W / 2, y = Y0 + H, d;
+    if (a.from === a.to) { x1 -= 22; x2 += 22; d = 'M' + x1 + ',' + y + ' C' + (x1 - 10) + ',' + (y + 55) + ' ' + (x2 + 10) + ',' + (y + 55) + ' ' + x2 + ',' + (y + 3); }
+    else d = 'M' + x1 + ',' + y + ' C' + x1 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 4);
+    kids.push(Viz.s('path', { d: d, class: 'arrow ' + (a.cls || ''), 'marker-end': 'url(#' + id + ')' }));
+    if (a.label) kids.push(Viz.s('text', { x: (x1 + x2) / 2, y: y + 66, 'text-anchor': 'middle', class: 'lbl', text: a.label }));
+  });
+  var svgEl = Viz.svg(width, height, kids); svgEl.style.minWidth = Math.min(width, 600) + 'px';
+  body.appendChild(svgEl);
+  if (o.note !== false) body.appendChild(Viz.note('এখানে 0xc000012000-এর মতো address গুলো বোঝানোর জন্য বানানো; আসল address প্রতিবার run করলে আলাদা হয়।'));
+}
+function out(body, lines) {
+  body.appendChild(E('div', { class: 'out', html: lines && lines.length ? lines.map(function (l) { return esc(l); }).join('<br>') : '<i>(প্রোগ্রামের output এখানে আসবে)</i>' }));
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function chips(items) { return E('div', { class: 'hdrs' }, items.map(function (c) { return E('span', { class: 'chip ' + (c.cls || ''), text: c.text }); })); }
+
+document.getElementById('legend').appendChild(Viz.legend([{cls:'range',label:'slice দিয়ে দেখা যায় (len)'},{cls:'spare',label:'বাড়তি জায়গা (cap, কিন্তু len-এ নেই)'},{cls:'hit',label:'এইমাত্র লেখা হয়েছে'},{cls:'dim',label:'পুরনো array, এই slice আর ব্যবহার করছে না'}]));
+
+function render(st, i, body) {
+  body.appendChild(chips(st.slices.map(function (s) {
+    return { text: s.name + ' = [ptr → ' + st.arrays[s.arr].name + '[' + s.off + '] | len ' + s.len + ' | cap ' + s.cap + ']', cls: s.cls || '' };
+  })));
+  st.arrays.forEach(function (ar, ai) {
+    var classes = {}, marks = {};
+    ar.vals.forEach(function (_, k) { classes[k] = ar.dead ? 'dim' : 'spare'; });
+    st.slices.forEach(function (s) {
+      if (s.arr !== ai) return;
+      for (var k = s.off; k < s.off + s.len; k++) classes[k] = ar.dead ? 'dim' : 'range';
+      marks[s.off] = (marks[s.off] || []).concat(s.name);
+    });
+    if (st.hit && st.hit.arr === ai) st.hit.idx.forEach(function (k) { classes[k] = 'hit'; });
+    var wrap = E('div', { class: 'arrrow' });
+    body.appendChild(Viz.array(ar.vals, { marks: marks, classes: classes, title: ar.name + (ar.dead ? ' (পুরনো)' : '') + (ar.note ? ' - ' + ar.note : '') }));
+  });
+  if (st.out) out(body, st.out);
+}
+function A(name, vals, extra) { return Object.assign({ name: name, vals: vals.slice() }, extra || {}); }
+function S(name, arr, off, len, cap, cls) { return { name: name, arr: arr, off: off, len: len, cap: cap, cls: cls }; }
+multi([
+ { name: 'append আর growth', desc: 'যতক্ষণ বাড়তি জায়গা আছে, append সেখানেই লেখে। জায়গা না থাকলে Go একটা বড় array বানিয়ে সব copy করে।',
+   inputs: [{ id: 'len', label: 'make-এর len', value: '3', size: 4 }, { id: 'cap', label: 'make-এর cap', value: '3', size: 4 }, { id: 'n', label: 'append করার সংখ্যা', value: '3', size: 4 }],
+   code: function () { return ['s := make([]int, ' + I('len') + ', ' + I('cap') + ')', 'for i := 1; i <= ' + I('n') + '; i++ {', '    s = append(s, i*10)', '}']; },
+   render: render,
+   steps: function () {
+     var L = N('len', 0, 6), C = N('cap', 0, 8), n = N('n', 1, 9);
+     if (C < L) throw new Error('cap অবশ্যই len-এর সমান বা বেশি হতে হবে।');
+     var vals = []; for (var i = 0; i < C; i++) vals.push(0);
+     var arrays = [A('arr1', vals)], cur = 0, len = L, cap = C, steps = [];
+     function snap(text, line, hit) {
+       steps.push({ line: line, text: text, arrays: arrays.map(function (a) { return Object.assign({}, a, { vals: a.vals.slice() }); }), slices: [S('s', cur, 0, len, cap)], hit: hit });
+     }
+     snap('make([]int, ' + L + ', ' + C + ') একটা array বানায় যেখানে ' + C + ' টা zero আছে, আর একটা slice header: len ' + L + ' (দেখা যায়), cap ' + C + '।', 0);
+     for (var k = 1; k <= n; k++) {
+       if (len < cap) {
+         arrays[cur].vals[len] = k * 10; len++;
+         snap('append #' + k + ': জায়গা আছে (len ' + (len - 1) + ' < cap ' + cap + '), তাই ' + (k * 10) + ' আগের array-তেই লেখা হয় এবং len হয় ' + len + '। একই array, কিছু copy হয়নি।', 2, { arr: cur, idx: [len - 1] });
+       } else {
+         var newCap = cap === 0 ? 1 : cap * 2;
+         var nv = arrays[cur].vals.slice(0, len); while (nv.length < newCap) nv.push(0);
+         arrays[cur].dead = true;
+         arrays.push(A('arr' + (arrays.length + 1), nv, { note: 'নতুন, বড়' }));
+         cur = arrays.length - 1; cap = newCap;
+         snap('append #' + k + ': জায়গা শেষ (len = cap)। Go একটা বড় array বানায় (cap ' + newCap + ', ছোট slice-এ সাধারণত দ্বিগুণ হয়) এবং আগের ' + len + ' টা element সেখানে copy করে। পুরনো array আর ব্যবহার হয় না।', 2, { arr: cur, idx: [] });
+         arrays[cur].vals[len] = k * 10; len++;
+         snap('এবার জায়গা আছে: ' + (k * 10) + ' নতুন array-তে লেখা হয়। len ' + len + ', cap ' + cap + '।', 2, { arr: cur, idx: [len - 1] });
+       }
+     }
+     return steps;
+   } },
+ { name: 'Aliasing (shared array)', desc: 'Sub-slice আসলটার সাথে memory share করে। একটার মাধ্যমে লিখলে অন্যটাতে সেটা দেখা যায়, append করলেও।',
+   code: ['a := []int{1, 2, 3, 4, 5}', 'b := a[1:3]            // [2 3]', 'b[0] = 99', 'b = append(b, 100)', 'fmt.Println(a, b)'],
+   render: render,
+   steps: function () {
+     var v = [1, 2, 3, 4, 5];
+     function ar(vs) { return [A('arr', vs)]; }
+     return [
+      { line: 0, text: 'a একটা slice, যেটা 5 element-এর একটা array-র ওপর বসানো: len 5, cap 5।', arrays: ar(v), slices: [S('a', 0, 0, 5, 5)], out: [] },
+      { line: 1, text: 'b := a[1:3] কিছুই copy করে না। b শুধু একটা নতুন header: index 1 থেকে শুরু, len 2, cap 4 (index 1 থেকে array-র শেষ পর্যন্ত)।', arrays: ar(v), slices: [S('a', 0, 0, 5, 5), S('b', 0, 1, 2, 4, 'hit')], out: [] },
+      { line: 2, text: 'b[0] = 99 array-র index 1-এ লেখে, যেটা a-ও দেখতে পায়। এখন a[1] হলো 99।', arrays: ar([1, 99, 3, 4, 5]), slices: [S('a', 0, 0, 5, 5), S('b', 0, 1, 2, 4)], hit: { arr: 0, idx: [1] }, out: [] },
+      { line: 3, text: 'append(b, 100): b-এর জায়গা বাকি আছে (len 2, cap 4), তাই Go array-র index 3-এ লেখে। ফলে a যে 4 দেখছিল সেটা overwrite হয়ে যায়!', arrays: ar([1, 99, 3, 100, 5]), slices: [S('a', 0, 0, 5, 5), S('b', 0, 1, 3, 4)], hit: { arr: 0, idx: [3] }, out: [] },
+      { line: 4, text: 'ফলাফল: a = [1 99 3 100 5], b = [99 3 100]। b-তে append করায় a বদলে গেছে। প্রায় সবাই একবার এতে অবাক হয়।', arrays: ar([1, 99, 3, 100, 5]), slices: [S('a', 0, 0, 5, 5), S('b', 0, 1, 3, 4)], out: ['[1 99 3 100 5] [99 3 100]'] }
+     ];
+   } },
+ { name: 'Full slice expression a[1:3:3]', desc: 'তৃতীয় সংখ্যাটা capacity সীমিত করে দেয়, তাই append overwrite না করে copy করতে বাধ্য হয়।',
+   code: ['a := []int{1, 2, 3, 4, 5}', 'c := a[1:3:3]          // len 2, cap 2', 'c = append(c, 77)', 'fmt.Println(a, c)'],
+   render: render,
+   steps: function () {
+     var v = [1, 2, 3, 4, 5];
+     return [
+      { line: 0, text: 'a, 5 element-এর একটা array-র ওপর।', arrays: [A('arr1', v)], slices: [S('a', 0, 0, 5, 5)], out: [] },
+      { line: 1, text: 'a[1:3:3]: শুরু 1, শেষ 3, আর capacity limit 3। তাই c মাত্র 2 টা element দেখে এবং তার cap-ও 2: বাড়তি জায়গা নেই।', arrays: [A('arr1', v)], slices: [S('a', 0, 0, 5, 5), S('c', 0, 1, 2, 2, 'hit')], out: [] },
+      { line: 2, text: 'append(c, 77): c ভর্তি, তাই Go একটা নতুন array বানায় (cap 4), [2 3] copy করে আর 77 যোগ করে। আসল array অপরিবর্তিত থাকে।', arrays: [A('arr1', v), A('arr2', [2, 3, 77, 0], { note: 'নতুন' })], slices: [S('a', 0, 0, 5, 5), S('c', 1, 0, 3, 4, 'hit')], hit: { arr: 1, idx: [2] }, out: [] },
+      { line: 3, text: 'a এখনো [1 2 3 4 5]। append যাতে পাশের element overwrite না করে, সেজন্য 3-index form ব্যবহার করা হয়।', arrays: [A('arr1', v), A('arr2', [2, 3, 77, 0], { note: 'নতুন' })], slices: [S('a', 0, 0, 5, 5), S('c', 1, 0, 3, 4)], out: ['[1 2 3 4 5] [2 3 77]'] }
+     ];
+   } },
+ { name: 'Array copy হয়, slice share করে', desc: 'Array হলো value: assignment করলে প্রতিটা element copy হয়। কিন্তু array-র slice সেই একই array share করে।',
+   code: ['arr := [3]int{1, 2, 3}', 'arr2 := arr          // copies all 3', 'arr2[0] = 9', 'sl := arr[:]         // slice over arr', 'sl[1] = 8'],
+   render: render,
+   steps: function () {
+     return [
+      { line: 0, text: 'arr হলো ঠিক 3 টা int-এর একটা fixed array।', arrays: [A('arr', [1, 2, 3])], slices: [] },
+      { line: 1, text: 'arr2 := arr পুরো array-টা copy করে দ্বিতীয় একটা স্বাধীন array বানায়।', arrays: [A('arr', [1, 2, 3]), A('arr2', [1, 2, 3])], slices: [] },
+      { line: 2, text: 'arr2[0] = 9 শুধু arr2-কে বদলায়।', arrays: [A('arr', [1, 2, 3]), A('arr2', [9, 2, 3])], slices: [], hit: { arr: 1, idx: [0] } },
+      { line: 3, text: 'sl := arr[:] arr-এর ওপরেই একটা slice header বানায়। কোনো copy হয় না।', arrays: [A('arr', [1, 2, 3]), A('arr2', [9, 2, 3])], slices: [S('sl', 0, 0, 3, 3, 'hit')] },
+      { line: 4, text: 'sl[1] = 8 arr-এ লেখে, তাই arr হয়ে যায় [1 8 3]। arr2 প্রভাবিত হয় না।', arrays: [A('arr', [1, 8, 3]), A('arr2', [9, 2, 3])], slices: [S('sl', 0, 0, 3, 3)], hit: { arr: 0, idx: [1] } }
+     ];
+   } }
+]);
+
+})();
+</script>
+</body>
+</html>

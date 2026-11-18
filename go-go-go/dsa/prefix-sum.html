@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prefix Sum - visual</title>
+<meta name="description" content="Pre-compute running totals once so the sum of any range can be answered instantly.">
+<link rel="stylesheet" href="../assets/viz.css">
+<style>.stat{font:14px var(--mono);margin:4px 0}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/prefix-sum.html">বাংলা</a></nav>
+  <h1>Prefix Sum</h1>
+  <p class="lead">Do one pass up front so every later question takes a single subtraction.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea</h2>
+    <p>Think of a bank statement showing a <b>running balance</b> after every transaction. How much did you spend between transaction 3 and transaction 6? You do not re-add the spending: you take the balance after #6 and subtract the balance before #3.</p>
+<p>A <b>prefix sum</b> array <code>p</code> is that running balance: <code>p[i]</code> is the sum of the first <code>i</code> numbers. The sum of <code>nums[l..r]</code> is then <code>p[r+1] &minus; p[l]</code>. We add one extra slot <code>p[0] = 0</code> (the sum of nothing) so the formula works even when <code>l</code> is 0.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+  <label>Numbers<input id="arr" value="3, 1, 4, 1, 5, 9, 2, 6"></label>
+  <label>l (start index)<input id="l" value="2" size="4"></label>
+  <label>r (end index)<input id="r" value="5" size="4"></label>
+  <button id="go">Run</button>
+</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul><li>Query <code>l = 0, r = 0</code>. Which two prefix cells are used, and why is <code>p[0] = 0</code> needed?</li><li>Query the whole list (<code>l = 0</code>, <code>r =</code> last index). Which single prefix cell holds the total?</li><li>Add negative numbers (like <code>5, -2, 7</code>). The method still works. Why?</li><li>Count the work: building is one pass, but a query is always just one subtraction no matter how wide the range.</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul><li><b>Forgetting the extra leading 0:</b> without <code>p[0] = 0</code> the range starting at index 0 needs a special case.</li><li><b>Off-by-one:</b> for an <i>inclusive</i> range <code>[l, r]</code> the formula is <code>p[r+1] - p[l]</code>, not <code>p[r] - p[l]</code>.</li><li><b>Using it when the data changes:</b> if values are updated often, the stored prefixes go stale. (That calls for a Fenwick tree.)</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">How fast is it?</h2>
+    <p><b>Build: O(n)</b> time once. <b>Each query: O(1)</b>. Space: O(n) for the prefix array. Without it, every query would re-add up to n numbers (O(n) each).</p>
+  </div>
+
+  <div class="pagenav"><a href="hash-map-two-sum.html">&larr; Hash Map: Two Sum</a><a href="stack-valid-parentheses.html">Stack: Valid Parentheses &rarr;</a></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script id="algo">
+
+function prefixSteps(nums, l, r) {
+  var steps = [], p = [0];
+  function snap(line, text, extra) { steps.push(Object.assign({ nums: nums, p: p.slice(), l: l, r: r, line: line, text: text }, extra || {})); }
+  snap(1, 'Make p with one extra slot. p[0] = 0 because the sum of zero numbers is 0.', { cur: 0 });
+  for (var i = 0; i < nums.length; i++) {
+    p.push(p[i] + nums[i]);
+    snap(3, 'p[' + (i + 1) + '] = p[' + i + '] + nums[' + i + '] = ' + p[i] + ' + ' + nums[i] + ' = ' + p[i + 1] + '.', { cur: i + 1, srcNum: i });
+  }
+  snap(5, 'The prefix array is built. p[i] = the sum of the first i numbers. This took one pass.', { cur: -1, built: true });
+  snap(9, 'Now a question: what is the sum of nums[' + l + '..' + r + ']?', { cur: -1, built: true, query: true });
+  var ans = p[r + 1] - p[l];
+  snap(10, 'rangeSum = p[' + (r + 1) + '] - p[' + l + '] = ' + p[r + 1] + ' - ' + p[l] + ' = ' + ans + '. One subtraction, no loop!', { cur: -1, built: true, query: true, answer: ans, result: ans });
+  return steps;
+}
+
+</script>
+<script id="ui">
+
+function $id(x) { return document.getElementById(x); }
+function showErr(m) { $id('err').textContent = m || ''; }
+var current = null;
+function mountStepper(opts) {
+  if (current) current.pause();
+  var app = $id('app'); app.innerHTML = ''; app.className = '';
+  current = Viz.stepper(Object.assign({ mount: '#app' }, opts));
+  return current;
+}
+function setLegend(items) { var l = $id('legend'); l.innerHTML = ''; l.appendChild(Viz.legend(items)); }
+function mark(marks, ix, label) { marks[ix] = (marks[ix] || []).concat(label); }
+
+
+var CODE = ['func buildPrefix(nums []int) []int {',
+'    p := make([]int, len(nums)+1)',
+'    for i, n := range nums {',
+'        p[i+1] = p[i] + n',
+'    }',
+'    return p',
+'}',
+'',
+'// sum of nums[l..r], both inclusive',
+'func rangeSum(p []int, l, r int) int {',
+'    return p[r+1] - p[l]',
+'}'];
+function render(st, i, body) {
+  var c1 = {}, c2 = {}, m2 = {};
+  st.nums.forEach(function (_, ix) { c1[ix] = st.query ? ((ix >= st.l && ix <= st.r) ? 'range' : 'dim') : 'range'; });
+  if (st.srcNum !== undefined) c1[st.srcNum] = 'hit';
+  st.p.forEach(function (_, ix) { c2[ix] = 'range'; });
+  if (st.cur >= 0) c2[st.cur] = 'hit';
+  if (st.answer !== undefined) { c2[st.r + 1] = 'found'; c2[st.l] = 'bad'; mark(m2, st.r + 1, 'p[r+1]'); mark(m2, st.l, 'p[l]'); }
+  var pc = st.p.slice(); while (pc.length < st.nums.length + 1) pc.push(null);
+  for (var q = st.p.length; q < pc.length; q++) c2[q] = 'dim';
+  body.appendChild(Viz.array(st.nums, { classes: c1, title: 'nums' }));
+  body.appendChild(Viz.array(pc, { classes: c2, marks: m2, title: 'p (prefix sums)' }));
+  if (st.answer !== undefined) body.appendChild(Viz.el('div', { class: 'stat', html: 'p[' + (st.r + 1) + '] &minus; p[' + st.l + '] = ' + st.p[st.r + 1] + ' &minus; ' + st.p[st.l] + ' = <b>' + st.answer + '</b>' }));
+  if (st.answer !== undefined) {
+    var check = 0; for (var k = st.l; k <= st.r; k++) check += st.nums[k];
+    body.appendChild(Viz.note('Check by adding the highlighted numbers one by one: ' + st.nums.slice(st.l, st.r + 1).join(' + ') + ' = ' + check));
+  }
+}
+function run() {
+  showErr('');
+  var nums = Viz.parseNums($id('arr').value), l = Number($id('l').value), r = Number($id('r').value);
+  if (!nums.length || nums.length > 12) { showErr('Enter between 1 and 12 numbers.'); return; }
+  if (!Number.isInteger(l) || !Number.isInteger(r) || l < 0 || r < l || r >= nums.length) { showErr('Need whole numbers with 0 <= l <= r <= ' + (nums.length - 1) + '.'); return; }
+  setLegend([{ cls: 'hit', label: 'being filled' }, { cls: 'range', label: 'in the query range / filled' }, { cls: 'bad', label: 'p[l] (subtracted)' }, { cls: 'found', label: 'p[r+1]' }, { cls: 'dim', label: 'not yet / outside' }]);
+  mountStepper({ code: CODE, render: render }).load(prefixSteps(nums, l, r));
+}
+$id('go').addEventListener('click', run);
+run();
+
+</script>
+</body>
+</html>

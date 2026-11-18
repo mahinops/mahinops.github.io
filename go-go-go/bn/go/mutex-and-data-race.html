@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mutex and Data Race</title>
+<meta name="description" content="দুটো goroutine কীভাবে counter++ করতে গিয়ে একটা update হারিয়ে ফেলে (data race) এবং Mutex কীভাবে সেটা ঠিক করে, তা ধাপে ধাপে দেখুন।">
+<link rel="stylesheet" href="../../assets/viz.css">
+<style>
+.viz-layout{grid-template-columns:minmax(0,1fr)}
+.viz-stage,.viz-code{min-width:0;max-width:100%}
+@media (max-width:760px){.viz-layout.viz-has-code{grid-template-columns:minmax(0,1fr)}}
+body{overflow-x:hidden}
+.viz-svg .ah{fill:var(--accent)}
+.viz-svg .arrow{fill:none;stroke:var(--accent);stroke-width:2.5}
+.viz-svg .arrow.bad{stroke:var(--bad-line)}
+.viz-svg .node.bad{fill:var(--bad);stroke:var(--bad-line)}
+.viz-svg .node.nilp{stroke-dasharray:5 4}
+.viz-svg .nm{font-size:12px;fill:var(--muted)}
+.viz-svg .val{font-size:17px;font-weight:700}
+.viz-svg .ad{font-size:10px;fill:var(--muted)}
+.viz-svg .val.small{font-size:12px}
+.viz-svg .lbl{font-size:12px;fill:var(--accent);font-weight:700}
+.viz-cell.spare{background:transparent;border-style:dashed;color:var(--muted)}
+.hdrs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.chip{border:2px solid var(--cell-line);background:var(--cell);border-radius:10px;padding:4px 10px;font:600 13px var(--mono)}
+.chip.hit{background:var(--hit);border-color:var(--hit-line)}
+.chip.found{background:var(--found);border-color:var(--found-line)}
+.chip.dim{opacity:.45}
+.chip.bad{background:var(--bad);border-color:var(--bad-line)}
+.stackcol{display:flex;flex-direction:column-reverse;gap:6px;max-width:420px}
+.frame{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:6px 10px;font:13px var(--mono)}
+.frame b{display:block;margin-bottom:2px}
+.frame.hit{background:var(--hit);border-color:var(--hit-line)}
+.frame.found{background:var(--found);border-color:var(--found-line)}
+.frame.bad{background:var(--bad);border-color:var(--bad-line)}
+.frame.dim{opacity:.55}
+.out{font:13px var(--mono);background:var(--code-bg);color:var(--code-ink);padding:8px 10px;border-radius:8px;min-height:2.2em;white-space:pre-wrap;margin-top:10px}
+.out i{color:#6b7a90;font-style:normal}
+.row2{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.lane{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:8px 12px;min-width:170px;font:13px var(--mono)}
+.lane h4{margin:0 0 4px;font:700 13px var(--sans)}
+.lane.hit{background:var(--hit);border-color:var(--hit-line)}
+.lane.found{background:var(--found);border-color:var(--found-line)}
+.lane.bad{background:var(--bad);border-color:var(--bad-line)}
+.lane.dim{opacity:.55}
+.slots{display:flex;gap:6px}
+.slot{width:44px;height:44px;border:2px dashed var(--cell-line);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 15px var(--mono)}
+.slot.full{border-style:solid;background:var(--range);border-color:var(--range-line)}
+.iface{display:inline-flex;border:2px solid var(--cell-line);border-radius:10px;overflow:hidden;background:var(--cell);margin:4px 10px 4px 0}
+.iface div{padding:6px 10px;font:600 13px var(--mono)}
+.iface .t{background:var(--dim)}
+.iface.hit{background:var(--hit);border-color:var(--hit-line)}
+.iface.found{background:var(--found);border-color:var(--found-line)}
+.iface.bad{background:var(--bad);border-color:var(--bad-line)}
+.bar{height:20px;border-radius:5px;background:var(--range);border:2px solid var(--range-line);transition:width .3s}
+.bar.hit{background:var(--hit);border-color:var(--hit-line)}
+.bar.found{background:var(--found);border-color:var(--found-line)}
+.bar.dim{background:var(--dim);border-color:transparent}
+.tl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;align-items:center;font:13px var(--mono)}
+.tree{font:13px var(--mono)} .tree .tn{border:2px solid var(--cell-line);border-radius:8px;padding:4px 8px;margin:4px 0;background:var(--cell);display:inline-block}
+.tree .tn.bad{background:var(--bad);border-color:var(--bad-line)} .tree .tn.hit{background:var(--hit);border-color:var(--hit-line)} .tree .tn.found{background:var(--found);border-color:var(--found-line)}
+.tree ul{list-style:none;margin:0;padding-left:26px;border-left:2px solid var(--line)}
+.mstep{display:block;margin:3px 0;padding:2px 6px;border-radius:6px}.mstep.done{opacity:.55}.mstep.now{background:var(--hit);outline:2px solid var(--hit-line)}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; সব visual</a> · <a href="../../go/mutex-and-data-race.html">English</a></nav>
+  <h1>Mutex and Data Race</h1>
+  <p class="lead"><code>counter++</code> একটা একক কাজ নয়। এটা <b>read, add, write</b>, আর দুটো goroutine এই ধাপগুলো এলোমেলোভাবে মিশিয়ে ফেলতে পারে।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা</h2>
+    <p>দুজন মানুষ একটা whiteboard share করছে, যেখানে লেখা 0। প্রত্যেকে করে &ldquo;সংখ্যাটা পড়ো, মনে মনে 1 যোগ করো, উত্তরটা আবার লিখে দাও&rdquo;। দুজনেই যদি কেউ লেখার আগেই 0 পড়ে ফেলে, তাহলে দুজনেই 1 লিখবে, আর একটা increment <b>হারিয়ে যাবে</b>। বোর্ডে হবে 1, 2 নয়।</p>
+ <p>এটাই <b>data race</b>: দুটো goroutine একই সময়ে একই variable ছুঁয়ে আছে এবং কমপক্ষে একজন লিখছে। <b>Mutex</b> (mutual exclusion lock) হলো একটা কলম যেটা একসময় একজনই ধরতে পারে: কলমটা নাও (<code>Lock</code>), পুরো read-add-write শেষ করো, তারপর ফেরত দাও (<code>Unlock</code>)। কলম খালি না হওয়া পর্যন্ত আর কেউ শুরু করতে পারে না।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+    <label>উদাহরণ<select id="sc"></select></label>
+    <span id="inputs" style="display:contents"></span>
+    <button id="run">Run</button>
+  </div>
+  <p class="viz-note" id="scdesc"></p>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul><li>&ldquo;আপনার নিজের interleaving&rdquo; উদাহরণে <code>1 1 1 2 2 2</code> (কোনো overlap নেই) দিন, তারপর <code>1 2 2 1 1 2</code>। কোন order-এ update হারায়?</li><li>&ldquo;Mutex দিয়ে ঠিক করা&rdquo; উদাহরণে blocked ধাপগুলো দেখুন: G1 unlock না করা পর্যন্ত G2 কেন পড়তে পারে না?</li><li>একটা আসল program <code>go run -race .</code> দিয়ে run করুন, তাহলে Go নিজেই race-টা report করবে।</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul><li>ভাবা যে <code>counter++</code> atomic। এটা নয়; <code>sync.Mutex</code> বা <code>sync/atomic</code> ব্যবহার করুন।</li><li><code>Unlock</code> করতে ভুলে যাওয়া (<code>Lock</code>-এর ঠিক পরেই <code>defer mu.Unlock()</code> লিখুন), যার ফলে বাকি সব goroutine আটকে যায়।</li><li>Mutex আছে এমন struct copy করা। এর বদলে pointer pass করুন।</li><li>একটা program test pass করেও race নিয়ে থাকতে পারে। <code>go test -race ./...</code> run করুন; race detector <code>WARNING: DATA RACE</code> print করে।</li></ul>
+  </div>
+
+  <div class="pagenav"><a href="select-and-timeouts.html">&larr; Select and Timeouts</a><a href="waitgroup-and-worker-pool.html">WaitGroup and Worker Pool &rarr;</a></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script>
+(function () {
+
+var E = Viz.el;
+/* ---- scenarios + dynamic inputs ---- */
+function multi(scenarios) {
+  var mount = Viz.$('#app'), sel = Viz.$('#sc'), inputsBox = Viz.$('#inputs'), err = Viz.$('#err'), desc = Viz.$('#scdesc');
+  var cur = 0, store = {}, pendingStep = null;
+  var hm = location.hash.match(/sc=(\d+)(?:&step=(\d+))?/);
+  if (hm && scenarios[+hm[1]]) { cur = +hm[1]; pendingStep = hm[2] ? +hm[2] : null; }
+  window.I = function (id) { var n = document.getElementById('in_' + id); return n ? n.value : ''; };
+  window.N = function (id, lo, hi) {
+    var raw = I(id).trim(); var v = Number(raw);
+    if (raw === '' || isNaN(v)) throw new Error('"' + id + '" অবশ্যই একটা সংখ্যা হতে হবে।');
+    if (lo !== undefined && v < lo) throw new Error('"' + id + '" অন্তত ' + lo + ' হতে হবে।');
+    if (hi !== undefined && v > hi) throw new Error('"' + id + '" সর্বোচ্চ ' + hi + ' পর্যন্ত হতে পারে।');
+    return Math.floor(v) === v ? v : Math.floor(v);
+  };
+  scenarios.forEach(function (sc, i) { sel.appendChild(E('option', { value: String(i), text: sc.name })); });
+  function buildInputs() {
+    inputsBox.innerHTML = '';
+    (scenarios[cur].inputs || []).forEach(function (inp) {
+      var key = cur + ':' + inp.id;
+      var val = store[key] !== undefined ? store[key] : inp.value;
+      var ctl;
+      if (inp.options) {
+        ctl = E('select', { id: 'in_' + inp.id }, inp.options.map(function (o) { return E('option', { value: o[0], text: o[1] }); }));
+        ctl.value = val;
+      } else {
+        ctl = E('input', { id: 'in_' + inp.id, value: val, size: inp.size || 10 });
+      }
+      ctl.addEventListener('change', function () { store[key] = ctl.value; show(); });
+      inputsBox.appendChild(E('label', { text: inp.label }, [ctl]));
+    });
+  }
+  function show() {
+    var sc = scenarios[cur];
+    err.textContent = '';
+    mount.innerHTML = '';
+    desc.textContent = sc.desc || '';
+    var steps;
+    try { steps = sc.steps(); } catch (e) { err.textContent = e.message; return; }
+    var st = Viz.stepper({ mount: mount, code: typeof sc.code === 'function' ? sc.code() : sc.code, render: sc.render });
+    st.load(steps);
+    if (pendingStep !== null) { st.go(pendingStep); pendingStep = null; }
+  }
+  sel.addEventListener('change', function () { cur = +sel.value; buildInputs(); show(); });
+  Viz.$('#run').addEventListener('click', function () { show(); });
+  sel.value = String(cur); buildInputs(); show();
+  if (location.hash === '#test') {
+    var log = [];
+    scenarios.forEach(function (sc, k) {
+      try {
+        cur = k; buildInputs();
+        var steps = sc.steps(), code = typeof sc.code === 'function' ? sc.code() : sc.code, tmp = document.createElement('div');
+        if (!steps.length) throw new Error('no steps');
+        steps.forEach(function (stp, j) {
+          tmp.innerHTML = ''; sc.render(stp, j, tmp);
+          if (!tmp.firstChild) throw new Error('empty render at step ' + j);
+          [].concat(stp.line === undefined ? [] : stp.line).forEach(function (ln) { if (!(ln >= 0 && ln < code.length)) throw new Error('bad line ' + ln + ' at step ' + j); });
+          if (!stp.text) throw new Error('no text at step ' + j);
+        });
+        log.push('OK   ' + sc.name + ' (' + steps.length + ' steps)');
+      } catch (e) { log.push('FAIL ' + sc.name + ': ' + e.message); }
+    });
+    cur = 0; sel.value = '0'; buildInputs(); show();
+    document.body.appendChild(E('pre', { id: 'testresult', text: log.join('\n') }));
+  }
+}
+
+/* ---- memory diagram: boxes + arrows (illustrative addresses) ---- */
+var _mid = 0;
+function mem(body, cells, arrows, o) {
+  o = o || {};
+  var W = 124, H = 70, G = 34, X0 = 12, Y0 = 12, n = Math.max(cells.length, 1), id = 'ah' + (++_mid);
+  var width = X0 * 2 + n * W + (n - 1) * G, hasA = arrows && arrows.length, height = Y0 + H + (hasA ? 92 : 14);
+  var kids = [Viz.s('defs', {}, [Viz.s('marker', { id: id, viewBox: '0 0 10 10', refX: '8', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto' }, [Viz.s('path', { d: 'M0,0L10,5L0,10z', class: 'ah' })])])];
+  cells.forEach(function (c, i) {
+    var x = X0 + i * (W + G);
+    kids.push(Viz.s('rect', { x: x, y: Y0, width: W, height: H, rx: 10, class: 'node ' + (c.cls || '') }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 17, 'text-anchor': 'middle', class: 'nm', text: c.name }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 42, 'text-anchor': 'middle', class: 'val' + (String(c.value).length > 8 ? ' small' : ''), text: String(c.value) }));
+    if (c.addr) kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 62, 'text-anchor': 'middle', class: 'ad', text: c.addr }));
+  });
+  (arrows || []).forEach(function (a) {
+    var x1 = X0 + a.from * (W + G) + W / 2, x2 = X0 + a.to * (W + G) + W / 2, y = Y0 + H, d;
+    if (a.from === a.to) { x1 -= 22; x2 += 22; d = 'M' + x1 + ',' + y + ' C' + (x1 - 10) + ',' + (y + 55) + ' ' + (x2 + 10) + ',' + (y + 55) + ' ' + x2 + ',' + (y + 3); }
+    else d = 'M' + x1 + ',' + y + ' C' + x1 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 4);
+    kids.push(Viz.s('path', { d: d, class: 'arrow ' + (a.cls || ''), 'marker-end': 'url(#' + id + ')' }));
+    if (a.label) kids.push(Viz.s('text', { x: (x1 + x2) / 2, y: y + 66, 'text-anchor': 'middle', class: 'lbl', text: a.label }));
+  });
+  var svgEl = Viz.svg(width, height, kids); svgEl.style.minWidth = Math.min(width, 600) + 'px';
+  body.appendChild(svgEl);
+  if (o.note !== false) body.appendChild(Viz.note('এখানে 0xc000012000-এর মতো address গুলো বোঝানোর জন্য বানানো; আসল address প্রতিবার run করলে আলাদা হয়।'));
+}
+function out(body, lines) {
+  body.appendChild(E('div', { class: 'out', html: lines && lines.length ? lines.map(function (l) { return esc(l); }).join('<br>') : '<i>(প্রোগ্রামের output এখানে আসবে)</i>' }));
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function chips(items) { return E('div', { class: 'hdrs' }, items.map(function (c) { return E('span', { class: 'chip ' + (c.cls || ''), text: c.text }); })); }
+
+document.getElementById('legend').appendChild(Viz.legend([{cls:'hit',label:'যে step এইমাত্র execute হয়েছে'},{cls:'dim',label:'অপেক্ষায় / blocked'},{cls:'found',label:'সঠিক ফল'},{cls:'bad',label:'ভুল ফল'}]));
+
+var LABEL = { lock: 'mu.Lock()', read: 'tmp := counter', add: 'tmp = tmp + 1', write: 'counter = tmp', unlock: 'mu.Unlock()' };
+function render(st, i, body) {
+  var lanes = [0, 1].map(function (g) {
+    var G = st.gs[g];
+    var rows = st.prog.map(function (kind, k) {
+      var cls = 'mstep' + (k < G.pc ? ' done' : '') + (st.active === g && st.justRan === k ? ' now' : '');
+      return E('span', { class: cls, text: (k < G.pc ? '✓ ' : (k === G.pc ? '▶ ' : '  ')) + LABEL[kind] });
+    });
+    return E('div', { class: 'lane ' + (st.active === g ? (st.blocked ? 'dim' : 'hit') : '') }, [E('h4', { text: 'Goroutine ' + (g + 1) }), E('div', { class: 'tmpv', text: 'tmp = ' + (G.tmp === null ? '?' : G.tmp) })].concat(rows).concat(G.blocked ? [E('div', { text: 'BLOCKED: lock-এর জন্য অপেক্ষা' })] : []));
+  });
+  var counter = Viz.varBox('counter (shared)', st.counter, { class: st.final === undefined ? (st.wrote ? 'hit' : '') : (st.final ? 'found' : 'bad') });
+  var mid = [counter];
+  if (st.useMutex) mid.push(E('div', { class: 'chip ' + (st.lock === null ? 'found' : 'hit'), text: 'mutex: ' + (st.lock === null ? 'খালি' : 'ধরে আছে: G' + (st.lock + 1)) }));
+  body.appendChild(E('div', { class: 'row2' }, [lanes[0], E('div', {}, mid), lanes[1]]));
+}
+function simulate(order, useMutex) {
+  var prog = useMutex ? ['lock', 'read', 'add', 'write', 'unlock'] : ['read', 'add', 'write'];
+  var code = useMutex
+    ? ['var (', '    counter int', '    mu      sync.Mutex', ')', 'func worker() {', '    mu.Lock()', '    tmp := counter', '    tmp = tmp + 1', '    counter = tmp', '    mu.Unlock()', '}', 'go worker() // G1', 'go worker() // G2']
+    : ['var counter int', '', 'func worker() {', '    // counter++ really means:', '    tmp := counter', '    tmp = tmp + 1', '    counter = tmp', '}', '', 'go worker() // G1', 'go worker() // G2'];
+  var lineOf = useMutex ? { lock: 5, read: 6, add: 7, write: 8, unlock: 9 } : { read: 4, add: 5, write: 6 };
+  var gs = [{ pc: 0, tmp: null, blocked: false }, { pc: 0, tmp: null, blocked: false }];
+  var counter = 0, lock = null, steps = [];
+  function snap(o) { steps.push(Object.assign({ prog: prog, gs: JSON.parse(JSON.stringify(gs)), counter: counter, lock: lock, useMutex: useMutex }, o)); }
+  snap({ line: undefined, text: 'দুটো goroutine worker() run করতে যাচ্ছে। counter এখন 0। প্রত্যেকের ' + prog.length + ' টা ছোট step লাগবে।', active: null });
+  var guard = 0;
+  for (var oi = 0; oi < order.length && guard++ < 200; oi++) {
+    var g = order[oi] - 1, G = gs[g], kind = prog[G.pc], name = 'G' + (g + 1);
+    if (G.pc >= prog.length) continue;
+    if (kind === 'lock' && lock !== null && lock !== g) {
+      G.blocked = true;
+      snap({ line: lineOf.lock, text: name + ' mu.Lock() করার চেষ্টা করে, কিন্তু G' + (lock + 1) + ' সেটা ধরে আছে, তাই ' + name + '-কে অপেক্ষা করতেই হবে। সে counter ছুঁতে পারে না।', active: g, blocked: true, justRan: G.pc });
+      continue;
+    }
+    G.blocked = false;
+    var text, wrote = false;
+    if (kind === 'lock') { lock = g; text = name + ' lock নেয়। এখন আর কেউ critical section-এ ঢুকতে পারবে না।'; }
+    else if (kind === 'read') text = name + ' counter পড়ে (' + counter + ') নিজের private tmp-তে রাখে।', G.tmp = counter;
+    else if (kind === 'add') { G.tmp = G.tmp + 1; text = name + ' নিজের private tmp-তে 1 যোগ করে: tmp = ' + G.tmp + '। Shared counter এখনো ' + counter + '।'; }
+    else if (kind === 'write') { counter = G.tmp; wrote = true; text = name + ' tmp-র মান (' + G.tmp + ') counter-এ লেখে।'; }
+    else { lock = null; text = name + ' lock ছেড়ে দেয়।'; }
+    var ran = G.pc; G.pc++;
+    snap({ line: lineOf[kind], text: text, active: g, justRan: ran, wrote: wrote });
+  }
+  if (gs[0].pc < prog.length || gs[1].pc < prog.length) throw new Error('প্রতিটা goroutine (1 আর 2)-কে তার সব ' + prog.length + ' টা step run করতে হবে। প্রতিটা সংখ্যা ঠিক ' + prog.length + ' বার ব্যবহার করুন।');
+  var ok = counter === 2;
+  snap({ line: undefined, active: null, final: ok, text: ok ? 'দুটো increment-ই গোনা হয়েছে: counter = 2। সঠিক।' : 'counter = ' + counter + ', কিন্তু দুটো increment হয়েছে, তাই এটা 2 হওয়ার কথা। একটা update হারিয়ে গেছে (LOST)। এটাই data race।' });
+  return { steps: steps, code: code };
+}
+var last = null;
+function mk(orderFn, useMutex) {
+  return {
+    render: render,
+    code: function () { return last.code; },
+    steps: function () { last = simulate(orderFn(), useMutex); return last.steps; }
+  };
+}
+function parseOrder(txt, per) {
+  var o = txt.split(/[\s,]+/).filter(Boolean).map(Number);
+  if (o.some(function (x) { return x !== 1 && x !== 2; })) throw new Error('শুধু 1 আর 2 ব্যবহার করুন (কোন goroutine পরে run হবে)।');
+  var c1 = o.filter(function (x) { return x === 1; }).length, c2 = o.length - c1;
+  if (c1 !== per || c2 !== per) throw new Error('' + per + ' টা 1 আর ' + per + ' টা 2 লিখুন, যেমন "1 2 1 2 1 2"।');
+  return o;
+}
+var s1 = mk(function () { return [1, 2, 1, 2, 1, 2]; }, false);
+s1.name = 'Lost update (দুর্ভাগ্যজনক order)'; s1.desc = 'কেউ লেখার আগেই G1 আর G2 দুজনেই 0 পড়ে নেয়। Order ঠিক করা আছে: G1 G2 G1 G2 G1 G2।';
+var s2 = mk(function () { return parseOrder(I('order'), 3); }, false);
+s2.name = 'আপনার নিজের interleaving'; s2.desc = 'প্রতিটা সংখ্যা বলে কোন goroutine তার পরের step run করবে। আসল program-এ order আপনার হাতে থাকে না।';
+s2.inputs = [{ id: 'order', label: 'order (তিনটা 1, তিনটা 2)', value: '1 2 1 2 1 2', size: 18 }];
+var s3 = mk(function () { var o = []; for (var k = 0; k < 40; k++) o.push(k % 2 === 0 ? 1 : 2); return o; }, true);
+s3.name = 'Mutex দিয়ে ঠিক করা'; s3.desc = 'একই দুর্ভাগ্যজনক পালাক্রম, কিন্তু lock-এর কারণে G1 পুরোপুরি শেষ না হওয়া পর্যন্ত G2-কে অপেক্ষা করতেই হয়।';
+multi([s1, s2, s3]);
+
+})();
+</script>
+</body>
+</html>

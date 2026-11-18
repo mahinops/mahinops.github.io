@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Order tasks so every prerequisite comes first using Kahn's algorithm, and see how a cycle gets detected.">
+<title>Topological Sort - visual</title>
+<link rel="stylesheet" href="../assets/viz.css">
+<style>.viz-svg .node.bad { fill: var(--bad); stroke: var(--bad-line); }</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/topological-sort.html">বাংলা</a></nav>
+  <h1>Topological Sort</h1>
+  <p class="lead">Put tasks in an order where every task comes after the tasks it depends on.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea (getting dressed)</h2>
+    <p>You cannot put on shoes before socks, or a jacket before a shirt. Each arrow <b>A &rarr; B</b> means &ldquo;A must happen before B&rdquo;. A <b>topological sort</b> lists everything in an order that respects every arrow. Course prerequisites, build systems and task schedulers all need this.</p>
+    <p><b>Kahn&rsquo;s algorithm</b> does it by repeatedly doing what is allowed right now:</p>
+    <ol>
+      <li>For every task, count how many things it still waits for. This count is its <b>indegree</b> (arrows coming in).</li>
+      <li>Tasks with indegree 0 wait for nothing. Put them in a <b>queue</b>.</li>
+      <li>Take a task from the queue and add it to the answer. Then &ldquo;cross out&rdquo; its arrows: every task that waited on it now has one fewer thing to wait for. If a task reaches 0, queue it.</li>
+    </ol>
+    <p>If you run out of tasks to take but some are still waiting, they are waiting on <i>each other</i>: that is a <b>cycle</b>, and no valid order exists.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Number of tasks (2 to 10)<input id="n" value="6" size="4"></label>
+    <label>Arrows (A&gt;B means A before B)<input id="edges" value="5>2, 5>0, 4>0, 4>1, 2>3, 3>1" size="40"></label>
+    <button id="go">Run</button>
+  </div>
+  <div class="viz-note">Tasks are numbered from 0. At most 15 arrows.</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul>
+      <li>Run the default. There can be several valid orders; this one is the queue&rsquo;s choice. Check that every arrow points forward in the answer.</li>
+      <li>Add an arrow that makes a loop, like <code>1&gt;5</code>. What happens, and which nodes get stuck?</li>
+      <li>Remove all arrows. In what order do the tasks come out?</li>
+      <li>Make a straight chain <code>0&gt;1, 1&gt;2, 2&gt;3</code>. How many valid orders exist?</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul>
+      <li><b>Not checking for a cycle.</b> If <code>len(order) != n</code> the input has a cycle, and you must report that instead of a partial order.</li>
+      <li><b>Mixing up the arrow direction.</b> Decide what &ldquo;A&rarr;B&rdquo; means before coding (&ldquo;A before B&rdquo; vs &ldquo;B needs A&rdquo;). Many course problems list pairs as <code>[course, prerequisite]</code>, which is the reverse.</li>
+      <li><b>Forgetting isolated nodes.</b> Tasks with no arrows have indegree 0 and must still appear in the answer.</li>
+      <li><b>Assuming the answer is unique.</b> Usually many valid orders exist. Tests must check validity, not one exact list.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, in plain English:</b> every task enters the queue at most once and every arrow is crossed out once, so the time is about the tasks plus the arrows (<code>O(V + E)</code>).
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var CODE = [
+  'func topoSort(n int, edges [][2]int) []int {',       // 0
+  '    adj := make([][]int, n)',                        // 1
+  '    indeg := make([]int, n)',                        // 2
+  '    for _, e := range edges {',                      // 3
+  '        adj[e[0]] = append(adj[e[0]], e[1])',        // 4
+  '        indeg[e[1]]++',                              // 5
+  '    }',                                              // 6
+  '    var queue []int',                                // 7
+  '    for i := 0; i < n; i++ {',                       // 8
+  '        if indeg[i] == 0 {',                         // 9
+  '            queue = append(queue, i)',               // 10
+  '        }',                                          // 11
+  '    }',                                              // 12
+  '    var order []int',                                // 13
+  '    for len(queue) > 0 {',                           // 14
+  '        node := queue[0]',                           // 15
+  '        queue = queue[1:]',                          // 16
+  '        order = append(order, node)',                // 17
+  '        for _, next := range adj[node] {',           // 18
+  '            indeg[next]--',                          // 19
+  '            if indeg[next] == 0 {',                  // 20
+  '                queue = append(queue, next)',        // 21
+  '            }',                                      // 22
+  '        }',                                          // 23
+  '    }',                                              // 24
+  '    if len(order) != n {',                           // 25
+  '        return nil // there is a cycle',             // 26
+  '    }',                                              // 27
+  '    return order',                                   // 28
+  '}',                                                  // 29
+];
+
+function parseEdges(str, n) {
+  var parts = str.split(',').map(function (s) { return s.trim(); }).filter(Boolean), edges = [], seen = {}, m;
+  if (parts.length > 15) return { error: 'Please use at most 15 arrows.' };
+  for (var i = 0; i < parts.length; i++) {
+    m = /^(\d+)\s*>\s*(\d+)$/.exec(parts[i]);
+    if (!m) return { error: 'I do not understand "' + parts[i] + '". Write arrows like 0>1 (0 must come before 1).' };
+    var a = +m[1], b = +m[2];
+    if (a >= n || b >= n) return { error: 'In "' + parts[i] + '" the tasks must be between 0 and ' + (n - 1) + '.' };
+    if (a === b) return { error: '"' + parts[i] + '" makes a task depend on itself. Please remove it.' };
+    if (seen[a + '>' + b]) return { error: 'The arrow ' + a + '>' + b + ' is listed twice. Keep just one.' };
+    seen[a + '>' + b] = true; edges.push([a, b]);
+  }
+  return { edges: edges };
+}
+
+function genTopo(n, edges) {
+  var adj = [], indeg = [], queue = [], order = [], steps = [], i;
+  for (i = 0; i < n; i++) { adj.push([]); indeg.push(0); }
+  function snap(text, line, cur, edge, stuck) {
+    steps.push({ text: text, line: line, cur: cur === undefined ? -1 : cur, edge: edge || null, indeg: indeg.slice(), queue: queue.slice(), order: order.slice(), stuck: stuck || [] });
+  }
+  snap('We have ' + n + ' tasks and ' + edges.length + ' arrows. First we need to know how many arrows point into each task.', 0);
+  edges.forEach(function (e) { adj[e[0]].push(e[1]); indeg[e[1]]++; });
+  snap('Counted. indeg[i] is the number of prerequisites task i still waits for.', [1, 2, 3, 4, 5, 6]);
+  for (i = 0; i < n; i++) if (indeg[i] === 0) queue.push(i);
+  snap(queue.length ? 'Tasks with indegree 0 wait for nothing, so they can go first: put ' + queue.join(', ') + ' in the queue.' : 'No task has indegree 0: every task is waiting for another. The queue starts empty.', [7, 8, 9, 10, 11, 12]);
+  while (queue.length) {
+    var node = queue.shift();
+    order.push(node);
+    snap('Take ' + node + ' from the front of the queue and add it to the order.', [15, 16, 17], node);
+    adj[node].forEach(function (nx) {
+      indeg[nx]--;
+      if (indeg[nx] === 0) {
+        queue.push(nx);
+        snap('Cross out the arrow ' + node + '→' + nx + ': task ' + nx + ' now waits for 0 things, so add it to the queue.', [18, 19, 20, 21], node, [node, nx]);
+      } else {
+        snap('Cross out the arrow ' + node + '→' + nx + ': task ' + nx + ' still waits for ' + indeg[nx] + ' more.', [18, 19, 20], node, [node, nx]);
+      }
+    });
+  }
+  if (order.length !== n) {
+    var stuck = [];
+    for (i = 0; i < n; i++) if (order.indexOf(i) === -1) stuck.push(i);
+    snap('The queue is empty but only ' + order.length + ' of ' + n + ' tasks were ordered. Tasks ' + stuck.join(', ') + ' still wait on each other (a cycle), so no valid order exists. The function returns nil.', [25, 26], -1, null, stuck);
+  } else {
+    snap('All ' + n + ' tasks were ordered: ' + order.join(' → ') + '. Every arrow points forward in this list.', 28);
+  }
+  return { steps: steps, order: order.length === n ? order : null };
+}
+
+/* layers: left-to-right by longest chain of prerequisites (stuck nodes go in an extra last column) */
+function layers(n, edges) {
+  var indeg = [], adj = [], layer = [], q = [], i, done = 0;
+  for (i = 0; i < n; i++) { indeg.push(0); adj.push([]); layer.push(0); }
+  edges.forEach(function (e) { adj[e[0]].push(e[1]); indeg[e[1]]++; });
+  for (i = 0; i < n; i++) if (indeg[i] === 0) q.push(i);
+  var seen = {};
+  while (q.length) {
+    var v = q.shift(); seen[v] = true; done++;
+    adj[v].forEach(function (w) { layer[w] = Math.max(layer[w], layer[v] + 1); indeg[w]--; if (indeg[w] === 0) q.push(w); });
+  }
+  if (done < n) {
+    var mx = 0; for (i = 0; i < n; i++) if (seen[i]) mx = Math.max(mx, layer[i]);
+    for (i = 0; i < n; i++) if (!seen[i]) layer[i] = mx + 1;
+  }
+  return layer;
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+  var G = null;
+
+  function graphSvg(st) {
+    var n = G.n, layer = G.layer, cols = Math.max.apply(null, layer) + 1, r = 18, colW = 96, rowH = 58, pad = 28;
+    var counts = {}, idxIn = [], maxRows = 0;
+    for (var i = 0; i < n; i++) { counts[layer[i]] = (counts[layer[i]] || 0); idxIn.push(counts[layer[i]]++); maxRows = Math.max(maxRows, counts[layer[i]]); }
+    var W = pad * 2 + (cols - 1) * colW + 20, H = pad * 2 + (maxRows - 1) * rowH + 18, parts = [];
+    function pos(v) { var c = counts[layer[v]]; return { x: pad + layer[v] * colW + 10, y: pad + (maxRows - c) * rowH / 2 + idxIn[v] * rowH + 4 }; }
+    G.edges.forEach(function (e) {
+      var p = pos(e[0]), q = pos(e[1]), dx = q.x - p.x, dy = q.y - p.y, len = Math.sqrt(dx * dx + dy * dy) || 1, ux = dx / len, uy = dy / len;
+      var hl = st.edge && st.edge[0] === e[0] && st.edge[1] === e[1];
+      var gone = st.order.indexOf(e[0]) !== -1 && !hl;
+      var col = hl ? 'var(--hit-line)' : 'var(--cell-line)';
+      var st2 = 'stroke:' + col + ';fill:' + col + ';' + (gone ? 'opacity:.3;' : '') + (hl ? 'stroke-width:3px;' : '');
+      var sx = p.x + ux * r, sy = p.y + uy * r, ex = q.x - ux * (r + 2), ey = q.y - uy * (r + 2);
+      parts.push(Viz.s('line', { x1: sx, y1: sy, x2: ex, y2: ey, style: st2 + 'stroke-width:' + (hl ? 3 : 2) + 'px' }));
+      parts.push(Viz.s('polygon', { points: ex + ',' + ey + ' ' + (ex - ux * 10 - uy * 5) + ',' + (ey - uy * 10 + ux * 5) + ' ' + (ex - ux * 10 + uy * 5) + ',' + (ey - uy * 10 - ux * 5), style: st2 }));
+    });
+    for (var v = 0; v < n; v++) {
+      var p2 = pos(v), cls = 'node';
+      if (st.stuck.indexOf(v) !== -1) cls += ' bad'; else if (v === st.cur) cls += ' hit'; else if (st.order.indexOf(v) !== -1) cls += ' found'; else if (st.queue.indexOf(v) !== -1) cls += ' range';
+      parts.push(Viz.s('circle', { class: cls, cx: p2.x, cy: p2.y, r: r }));
+      parts.push(Viz.s('text', { x: p2.x, y: p2.y + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, text: String(v) }));
+      parts.push(Viz.s('text', { x: p2.x, y: p2.y + r + 13, 'text-anchor': 'middle', 'font-size': 11, text: 'in=' + st.indeg[v] }));
+    }
+    return Viz.svg(W, H, parts);
+  }
+
+  function render(st, i, body) {
+    body.appendChild(graphSvg(st));
+    var qm = {}; if (st.queue.length) qm[0] = 'next out';
+    body.appendChild(Viz.array(st.queue, { title: 'queue (tasks that are free to go)', indexes: false, marks: qm }));
+    if (!st.queue.length) body.appendChild(Viz.note('(queue is empty)'));
+    var oc = {}; st.order.forEach(function (_, k) { oc[k] = 'found'; });
+    body.appendChild(Viz.array(st.order, { title: 'order so far', indexes: false, classes: oc }));
+    if (!st.order.length) body.appendChild(Viz.note('(nothing ordered yet)'));
+    body.appendChild(Viz.array(st.indeg, { title: 'indeg[task]  (how many prerequisites are still waiting)' }));
+  }
+
+  function run() {
+    errBox.textContent = '';
+    var nStr = document.getElementById('n').value.trim();
+    if (!/^\d+$/.test(nStr) || +nStr < 2 || +nStr > 10) { errBox.textContent = 'The number of tasks must be a whole number from 2 to 10.'; return; }
+    var n = +nStr, p = parseEdges(document.getElementById('edges').value, n);
+    if (p.error) { errBox.textContent = p.error; return; }
+    G = { n: n, edges: p.edges, layer: layers(n, p.edges) };
+    app.innerHTML = '';
+    var st = Viz.stepper({ mount: app, code: CODE, render: render });
+    st.load(genTopo(n, p.edges).steps);
+  }
+
+  document.getElementById('legend').appendChild(Viz.legend([
+    { cls: 'hit', label: 'task being processed' }, { cls: 'range', label: 'in the queue (free to go)' }, { cls: 'found', label: 'already in the order' }, { cls: 'bad', label: 'stuck in a cycle' },
+  ]));
+  document.getElementById('go').addEventListener('click', run);
+  run();
+})();
+</script>
+</body>
+</html>

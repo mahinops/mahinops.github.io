@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Two Pointers - visual</title>
+<meta name="description" content="Walk two markers through a list, from both ends or side by side, to solve pair and in-place problems without nested loops.">
+<link rel="stylesheet" href="../assets/viz.css">
+<style></style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/dsa/two-pointers.html">বাংলা</a></nav>
+  <h1>Two Pointers</h1>
+  <p class="lead">Use two index markers instead of two nested loops.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea</h2>
+    <p>Imagine two people walking toward each other along a sorted row of numbered stones, one from each end. You want two stones that add up to a target. If the sum is <b>too small</b>, the left person steps right to a bigger stone. If it is <b>too big</b>, the right person steps left to a smaller one. Each step rules out a stone for good, so one pass is enough.</p>
+<p>The same trick reverses a list in place: swap the two ends, move both markers inward, repeat until they meet.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+  <label>Problem<select id="mode"><option value="pair">Pair with a given sum (sorted list)</option><option value="reverse">Reverse in place</option></select></label>
+  <label>Numbers<input id="arr" value="1, 3, 4, 6, 8, 11, 15"></label>
+  <label id="targetWrap">Target sum<input id="target" value="14" size="6"></label>
+  <button id="go">Run</button>
+</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul><li>Pair mode, target <code>14</code>: watch which pointer moves each time and why.</li><li>Change the target to <code>100</code>. When do the pointers stop, and what is returned?</li><li>Put the numbers out of order. The page refuses. Why would two pointers give wrong answers on unsorted data?</li><li>Switch to Reverse with an odd count (like 5 numbers). What happens to the middle one?</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul><li><b>Unsorted input:</b> &ldquo;too small, move left&rdquo; only makes sense when the list is sorted.</li><li><b>Using <code>l &lt;= r</code> instead of <code>l &lt; r</code></b> in pair problems lets an element pair with itself.</li><li><b>Moving the wrong pointer:</b> if the sum is too small, only the left pointer can help (it points at the smallest candidate).</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">How fast is it?</h2>
+    <p><b>Time: O(n)</b> &ndash; the pointers only ever move inward, so each item is looked at at most once. A nested-loop version needs O(n&sup2;). <b>Space: O(1)</b> &ndash; just two integers.</p>
+  </div>
+
+  <div class="pagenav"><a href="binary-search.html">&larr; Binary Search</a><a href="sliding-window.html">Sliding Window &rarr;</a></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script id="algo">
+
+function pairSumSteps(nums, target) {
+  var steps = [], l = 0, r = nums.length - 1;
+  function snap(line, text, extra) { steps.push(Object.assign({ mode: 'pair', arr: nums.slice(), l: l, r: r, line: line, text: text }, extra || {})); }
+  snap(1, 'Start: l points at the smallest number (index 0), r at the largest (index ' + r + ').');
+  while (l < r) {
+    var sum = nums[l] + nums[r];
+    snap(3, 'sum = nums[' + l + '] + nums[' + r + '] = ' + nums[l] + ' + ' + nums[r] + ' = ' + sum + '.', { sum: sum, hl: [l, r] });
+    if (sum === target) {
+      snap([4, 5], sum + ' equals the target ' + target + '. Found the pair at indexes ' + l + ' and ' + r + '.', { sum: sum, found: [l, r], result: [l, r] });
+      return steps;
+    } else if (sum < target) {
+      l++;
+      snap([6, 7], 'Sum is too small. The only way to get bigger is a bigger left number, so move l right to index ' + l + '.', { sum: sum });
+    } else {
+      r--;
+      snap([8, 9], 'Sum is too big. The only way to get smaller is a smaller right number, so move r left to index ' + r + '.', { sum: sum });
+    }
+  }
+  snap(11, 'l and r met (l = ' + l + ', r = ' + r + '), so no pair is left to try. Return "not found".', { result: null });
+  return steps;
+}
+function reverseSteps(nums) {
+  var a = nums.slice(), steps = [], l = 0, r = a.length - 1;
+  function snap(line, text, extra) { steps.push(Object.assign({ mode: 'reverse', arr: a.slice(), l: l, r: r, line: line, text: text }, extra || {})); }
+  snap(1, 'Start: l at the first item (index 0), r at the last (index ' + r + ').');
+  while (l < r) {
+    snap(2, 'l (' + l + ') < r (' + r + '), so there is still something to swap.', { hl: [l, r] });
+    var t = a[l]; a[l] = a[r]; a[r] = t;
+    snap(3, 'Swap a[' + l + '] and a[' + r + ']. Now ' + a[l] + ' and ' + a[r] + ' are in their final places.', { swapped: [l, r] });
+    l++; r--;
+    snap([4, 5], 'Move both markers inward: l = ' + l + ', r = ' + r + '.');
+  }
+  snap(2, l === r ? 'l and r are on the same item (index ' + l + '). It is already in the right place. Done!' : 'l is no longer smaller than r. Done!', { done: true, result: a.slice() });
+  return steps;
+}
+
+</script>
+<script id="ui">
+
+function $id(x) { return document.getElementById(x); }
+function showErr(m) { $id('err').textContent = m || ''; }
+var current = null;
+function mountStepper(opts) {
+  if (current) current.pause();
+  var app = $id('app'); app.innerHTML = ''; app.className = '';
+  current = Viz.stepper(Object.assign({ mount: '#app' }, opts));
+  return current;
+}
+function setLegend(items) { var l = $id('legend'); l.innerHTML = ''; l.appendChild(Viz.legend(items)); }
+function mark(marks, ix, label) { marks[ix] = (marks[ix] || []).concat(label); }
+
+
+var PAIR_CODE = ['func pairSum(nums []int, target int) (int, int, bool) {',
+'    l, r := 0, len(nums)-1',
+'    for l < r {',
+'        sum := nums[l] + nums[r]',
+'        if sum == target {',
+'            return l, r, true',
+'        } else if sum < target {',
+'            l++',
+'        } else {',
+'            r--',
+'        }',
+'    }',
+'    return 0, 0, false',
+'}'];
+var REV_CODE = ['func reverse(nums []int) {',
+'    l, r := 0, len(nums)-1',
+'    for l < r {',
+'        nums[l], nums[r] = nums[r], nums[l]',
+'        l++',
+'        r--',
+'    }',
+'}'];
+function render(st, i, body) {
+  var n = st.arr.length, marks = {}, cls = {};
+  for (var ix = 0; ix < n; ix++) {
+    if (st.mode === 'pair') cls[ix] = (ix >= st.l && ix <= st.r) ? 'range' : 'dim';
+    else cls[ix] = (ix < st.l || ix > st.r) ? 'found' : 'range';
+  }
+  if (!st.done) { mark(marks, st.l, 'l'); mark(marks, st.r, 'r'); }
+  (st.hl || []).forEach(function (ix) { cls[ix] = 'hit'; });
+  (st.swapped || []).forEach(function (ix) { cls[ix] = 'bad'; });
+  (st.found || []).forEach(function (ix) { cls[ix] = 'found'; });
+  if (st.done) for (var k = 0; k < n; k++) cls[k] = 'found';
+  body.appendChild(Viz.array(st.arr, { marks: marks, classes: cls, title: 'nums' }));
+  if (st.sum !== undefined) body.appendChild(Viz.note('sum = <b>' + st.sum + '</b>'));
+  if (st.mode === 'pair' && st.result !== undefined) body.appendChild(Viz.note(st.result ? '<b>Result: indexes ' + st.result[0] + ' and ' + st.result[1] + '</b>' : '<b>Result: not found</b>'));
+}
+function run() {
+  showErr('');
+  var mode = $id('mode').value, nums = Viz.parseNums($id('arr').value);
+  if (!nums.length || nums.length > 14) { showErr('Enter between 1 and 14 numbers.'); return; }
+  if (mode === 'pair') {
+    var tv = $id('target').value.trim(), target = Number(tv);
+    if (tv === '' || isNaN(target)) { showErr('Target must be a number.'); return; }
+    for (var i = 1; i < nums.length; i++) if (nums[i] < nums[i - 1]) { showErr('Two pointers needs a sorted list (smallest to largest). Please sort it first.'); return; }
+    setLegend([{ cls: 'range', label: 'still a candidate' }, { cls: 'hit', label: 'being added' }, { cls: 'dim', label: 'ruled out' }, { cls: 'found', label: 'answer' }]);
+    mountStepper({ code: PAIR_CODE, render: render }).load(pairSumSteps(nums, target));
+  } else {
+    setLegend([{ cls: 'range', label: 'not swapped yet' }, { cls: 'hit', label: 'about to swap' }, { cls: 'bad', label: 'just swapped' }, { cls: 'found', label: 'final place' }]);
+    mountStepper({ code: REV_CODE, render: render }).load(reverseSteps(nums));
+  }
+}
+$id('mode').addEventListener('change', function () {
+  var pair = $id('mode').value === 'pair';
+  $id('targetWrap').style.display = pair ? '' : 'none';
+  $id('arr').value = pair ? '1, 3, 4, 6, 8, 11, 15' : '1, 2, 3, 4, 5, 6';
+  run();
+});
+$id('go').addEventListener('click', run);
+run();
+
+</script>
+</body>
+</html>

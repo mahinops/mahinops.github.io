@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pointers</title>
+<meta name="description" content="বক্স আর তীর দিয়ে Go-র pointer বুঝুন: address-of, dereference, pass by value বনাম pointer, struct, nil আর panic।">
+<link rel="stylesheet" href="../../assets/viz.css">
+<style>
+.viz-layout{grid-template-columns:minmax(0,1fr)}
+.viz-stage,.viz-code{min-width:0;max-width:100%}
+@media (max-width:760px){.viz-layout.viz-has-code{grid-template-columns:minmax(0,1fr)}}
+body{overflow-x:hidden}
+.viz-svg .ah{fill:var(--accent)}
+.viz-svg .arrow{fill:none;stroke:var(--accent);stroke-width:2.5}
+.viz-svg .arrow.bad{stroke:var(--bad-line)}
+.viz-svg .node.bad{fill:var(--bad);stroke:var(--bad-line)}
+.viz-svg .node.nilp{stroke-dasharray:5 4}
+.viz-svg .nm{font-size:12px;fill:var(--muted)}
+.viz-svg .val{font-size:17px;font-weight:700}
+.viz-svg .ad{font-size:10px;fill:var(--muted)}
+.viz-svg .val.small{font-size:12px}
+.viz-svg .lbl{font-size:12px;fill:var(--accent);font-weight:700}
+.viz-cell.spare{background:transparent;border-style:dashed;color:var(--muted)}
+.hdrs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.chip{border:2px solid var(--cell-line);background:var(--cell);border-radius:10px;padding:4px 10px;font:600 13px var(--mono)}
+.chip.hit{background:var(--hit);border-color:var(--hit-line)}
+.chip.found{background:var(--found);border-color:var(--found-line)}
+.chip.dim{opacity:.45}
+.chip.bad{background:var(--bad);border-color:var(--bad-line)}
+.stackcol{display:flex;flex-direction:column-reverse;gap:6px;max-width:420px}
+.frame{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:6px 10px;font:13px var(--mono)}
+.frame b{display:block;margin-bottom:2px}
+.frame.hit{background:var(--hit);border-color:var(--hit-line)}
+.frame.found{background:var(--found);border-color:var(--found-line)}
+.frame.bad{background:var(--bad);border-color:var(--bad-line)}
+.frame.dim{opacity:.55}
+.out{font:13px var(--mono);background:var(--code-bg);color:var(--code-ink);padding:8px 10px;border-radius:8px;min-height:2.2em;white-space:pre-wrap;margin-top:10px}
+.out i{color:#6b7a90;font-style:normal}
+.row2{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.lane{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:8px 12px;min-width:170px;font:13px var(--mono)}
+.lane h4{margin:0 0 4px;font:700 13px var(--sans)}
+.lane.hit{background:var(--hit);border-color:var(--hit-line)}
+.lane.found{background:var(--found);border-color:var(--found-line)}
+.lane.bad{background:var(--bad);border-color:var(--bad-line)}
+.lane.dim{opacity:.55}
+.slots{display:flex;gap:6px}
+.slot{width:44px;height:44px;border:2px dashed var(--cell-line);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 15px var(--mono)}
+.slot.full{border-style:solid;background:var(--range);border-color:var(--range-line)}
+.iface{display:inline-flex;border:2px solid var(--cell-line);border-radius:10px;overflow:hidden;background:var(--cell);margin:4px 10px 4px 0}
+.iface div{padding:6px 10px;font:600 13px var(--mono)}
+.iface .t{background:var(--dim)}
+.iface.hit{background:var(--hit);border-color:var(--hit-line)}
+.iface.found{background:var(--found);border-color:var(--found-line)}
+.iface.bad{background:var(--bad);border-color:var(--bad-line)}
+.bar{height:20px;border-radius:5px;background:var(--range);border:2px solid var(--range-line);transition:width .3s}
+.bar.hit{background:var(--hit);border-color:var(--hit-line)}
+.bar.found{background:var(--found);border-color:var(--found-line)}
+.bar.dim{background:var(--dim);border-color:transparent}
+.tl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;align-items:center;font:13px var(--mono)}
+.tree{font:13px var(--mono)} .tree .tn{border:2px solid var(--cell-line);border-radius:8px;padding:4px 8px;margin:4px 0;background:var(--cell);display:inline-block}
+.tree .tn.bad{background:var(--bad);border-color:var(--bad-line)} .tree .tn.hit{background:var(--hit);border-color:var(--hit-line)} .tree .tn.found{background:var(--found);border-color:var(--found-line)}
+.tree ul{list-style:none;margin:0;padding-left:26px;border-left:2px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; সব visual</a> · <a href="../../go/pointers.html">English</a></nav>
+  <h1>Pointers</h1>
+  <p class="lead">Pointer হলো এমন একটা box, যার ভেতরে <b>অন্য একটা box-এর address</b> থাকে। এটাকে একটা তীর (arrow) হিসেবে আঁকা যায়।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা</h2>
+    <p>মনে করুন আপনার বন্ধুর একটা বাড়ি আছে। <b>Value</b> হলো বাড়িটা নিজেই। <b>Pointer</b> হলো একটা কাগজের টুকরো, যাতে বাড়ির ঠিকানা লেখা। কাউকে যদি বাড়ির <i>ফটোকপি</i> দেন (pass by value), সে তাতে রং করলেও আপনার আসল বাড়ি আগের মতোই থাকবে। আর যদি <i>ঠিকানার কাগজটা</i> (pointer) দেন, সে সেখানে গিয়ে আপনার আসল বাড়িতেই রং করে দিতে পারবে।</p>
+ <p>দুটো symbol দিয়েই পুরো কাজ হয়: <code>&amp;x</code> মানে &ldquo;x-এর address&rdquo; (তীর বানানো), আর <code>*p</code> মানে &ldquo;p যেখানে point করছে সেখানে যাও&rdquo; (তীর ধরে গিয়ে পড়া বা লেখা)।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+    <label>উদাহরণ<select id="sc"></select></label>
+    <span id="inputs" style="display:contents"></span>
+    <button id="run">Run</button>
+  </div>
+  <p class="viz-note" id="scdesc"></p>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul><li>&ldquo;Address-of আর dereference&rdquo; উদাহরণে <code>*p</code> দিয়ে যে নতুন মান লেখা হচ্ছে সেটা বদলান। দেখবেন <code>x</code>-এর নাম একবারও না লিখেও তার মান বদলে যাচ্ছে।</li><li>&ldquo;Pass by value বনাম pointer&rdquo; উদাহরণে ধীরে ধীরে ধাপ দেখুন: কোন function caller-এর <code>x</code> বদলায়, আর কেন?</li><li>&ldquo;new() আর nil pointer panic&rdquo; উদাহরণে খুঁজে বের করুন প্রোগ্রাম ঠিক কোন ধাপে crash করে।</li><li>&ldquo;দুটো pointer, একটাই target&rdquo; উদাহরণে এক pointer দিয়ে লিখুন, আরেকটা দিয়ে পড়ুন।</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul><li><code>nil</code> pointer dereference করলে panic হয়: <code>invalid memory address or nil pointer dereference</code>। আগে <code>p != nil</code> check করে নিন।</li><li>Value pass করার পরেও আশা করা যে function আপনার variable বদলে দেবে। এর বদলে <code>&amp;x</code> pass করুন আর function-এ <code>*int</code> parameter নিন।</li><li><code>p</code> (address) আর <code>*p</code> (যে value-তে point করছে) গুলিয়ে ফেলা। <code>p</code> print করলে address দেখা যায়, আপনার data নয়।</li><li>Local variable-এর pointer return করা Go-তে ঠিক আছে (variable-টা heap-এ সরে যায়), C-র মতো সমস্যা হয় না।</li></ul>
+  </div>
+
+  <div class="pagenav"><a href="variables-and-memory.html">&larr; Variables and Memory</a><a href="arrays-vs-slices.html">Arrays vs Slices &rarr;</a></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script>
+(function () {
+
+var E = Viz.el;
+/* ---- scenarios + dynamic inputs ---- */
+function multi(scenarios) {
+  var mount = Viz.$('#app'), sel = Viz.$('#sc'), inputsBox = Viz.$('#inputs'), err = Viz.$('#err'), desc = Viz.$('#scdesc');
+  var cur = 0, store = {}, pendingStep = null;
+  var hm = location.hash.match(/sc=(\d+)(?:&step=(\d+))?/);
+  if (hm && scenarios[+hm[1]]) { cur = +hm[1]; pendingStep = hm[2] ? +hm[2] : null; }
+  window.I = function (id) { var n = document.getElementById('in_' + id); return n ? n.value : ''; };
+  window.N = function (id, lo, hi) {
+    var raw = I(id).trim(); var v = Number(raw);
+    if (raw === '' || isNaN(v)) throw new Error('"' + id + '" অবশ্যই একটা সংখ্যা হতে হবে।');
+    if (lo !== undefined && v < lo) throw new Error('"' + id + '" অন্তত ' + lo + ' হতে হবে।');
+    if (hi !== undefined && v > hi) throw new Error('"' + id + '" সর্বোচ্চ ' + hi + ' পর্যন্ত হতে পারে।');
+    return Math.floor(v) === v ? v : Math.floor(v);
+  };
+  scenarios.forEach(function (sc, i) { sel.appendChild(E('option', { value: String(i), text: sc.name })); });
+  function buildInputs() {
+    inputsBox.innerHTML = '';
+    (scenarios[cur].inputs || []).forEach(function (inp) {
+      var key = cur + ':' + inp.id;
+      var val = store[key] !== undefined ? store[key] : inp.value;
+      var ctl;
+      if (inp.options) {
+        ctl = E('select', { id: 'in_' + inp.id }, inp.options.map(function (o) { return E('option', { value: o[0], text: o[1] }); }));
+        ctl.value = val;
+      } else {
+        ctl = E('input', { id: 'in_' + inp.id, value: val, size: inp.size || 10 });
+      }
+      ctl.addEventListener('change', function () { store[key] = ctl.value; show(); });
+      inputsBox.appendChild(E('label', { text: inp.label }, [ctl]));
+    });
+  }
+  function show() {
+    var sc = scenarios[cur];
+    err.textContent = '';
+    mount.innerHTML = '';
+    desc.textContent = sc.desc || '';
+    var steps;
+    try { steps = sc.steps(); } catch (e) { err.textContent = e.message; return; }
+    var st = Viz.stepper({ mount: mount, code: typeof sc.code === 'function' ? sc.code() : sc.code, render: sc.render });
+    st.load(steps);
+    if (pendingStep !== null) { st.go(pendingStep); pendingStep = null; }
+  }
+  sel.addEventListener('change', function () { cur = +sel.value; buildInputs(); show(); });
+  Viz.$('#run').addEventListener('click', function () { show(); });
+  sel.value = String(cur); buildInputs(); show();
+  if (location.hash === '#test') {
+    var log = [];
+    scenarios.forEach(function (sc, k) {
+      try {
+        cur = k; buildInputs();
+        var steps = sc.steps(), code = typeof sc.code === 'function' ? sc.code() : sc.code, tmp = document.createElement('div');
+        if (!steps.length) throw new Error('no steps');
+        steps.forEach(function (stp, j) {
+          tmp.innerHTML = ''; sc.render(stp, j, tmp);
+          if (!tmp.firstChild) throw new Error('empty render at step ' + j);
+          [].concat(stp.line === undefined ? [] : stp.line).forEach(function (ln) { if (!(ln >= 0 && ln < code.length)) throw new Error('bad line ' + ln + ' at step ' + j); });
+          if (!stp.text) throw new Error('no text at step ' + j);
+        });
+        log.push('OK   ' + sc.name + ' (' + steps.length + ' steps)');
+      } catch (e) { log.push('FAIL ' + sc.name + ': ' + e.message); }
+    });
+    cur = 0; sel.value = '0'; buildInputs(); show();
+    document.body.appendChild(E('pre', { id: 'testresult', text: log.join('\n') }));
+  }
+}
+
+/* ---- memory diagram: boxes + arrows (illustrative addresses) ---- */
+var _mid = 0;
+function mem(body, cells, arrows, o) {
+  o = o || {};
+  var W = 124, H = 70, G = 34, X0 = 12, Y0 = 12, n = Math.max(cells.length, 1), id = 'ah' + (++_mid);
+  var width = X0 * 2 + n * W + (n - 1) * G, hasA = arrows && arrows.length, height = Y0 + H + (hasA ? 92 : 14);
+  var kids = [Viz.s('defs', {}, [Viz.s('marker', { id: id, viewBox: '0 0 10 10', refX: '8', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto' }, [Viz.s('path', { d: 'M0,0L10,5L0,10z', class: 'ah' })])])];
+  cells.forEach(function (c, i) {
+    var x = X0 + i * (W + G);
+    kids.push(Viz.s('rect', { x: x, y: Y0, width: W, height: H, rx: 10, class: 'node ' + (c.cls || '') }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 17, 'text-anchor': 'middle', class: 'nm', text: c.name }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 42, 'text-anchor': 'middle', class: 'val' + (String(c.value).length > 8 ? ' small' : ''), text: String(c.value) }));
+    if (c.addr) kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 62, 'text-anchor': 'middle', class: 'ad', text: c.addr }));
+  });
+  (arrows || []).forEach(function (a) {
+    var x1 = X0 + a.from * (W + G) + W / 2, x2 = X0 + a.to * (W + G) + W / 2, y = Y0 + H, d;
+    if (a.from === a.to) { x1 -= 22; x2 += 22; d = 'M' + x1 + ',' + y + ' C' + (x1 - 10) + ',' + (y + 55) + ' ' + (x2 + 10) + ',' + (y + 55) + ' ' + x2 + ',' + (y + 3); }
+    else d = 'M' + x1 + ',' + y + ' C' + x1 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 4);
+    kids.push(Viz.s('path', { d: d, class: 'arrow ' + (a.cls || ''), 'marker-end': 'url(#' + id + ')' }));
+    if (a.label) kids.push(Viz.s('text', { x: (x1 + x2) / 2, y: y + 66, 'text-anchor': 'middle', class: 'lbl', text: a.label }));
+  });
+  var svgEl = Viz.svg(width, height, kids); svgEl.style.minWidth = Math.min(width, 600) + 'px';
+  body.appendChild(svgEl);
+  if (o.note !== false) body.appendChild(Viz.note('এখানে 0xc000012000-এর মতো address গুলো বোঝানোর জন্য বানানো; আসল address প্রতিবার run করলে আলাদা হয়।'));
+}
+function out(body, lines) {
+  body.appendChild(E('div', { class: 'out', html: lines && lines.length ? lines.map(function (l) { return esc(l); }).join('<br>') : '<i>(প্রোগ্রামের output এখানে আসবে)</i>' }));
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function chips(items) { return E('div', { class: 'hdrs' }, items.map(function (c) { return E('span', { class: 'chip ' + (c.cls || ''), text: c.text }); })); }
+
+document.getElementById('legend').appendChild(Viz.legend([{cls:'hit',label:'যে box পড়া বা লেখা হচ্ছে'},{cls:'range',label:'pointer box (ভেতরে address থাকে)'},{cls:'found',label:'ফলাফল'},{cls:'bad',label:'সমস্যা (nil / panic)'}]));
+
+function cell(name, value, addr, cls) { return { name: name, value: value, addr: addr, cls: cls || '' }; }
+function render(st, i, body) { mem(body, st.cells, st.arrows || []); if (st.out) out(body, st.out); }
+var AX = '0xc000012080';
+multi([
+ { name: 'Address-of আর dereference', desc: '&x দিয়ে x-এর দিকে একটা তীর তৈরি হয়। *p সেই তীর ধরে এগোয়।',
+   inputs: [{ id: 'x0', label: 'x শুরুতে', value: '10', size: 6 }, { id: 'nv', label: '*p দিয়ে লিখুন', value: '25', size: 6 }],
+   code: function () { return ['func main() {', '    x := ' + I('x0'), '    p := &x', '    fmt.Println(*p)', '    *p = ' + I('nv'), '    fmt.Println(x)', '}']; },
+   render: render,
+   steps: function () {
+     var a = N('x0', -9999, 9999), b = N('nv', -9999, 9999);
+     function X(v, c) { return cell('x (int)', v, AX, c); }
+     return [
+      { line: 1, text: 'x := ' + a + ' লিখলে x নামে একটা box তৈরি হয়, যার ভেতরে মান ' + a + '। এই box-এর address ' + AX + '।', cells: [X(a, 'hit')], arrows: [], out: [] },
+      { line: 2, text: 'p := &x। এখানে &x মানে "x-এর address"। p একটা নতুন box, যার মান হলো ওই address-টাই। এটাকে p থেকে x-এর দিকে একটা তীর হিসেবে আঁকুন।', cells: [X(a), cell('p (*int)', AX, '0xc000012088', 'range')], arrows: [{ from: 1, to: 0, label: 'points to' }], out: [] },
+      { line: 3, text: '*p মানে "তীর ধরে গিয়ে box-এর মান পড়ো"। আমরা পাই ' + a + ' এবং print করি।', cells: [X(a, 'hit'), cell('p (*int)', AX, '0xc000012088', 'range')], arrows: [{ from: 1, to: 0 }], out: [String(a)] },
+      { line: 4, text: '*p = ' + b + ' তীর ধরে গিয়ে x-এর box-এ মান লেখে। আমরা কোথাও "x =" লিখিনি, তবু x বদলে গেছে।', cells: [X(b, 'hit'), cell('p (*int)', AX, '0xc000012088', 'range')], arrows: [{ from: 1, to: 0 }], out: [String(a)] },
+      { line: 5, text: 'x সরাসরি পড়লে নতুন মান দেখা যায়: ' + b + '। p আর x একই box-এ পৌঁছানোর দুটো আলাদা পথ।', cells: [X(b, 'found'), cell('p (*int)', AX, '0xc000012088', 'range')], arrows: [{ from: 1, to: 0 }], out: [String(a), String(b)] }
+     ];
+   } },
+ { name: 'Pass by value বনাম pointer', desc: 'Go সবসময় একটা COPY pass করে। সেই copy যদি কোনো address হয়, তাহলে function আপনার আসল variable-এ পৌঁছাতে পারে।',
+   inputs: [{ id: 'x0', label: 'x শুরুতে', value: '5', size: 6 }],
+   code: ['func addByValue(n int) {', '    n = n + 1', '}', '', 'func addByPointer(n *int) {', '    *n = *n + 1', '}', '', 'func main() {', '    x := 5', '    addByValue(x)', '    addByPointer(&x)', '}'],
+   render: render,
+   steps: function () {
+     var a = N('x0', -9999, 9999);
+     function X(v, c) { return cell('x (main)', v, AX, c); }
+     return [
+      { line: 9, text: 'main-এ x তৈরি হলো, মান ' + a + '।', cells: [X(a, 'hit')], arrows: [] },
+      { line: 10, text: 'addByValue(x) call হলো। Go মান ' + a + ' COPY করে addByValue-এর নিজের নতুন box n-এ রাখে।', cells: [X(a), cell('n (addByValue)', a, '0xc000012100', 'range')], arrows: [] },
+      { line: 1, text: 'n = n + 1 শুধু copy-টাকেই বদলায়।', cells: [X(a), cell('n (addByValue)', a + 1, '0xc000012100', 'hit')], arrows: [] },
+      { line: 10, text: 'addByValue return করার সাথে সাথে তার n মুছে যায়। x এখনো ' + a + '। পরিবর্তনটা হারিয়ে গেল।', cells: [X(a, 'found')], arrows: [] },
+      { line: 11, text: 'addByPointer(&x): &x হলো x-এর address। function-কে যে COPY দেওয়া হলো সেটা ওই address, তাই n এখন main-এর x-এর দিকে point করছে।', cells: [X(a), cell('n (addByPointer)', AX, '0xc000012100', 'range')], arrows: [{ from: 1, to: 0, label: 'points to' }] },
+      { line: 5, text: '*n = *n + 1 তীর ধরে যায়: পড়ে ' + a + ', 1 যোগ করে, main-এর x-এ লেখে ' + (a + 1) + '।', cells: [X(a + 1, 'hit'), cell('n (addByPointer)', AX, '0xc000012100', 'range')], arrows: [{ from: 1, to: 0 }] },
+      { line: 11, text: 'Function return করল। x এখন ' + (a + 1) + '। শুধু pointer-এর version-টাই caller-এর variable বদলাতে পেরেছে।', cells: [X(a + 1, 'found')], arrows: [] }
+     ];
+   } },
+ { name: 'Struct-এর pointer', desc: 'Pointer-এর ওপরেও p.Age লেখা যায়: Go নিজেই তীর ধরে যায়। Struct copy করলে একটা আলাদা, স্বাধীন copy তৈরি হয়।',
+   inputs: [{ id: 'age', label: 'Age শুরুতে', value: '30', size: 6 }],
+   code: ['type Person struct {', '    Name string', '    Age  int', '}', '', 'func main() {', '    p := Person{"Ada", 30}', '    pp := &p', '    pp.Age = pp.Age + 1  // same as (*pp).Age', '    q := p               // copy', '    q.Age = 99', '}'],
+   render: render,
+   steps: function () {
+     var a = N('age', 0, 200);
+     function P(age, c) { return cell('p (Person)', 'Ada, ' + age, '0xc000014000', c); }
+     return [
+      { line: 6, text: 'p একটা Person box, যার ভেতরে Name আর Age আছে।', cells: [P(a, 'hit')], arrows: [] },
+      { line: 7, text: 'pp := &p। pp-তে p-এর address আছে, অর্থাৎ একটা তীর।', cells: [P(a), cell('pp (*Person)', '0xc000014000', '0xc000012088', 'range')], arrows: [{ from: 1, to: 0 }] },
+      { line: 8, text: 'pp.Age = ... Go নিজে থেকেই তীর ধরে যায় (-> operator লাগে না)। বদলায় ORIGINAL p।', cells: [P(a + 1, 'hit'), cell('pp (*Person)', '0xc000014000', '0xc000012088', 'range')], arrows: [{ from: 1, to: 0 }] },
+      { line: 9, text: 'q := p পুরো struct-টা একটা নতুন box-এ copy করে। কোনো তীর নেই। q সম্পূর্ণ আলাদা।', cells: [P(a + 1), cell('pp (*Person)', '0xc000014000', '0xc000012088', 'range'), cell('q (Person)', 'Ada, ' + (a + 1), '0xc000014020', 'range')], arrows: [{ from: 1, to: 0 }] },
+      { line: 10, text: 'q.Age = 99 শুধু q-কে বদলায়। p-তে থাকে ' + (a + 1) + '।', cells: [P(a + 1, 'found'), cell('pp (*Person)', '0xc000014000', '0xc000012088', 'range'), cell('q (Person)', 'Ada, 99', '0xc000014020', 'hit')], arrows: [{ from: 1, to: 0 }] }
+     ];
+   } },
+ { name: 'new() আর nil pointer panic', desc: 'যে pointer কোথাও point করে না সেটা nil। nil তীর ধরে এগোতে গেলে প্রোগ্রাম crash করে।',
+   code: ['func main() {', '    var p *int', '    fmt.Println(p == nil)', '    p = new(int)', '    *p = 7', '    p = nil', '    fmt.Println(*p)', '}'],
+   render: render,
+   steps: function () {
+     var H = '0xc00001a0a8';
+     return [
+      { line: 1, text: 'var p *int: একটা pointer box, যার zero value nil। এটা কোথাও point করে না (ড্যাশ দিয়ে আঁকা, কোনো তীর নেই)।', cells: [cell('p (*int)', 'nil', '0xc000012080', 'nilp range')], arrows: [], out: [] },
+      { line: 2, text: 'p == nil হলো true। pointer ব্যবহারের আগে এভাবেই check করতে হয়।', cells: [cell('p (*int)', 'nil', '0xc000012080', 'nilp range')], arrows: [], out: ['true'] },
+      { line: 3, text: 'new(int) একটা নতুন int box (মান 0) বানায় আর তার address return করে। p এখন সেটার দিকে point করছে।', cells: [cell('p (*int)', H, '0xc000012080', 'range'), cell('(new int)', 0, H, 'hit')], arrows: [{ from: 0, to: 1 }], out: ['true'] },
+      { line: 4, text: '*p = 7 ওই box-এ 7 লেখে।', cells: [cell('p (*int)', H, '0xc000012080', 'range'), cell('(new int)', 7, H, 'hit')], arrows: [{ from: 0, to: 1 }], out: ['true'] },
+      { line: 5, text: 'p = nil তীরটা কেটে দেয়। int box-এর দিকে এখন আর কেউ point করছে না; Go-র garbage collector পরে সেটা মুছে দেবে।', cells: [cell('p (*int)', 'nil', '0xc000012080', 'nilp range'), cell('(orphan int)', 7, H, 'dim')], arrows: [], out: ['true'] },
+      { line: 6, text: '*p এমন একটা তীর ধরতে চাইছে যেটা নেই। প্রোগ্রাম panic করে crash করে।', cells: [cell('p (*int)', 'nil', '0xc000012080', 'nilp bad'), cell('(orphan int)', 7, H, 'dim')], arrows: [], out: ['true', 'panic: runtime error: invalid memory address or nil pointer dereference', 'exit status 2'] }
+     ];
+   } },
+ { name: 'দুটো pointer, একটাই target', desc: 'একাধিক pointer একই box-এর দিকে point করতে পারে। একটার মাধ্যমে লিখলে অন্যটা দিয়ে সেই মান দেখা যায়।',
+   inputs: [{ id: 'nv', label: '*a দিয়ে লিখুন', value: '2', size: 6 }],
+   code: function () { return ['func main() {', '    x := 1', '    a := &x', '    b := &x', '    *a = ' + I('nv'), '    fmt.Println(*b)', '}']; },
+   render: render,
+   steps: function () {
+     var v = N('nv', -999, 999);
+     function X(val, c) { return cell('x (int)', val, AX, c); }
+     function A() { return cell('a (*int)', AX, '0xc000012088', 'range'); }
+     function B() { return cell('b (*int)', AX, '0xc000012090', 'range'); }
+     return [
+      { line: 1, text: 'x = 1।', cells: [X(1, 'hit')], arrows: [], out: [] },
+      { line: 2, text: 'a := &x: a, x-এর দিকে point করছে।', cells: [X(1), A()], arrows: [{ from: 1, to: 0 }], out: [] },
+      { line: 3, text: 'b := &x: b-ও x-এর দিকে point করছে। দুটো তীর, একটাই target।', cells: [X(1), A(), B()], arrows: [{ from: 1, to: 0 }, { from: 2, to: 0 }], out: [] },
+      { line: 4, text: '*a = ' + v + ' a-এর মাধ্যমে লেখা হলো।', cells: [X(v, 'hit'), A(), B()], arrows: [{ from: 1, to: 0 }, { from: 2, to: 0 }], out: [] },
+      { line: 5, text: '*b নিজের তীর ধরে একই box-এ গিয়ে পড়ে ' + v + '। এজন্যই pointer দিয়ে data share করা শক্তিশালী, আবার এজন্যই এতে সাবধান থাকতে হয়।', cells: [X(v, 'found'), A(), B()], arrows: [{ from: 1, to: 0 }, { from: 2, to: 0 }], out: [String(v)] }
+     ];
+   } }
+]);
+
+})();
+</script>
+</body>
+</html>

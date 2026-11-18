@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Functions and the Call Stack - Go visual</title>
+<meta name="description" content="Watch stack frames pushed and popped as functions are called, return multiple values and recurse.">
+<link rel="stylesheet" href="../assets/viz.css">
+<style>
+.viz-layout{grid-template-columns:minmax(0,1fr)}
+.viz-stage,.viz-code{min-width:0;max-width:100%}
+@media (max-width:760px){.viz-layout.viz-has-code{grid-template-columns:minmax(0,1fr)}}
+body{overflow-x:hidden}
+.viz-svg .ah{fill:var(--accent)}
+.viz-svg .arrow{fill:none;stroke:var(--accent);stroke-width:2.5}
+.viz-svg .arrow.bad{stroke:var(--bad-line)}
+.viz-svg .node.bad{fill:var(--bad);stroke:var(--bad-line)}
+.viz-svg .node.nilp{stroke-dasharray:5 4}
+.viz-svg .nm{font-size:12px;fill:var(--muted)}
+.viz-svg .val{font-size:17px;font-weight:700}
+.viz-svg .ad{font-size:10px;fill:var(--muted)}
+.viz-svg .val.small{font-size:12px}
+.viz-svg .lbl{font-size:12px;fill:var(--accent);font-weight:700}
+.viz-cell.spare{background:transparent;border-style:dashed;color:var(--muted)}
+.hdrs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.chip{border:2px solid var(--cell-line);background:var(--cell);border-radius:10px;padding:4px 10px;font:600 13px var(--mono)}
+.chip.hit{background:var(--hit);border-color:var(--hit-line)}
+.chip.found{background:var(--found);border-color:var(--found-line)}
+.chip.dim{opacity:.45}
+.chip.bad{background:var(--bad);border-color:var(--bad-line)}
+.stackcol{display:flex;flex-direction:column-reverse;gap:6px;max-width:420px}
+.frame{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:6px 10px;font:13px var(--mono)}
+.frame b{display:block;margin-bottom:2px}
+.frame.hit{background:var(--hit);border-color:var(--hit-line)}
+.frame.found{background:var(--found);border-color:var(--found-line)}
+.frame.bad{background:var(--bad);border-color:var(--bad-line)}
+.frame.dim{opacity:.55}
+.out{font:13px var(--mono);background:var(--code-bg);color:var(--code-ink);padding:8px 10px;border-radius:8px;min-height:2.2em;white-space:pre-wrap;margin-top:10px}
+.out i{color:#6b7a90;font-style:normal}
+.row2{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.lane{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:8px 12px;min-width:170px;font:13px var(--mono)}
+.lane h4{margin:0 0 4px;font:700 13px var(--sans)}
+.lane.hit{background:var(--hit);border-color:var(--hit-line)}
+.lane.found{background:var(--found);border-color:var(--found-line)}
+.lane.bad{background:var(--bad);border-color:var(--bad-line)}
+.lane.dim{opacity:.55}
+.slots{display:flex;gap:6px}
+.slot{width:44px;height:44px;border:2px dashed var(--cell-line);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 15px var(--mono)}
+.slot.full{border-style:solid;background:var(--range);border-color:var(--range-line)}
+.iface{display:inline-flex;border:2px solid var(--cell-line);border-radius:10px;overflow:hidden;background:var(--cell);margin:4px 10px 4px 0}
+.iface div{padding:6px 10px;font:600 13px var(--mono)}
+.iface .t{background:var(--dim)}
+.iface.hit{background:var(--hit);border-color:var(--hit-line)}
+.iface.found{background:var(--found);border-color:var(--found-line)}
+.iface.bad{background:var(--bad);border-color:var(--bad-line)}
+.bar{height:20px;border-radius:5px;background:var(--range);border:2px solid var(--range-line);transition:width .3s}
+.bar.hit{background:var(--hit);border-color:var(--hit-line)}
+.bar.found{background:var(--found);border-color:var(--found-line)}
+.bar.dim{background:var(--dim);border-color:transparent}
+.tl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;align-items:center;font:13px var(--mono)}
+.tree{font:13px var(--mono)} .tree .tn{border:2px solid var(--cell-line);border-radius:8px;padding:4px 8px;margin:4px 0;background:var(--cell);display:inline-block}
+.tree .tn.bad{background:var(--bad);border-color:var(--bad-line)} .tree .tn.hit{background:var(--hit);border-color:var(--hit-line)} .tree .tn.found{background:var(--found);border-color:var(--found-line)}
+.tree ul{list-style:none;margin:0;padding-left:26px;border-left:2px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/go/functions-and-call-stack.html">বাংলা</a></nav>
+  <h1>Functions and the Call Stack</h1>
+  <p class="lead">Every function call gets its own <b>frame</b>: a private scratch-pad, stacked on top of the caller&rsquo;s.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea</h2>
+    <p>Picture a stack of sticky notes on your desk. You are working on a task (<code>main</code>). You need a sub-task done, so you put a <b>fresh note on top</b> with the inputs written on it and work only on that note. When it is finished you read off the answer, <b>throw the note away</b>, and carry on with the one underneath.</p>
+ <p>Arguments are <b>copied</b> onto the new note, so the callee can scribble on its notes without touching yours. A function that calls itself (recursion) just keeps adding notes until it reaches a case it can answer immediately, then the answers flow back down the stack.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Example<select id="sc"></select></label>
+    <span id="inputs" style="display:contents"></span>
+    <button id="run">Run</button>
+  </div>
+  <p class="viz-note" id="scdesc"></p>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul><li>In &ldquo;Recursion&rdquo; set n to 1, then 4, then 8. How many frames exist at the deepest point?</li><li>In &ldquo;Multiple return values&rdquo; set b to 1 and then 7. Watch q and r.</li><li>Notice the callee never changes the caller&rsquo;s variables. Its inputs were copies.</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul><li>Forgetting the base case in recursion. The stack grows until Go reports a stack overflow: <code>fatal error: stack overflow</code>.</li><li>Expecting a function to modify your variable when you passed a copy. Pass a pointer if it must.</li><li>Ignoring an error result: <code>v, _ := f()</code> throws away the information that tells you it failed.</li><li>Unused function parameters are fine, but unused local variables are a compile error.</li></ul>
+  </div>
+
+  <div class="pagenav"><a href="maps.html">&larr; Maps</a><a href="closures.html">Closures &rarr;</a></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+
+var E = Viz.el;
+/* ---- scenarios + dynamic inputs ---- */
+function multi(scenarios) {
+  var mount = Viz.$('#app'), sel = Viz.$('#sc'), inputsBox = Viz.$('#inputs'), err = Viz.$('#err'), desc = Viz.$('#scdesc');
+  var cur = 0, store = {}, pendingStep = null;
+  var hm = location.hash.match(/sc=(\d+)(?:&step=(\d+))?/);
+  if (hm && scenarios[+hm[1]]) { cur = +hm[1]; pendingStep = hm[2] ? +hm[2] : null; }
+  window.I = function (id) { var n = document.getElementById('in_' + id); return n ? n.value : ''; };
+  window.N = function (id, lo, hi) {
+    var raw = I(id).trim(); var v = Number(raw);
+    if (raw === '' || isNaN(v)) throw new Error('"' + id + '" must be a number.');
+    if (lo !== undefined && v < lo) throw new Error('"' + id + '" must be at least ' + lo + '.');
+    if (hi !== undefined && v > hi) throw new Error('"' + id + '" must be at most ' + hi + '.');
+    return Math.floor(v) === v ? v : Math.floor(v);
+  };
+  scenarios.forEach(function (sc, i) { sel.appendChild(E('option', { value: String(i), text: sc.name })); });
+  function buildInputs() {
+    inputsBox.innerHTML = '';
+    (scenarios[cur].inputs || []).forEach(function (inp) {
+      var key = cur + ':' + inp.id;
+      var val = store[key] !== undefined ? store[key] : inp.value;
+      var ctl;
+      if (inp.options) {
+        ctl = E('select', { id: 'in_' + inp.id }, inp.options.map(function (o) { return E('option', { value: o[0], text: o[1] }); }));
+        ctl.value = val;
+      } else {
+        ctl = E('input', { id: 'in_' + inp.id, value: val, size: inp.size || 10 });
+      }
+      ctl.addEventListener('change', function () { store[key] = ctl.value; show(); });
+      inputsBox.appendChild(E('label', { text: inp.label }, [ctl]));
+    });
+  }
+  function show() {
+    var sc = scenarios[cur];
+    err.textContent = '';
+    mount.innerHTML = '';
+    desc.textContent = sc.desc || '';
+    var steps;
+    try { steps = sc.steps(); } catch (e) { err.textContent = e.message; return; }
+    var st = Viz.stepper({ mount: mount, code: typeof sc.code === 'function' ? sc.code() : sc.code, render: sc.render });
+    st.load(steps);
+    if (pendingStep !== null) { st.go(pendingStep); pendingStep = null; }
+  }
+  sel.addEventListener('change', function () { cur = +sel.value; buildInputs(); show(); });
+  Viz.$('#run').addEventListener('click', function () { show(); });
+  sel.value = String(cur); buildInputs(); show();
+  if (location.hash === '#test') {
+    var log = [];
+    scenarios.forEach(function (sc, k) {
+      try {
+        cur = k; buildInputs();
+        var steps = sc.steps(), code = typeof sc.code === 'function' ? sc.code() : sc.code, tmp = document.createElement('div');
+        if (!steps.length) throw new Error('no steps');
+        steps.forEach(function (stp, j) {
+          tmp.innerHTML = ''; sc.render(stp, j, tmp);
+          if (!tmp.firstChild) throw new Error('empty render at step ' + j);
+          [].concat(stp.line === undefined ? [] : stp.line).forEach(function (ln) { if (!(ln >= 0 && ln < code.length)) throw new Error('bad line ' + ln + ' at step ' + j); });
+          if (!stp.text) throw new Error('no text at step ' + j);
+        });
+        log.push('OK   ' + sc.name + ' (' + steps.length + ' steps)');
+      } catch (e) { log.push('FAIL ' + sc.name + ': ' + e.message); }
+    });
+    cur = 0; sel.value = '0'; buildInputs(); show();
+    document.body.appendChild(E('pre', { id: 'testresult', text: log.join('\n') }));
+  }
+}
+
+/* ---- memory diagram: boxes + arrows (illustrative addresses) ---- */
+var _mid = 0;
+function mem(body, cells, arrows, o) {
+  o = o || {};
+  var W = 124, H = 70, G = 34, X0 = 12, Y0 = 12, n = Math.max(cells.length, 1), id = 'ah' + (++_mid);
+  var width = X0 * 2 + n * W + (n - 1) * G, hasA = arrows && arrows.length, height = Y0 + H + (hasA ? 92 : 14);
+  var kids = [Viz.s('defs', {}, [Viz.s('marker', { id: id, viewBox: '0 0 10 10', refX: '8', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto' }, [Viz.s('path', { d: 'M0,0L10,5L0,10z', class: 'ah' })])])];
+  cells.forEach(function (c, i) {
+    var x = X0 + i * (W + G);
+    kids.push(Viz.s('rect', { x: x, y: Y0, width: W, height: H, rx: 10, class: 'node ' + (c.cls || '') }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 17, 'text-anchor': 'middle', class: 'nm', text: c.name }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 42, 'text-anchor': 'middle', class: 'val' + (String(c.value).length > 8 ? ' small' : ''), text: String(c.value) }));
+    if (c.addr) kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 62, 'text-anchor': 'middle', class: 'ad', text: c.addr }));
+  });
+  (arrows || []).forEach(function (a) {
+    var x1 = X0 + a.from * (W + G) + W / 2, x2 = X0 + a.to * (W + G) + W / 2, y = Y0 + H, d;
+    if (a.from === a.to) { x1 -= 22; x2 += 22; d = 'M' + x1 + ',' + y + ' C' + (x1 - 10) + ',' + (y + 55) + ' ' + (x2 + 10) + ',' + (y + 55) + ' ' + x2 + ',' + (y + 3); }
+    else d = 'M' + x1 + ',' + y + ' C' + x1 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 4);
+    kids.push(Viz.s('path', { d: d, class: 'arrow ' + (a.cls || ''), 'marker-end': 'url(#' + id + ')' }));
+    if (a.label) kids.push(Viz.s('text', { x: (x1 + x2) / 2, y: y + 66, 'text-anchor': 'middle', class: 'lbl', text: a.label }));
+  });
+  var svgEl = Viz.svg(width, height, kids); svgEl.style.minWidth = Math.min(width, 600) + 'px';
+  body.appendChild(svgEl);
+  if (o.note !== false) body.appendChild(Viz.note('Addresses like 0xc000012000 are made up for illustration; real addresses differ on every run.'));
+}
+function out(body, lines) {
+  body.appendChild(E('div', { class: 'out', html: lines && lines.length ? lines.map(function (l) { return esc(l); }).join('<br>') : '<i>(program output appears here)</i>' }));
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function chips(items) { return E('div', { class: 'hdrs' }, items.map(function (c) { return E('span', { class: 'chip ' + (c.cls || ''), text: c.text }); })); }
+
+document.getElementById('legend').appendChild(Viz.legend([{cls:'hit',label:'running now (top of the stack)'},{cls:'found',label:'returning / finished'},{cls:'dim',label:'waiting for the call above'}]));
+
+function render(st, i, body) {
+  var col = E('div', { class: 'stackcol' }, st.frames.map(function (f) {
+    return E('div', { class: 'frame ' + (f.cls || '') }, [E('b', { text: f.title }), E('div', { text: f.vars || '' })]);
+  }));
+  body.appendChild(E('div', { class: 'viz-note', text: 'Call stack (bottom = first call, top = running now)' }));
+  body.appendChild(col);
+  if (st.out) out(body, st.out);
+}
+function F(title, vars, cls) { return { title: title, vars: vars, cls: cls }; }
+multi([
+ { name: 'Multiple return values', desc: 'A function can return several values. The caller receives copies.',
+   inputs: [{ id: 'a', label: 'a', value: '17', size: 5 }, { id: 'b', label: 'b', value: '5', size: 5 }],
+   code: function () { return ['func divmod(a, b int) (int, int) {', '    return a / b, a % b', '}', '', 'func main() {', '    q, r := divmod(' + I('a') + ', ' + I('b') + ')', '    fmt.Println(q, r)', '}']; },
+   render: render,
+   steps: function () {
+     var a = N('a', -1000, 1000), b = N('b', -1000, 1000);
+     if (b === 0) throw new Error('b must not be 0 (in Go, integer division by zero panics).');
+     var q = Math.trunc(a / b), r = a % b;
+     return [
+      { line: 4, text: 'The program starts in main. It has a frame (a private scratch-pad) at the bottom of the stack.', frames: [F('main()', 'q, r not created yet', 'hit')] },
+      { line: 5, text: 'main calls divmod(' + a + ', ' + b + '). A NEW frame is pushed on top and the arguments are COPIED into it.', frames: [F('main()', 'waiting...', 'dim'), F('divmod(a, b)', 'a = ' + a + ', b = ' + b, 'hit')] },
+      { line: 1, text: 'divmod computes a / b = ' + q + ' and a % b = ' + r + ' (integer division drops the fraction) and returns both.', frames: [F('main()', 'waiting...', 'dim'), F('divmod(a, b)', 'a = ' + a + ', b = ' + b + '  → returns (' + q + ', ' + r + ')', 'found')] },
+      { line: 5, text: 'The divmod frame is popped (thrown away). Its two results are copied into q and r in main.', frames: [F('main()', 'q = ' + q + ', r = ' + r, 'hit')] },
+      { line: 6, text: 'main prints them.', frames: [F('main()', 'q = ' + q + ', r = ' + r, 'hit')], out: [q + ' ' + r] }
+     ];
+   } },
+ { name: 'Recursion: factorial', desc: 'A function calling itself stacks one frame per call; answers flow back when the base case is reached.',
+   inputs: [{ id: 'n', label: 'n', value: '4', size: 5 }],
+   code: ['func fact(n int) int {', '    if n <= 1 {', '        return 1          // base case', '    }', '    return n * fact(n-1)', '}'],
+   render: render,
+   steps: function () {
+     var n = N('n', 1, 8), steps = [], frames = [], k;
+     function snap(text, line, topCls, extra) {
+       steps.push({ line: line, text: text, frames: frames.map(function (f, ix) { return Object.assign({}, f, { cls: ix === frames.length - 1 ? topCls : 'dim' }); }), out: extra });
+     }
+     for (k = n; k >= 1; k--) {
+       frames.push(F('fact(n=' + k + ')', k > 1 ? 'needs fact(' + (k - 1) + ') first' : 'n <= 1: can answer now', ''));
+       snap(k === n ? 'main calls fact(' + n + '). A frame is pushed.' : 'fact(' + (k + 1) + ') calls fact(' + k + '): another frame on top.', k > 1 ? 4 : 1, 'hit');
+     }
+     var val = 1;
+     steps.push({ line: 2, text: 'Base case: fact(1) returns 1 without calling anything. The stack is now ' + n + ' frame(s) deep.', frames: frames.map(function (f, ix) { return Object.assign({}, f, { vars: ix === frames.length - 1 ? 'returns 1' : f.vars, cls: ix === frames.length - 1 ? 'found' : 'dim' }); }) });
+     frames[frames.length - 1].vars = 'returns 1';
+     for (k = 2; k <= n; k++) {
+       frames.pop(); val *= k;
+       frames[frames.length - 1].vars = '' + k + ' * ' + (val / k) + ' = ' + val + '  → returns ' + val;
+       snap('The frame above is popped. fact(' + k + ') now has its answer: ' + k + ' * ' + (val / k) + ' = ' + val + '.', 4, 'found');
+     }
+     steps.push({ line: 4, text: 'Back in main: fact(' + n + ') = ' + val + '. All frames are gone.', frames: [F('main()', 'result = ' + val, 'hit')], out: [String(val)] });
+     return steps;
+   } }
+]);
+
+})();
+</script>
+</body>
+</html>

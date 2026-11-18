@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hash Map: Two Sum</title>
+<meta name="description" content="একটু বেশি memory খরচ করে hash map-এ আগে দেখা মান মনে রেখে Two Sum দ্রুত সমাধান করা।">
+<link rel="stylesheet" href="../../assets/viz.css">
+<style>.seen{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;min-height:36px}.chip{font:600 14px var(--mono);border:2px solid var(--cell-line);border-radius:8px;padding:3px 8px;background:var(--cell)}.chip.hit{background:var(--found);border-color:var(--found-line)}.stat{font:14px var(--mono);margin:4px 0}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; সব visual</a> &middot; <a href="../../dsa/hash-map-two-sum.html">English</a></nav>
+  <h1>Hash Map: Two Sum</h1>
+  <p class="lead">একটু বেশি memory খরচ করে অনেক বেশি speed পান: যা আগে দেখেছেন সেটা মনে রাখুন।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা</h2>
+    <p>ধরুন একটা পার্টিতে আপনি এমন দুজন অতিথি খুঁজছেন যাদের বয়সের যোগফল 30। ধীর উপায়: প্রতিটা অতিথিকে বাকি সবার সাথে মিলিয়ে দেখা। Smart উপায়: প্রতিজন অতিথি আসার সাথে সাথে জিজ্ঞেস করুন <b>&ldquo;(30 &minus; আমার বয়স) বয়সের কেউ কি আগেই এসেছে?&rdquo;</b> আসা অতিথিদের একটা খাতা (<b>hash map</b>) রাখলে এই প্রশ্নের উত্তর সাথে সাথে পাওয়া যায়। উত্তর হ্যাঁ হলে কাজ শেষ। না হলে এই অতিথিকে খাতায় লিখে পরেরজনের কাছে যান।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+  <label>সংখ্যা (যেকোনো ক্রমে)<input id="arr" value="2, 7, 11, 15, 3, 6"></label>
+  <label>Target sum<input id="target" value="9" size="6"></label>
+  <button id="go">Run</button>
+</div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul><li>Target <code>9</code>: দুটো সংখ্যার মধ্যে <i>পরেরটা</i> আসার সময় pair পাওয়া যায়। প্রথমটা আসার সময় কেন নয়?</li><li>Target <code>100</code>: loop কোনো pair না পেয়েই শেষ হয়। শেষে map দেখতে কেমন?</li><li>একই সংখ্যা দুবার দিন, যেমন <code>3, 3</code> আর target <code>6</code>। এটা কেন কাজ করে?</li><li>শুধু একটা <code>5</code> আর target <code>10</code> দিন। এটা কি ভুলভাবে নিজের সাথেই pair হয়? ক্রমটা দেখুন: lookup হয় store করার <i>আগে</i>।</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul><li><b>Lookup-এর আগে store করা:</b> তাহলে একটা সংখ্যা নিজের সাথেই pair হয়ে যেতে পারে।</li><li><b>map-এ কী store হচ্ছে গুলিয়ে ফেলা:</b> এখানে map-এ value &rarr; index থাকে, তাই lookup-এর key হলো <i>যে value দরকার</i> সেটা।</li><li><b>List sorted ধরে নেওয়া:</b> map দিয়ে করলে sorting লাগে না। (Two pointers-এ লাগে।)</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Complexity</h2>
+    <p><b>Time complexity: O(n)</b> &ndash; একবার পুরো list দেখা হয়, আর map-এর প্রতিটা lookup/insert গড়ে O(1)। <b>Space complexity: O(n)</b> &ndash; map-এ সব সংখ্যাই থাকতে পারে। Brute-force double loop-এ time complexity O(n&sup2;) কিন্তু space complexity O(1)।</p>
+  </div>
+
+  <div class="pagenav"><a href="sliding-window.html">&larr; Sliding Window</a><a href="prefix-sum.html">Prefix Sum &rarr;</a></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script id="algo">
+
+function twoSumSteps(nums, target) {
+  var steps = [], seen = {}, order = [];
+  function snap(line, text, extra) { steps.push(Object.assign({ nums: nums, target: target, map: order.map(function (v) { return [v, seen[v]]; }), line: line, text: text }, extra || {})); }
+  snap(1, 'খালি map দিয়ে শুরু: value → index। যে সংখ্যাগুলো পার হয়ে এসেছি সেগুলো এখানে থাকবে।', { i: -1 });
+  for (var i = 0; i < nums.length; i++) {
+    var n = nums[i], need = target - n;
+    snap(3, 'দেখি nums[' + i + '] = ' + n + '। ' + target + ' পেতে দরকার ' + target + ' - ' + n + ' = ' + need + '।', { i: i, need: need });
+    if (Object.prototype.hasOwnProperty.call(seen, need)) {
+      var j = seen[need];
+      snap([4, 5], 'হ্যাঁ! ' + need + ' map-এ আছে, index ' + j + '। তাই nums[' + j + '] + nums[' + i + '] = ' + need + ' + ' + n + ' = ' + target + '। return করি [' + j + ', ' + i + ']।', { i: i, need: need, found: [j, i], result: [j, i] });
+      return steps;
+    }
+    snap(4, 'map-এ এখনো ' + need + ' নেই, তাই pair করার মতো কিছু নেই।', { i: i, need: need });
+    seen[n] = i; if (order.indexOf(n) === -1) order.push(n);
+    snap(7, 'map-এ লিখি ' + n + ' → ' + i + ' (এরপর পরের সংখ্যায় যাই)।', { i: i, need: need, stored: n });
+  }
+  snap(9, 'কোনো pair না পেয়ে শেষে পৌঁছে গেছি। nil return করি।', { i: nums.length - 1, result: null });
+  return steps;
+}
+
+</script>
+<script id="ui">
+
+function $id(x) { return document.getElementById(x); }
+function showErr(m) { $id('err').textContent = m || ''; }
+var current = null;
+function mountStepper(opts) {
+  if (current) current.pause();
+  var app = $id('app'); app.innerHTML = ''; app.className = '';
+  current = Viz.stepper(Object.assign({ mount: '#app' }, opts));
+  return current;
+}
+function setLegend(items) { var l = $id('legend'); l.innerHTML = ''; l.appendChild(Viz.legend(items)); }
+function mark(marks, ix, label) { marks[ix] = (marks[ix] || []).concat(label); }
+
+
+var CODE = ['func twoSum(nums []int, target int) []int {',
+'    seen := map[int]int{}',
+'    for i, n := range nums {',
+'        need := target - n',
+'        if j, ok := seen[need]; ok {',
+'            return []int{j, i}',
+'        }',
+'        seen[n] = i',
+'    }',
+'    return nil',
+'}'];
+function render(st, i, body) {
+  var cls = {}, marks = {};
+  st.nums.forEach(function (_, ix) { cls[ix] = ix < st.i ? 'dim' : 'range'; });
+  if (st.i >= 0) { cls[st.i] = 'hit'; mark(marks, st.i, 'i'); }
+  if (st.found) st.found.forEach(function (ix) { cls[ix] = 'found'; });
+  body.appendChild(Viz.array(st.nums, { marks: marks, classes: cls, title: 'nums (target = ' + st.target + ')' }));
+  if (st.need !== undefined) body.appendChild(Viz.el('div', { class: 'stat', html: 'need = ' + st.target + ' &minus; ' + st.nums[st.i] + ' = <b>' + st.need + '</b>' }));
+  body.appendChild(Viz.el('div', { class: 'viz-array-title', text: 'map (value → index)' }));
+  body.appendChild(Viz.el('div', { class: 'seen' }, st.map.length ? st.map.map(function (kv) {
+    return Viz.el('span', { class: 'chip' + (st.need === kv[0] && st.found ? ' hit' : ''), text: kv[0] + ' → ' + kv[1] });
+  }) : [Viz.el('span', { class: 'viz-note', text: '(খালি)' })]));
+  if (st.result !== undefined) body.appendChild(Viz.note(st.result ? '<b>ফলাফল: [' + st.result.join(', ') + ']</b>' : '<b>ফলাফল: nil (কোনো pair নেই)</b>'));
+}
+function run() {
+  showErr('');
+  var nums = Viz.parseNums($id('arr').value), tv = $id('target').value.trim(), target = Number(tv);
+  if (!nums.length || nums.length > 12) { showErr('1 থেকে 12টার মধ্যে সংখ্যা দিন।'); return; }
+  if (tv === '' || isNaN(target)) { showErr('Target একটা সংখ্যা হতে হবে।'); return; }
+  setLegend([{ cls: 'hit', label: 'বর্তমান সংখ্যা' }, { cls: 'range', label: 'এখনো দেখা হয়নি' }, { cls: 'dim', label: 'map-এ আছে' }, { cls: 'found', label: 'pair-টা' }]);
+  mountStepper({ code: CODE, render: render }).load(twoSumSteps(nums, target));
+}
+$id('go').addEventListener('click', run);
+run();
+
+</script>
+</body>
+</html>

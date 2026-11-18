@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Trie-তে word insert করা এবং search বা prefix query করার সময় অক্ষর ধরে ধরে নামার পথটি run করে দেখুন।">
+<title>Trie (Prefix Tree)</title>
+<link rel="stylesheet" href="../../assets/viz.css">
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">← সব visual</a> · <a href="../../dsa/trie.html">English</a></nav>
+  <h1>Trie (Prefix Tree)</h1>
+  <p class="lead">অক্ষরের একটি tree, যা "কোনো শব্দ কি এই অক্ষর দিয়ে শুরু হয়?" প্রশ্নের উত্তর খুব দ্রুত দেয়।</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">মূল ধারণা (ফোনের auto-complete)</h2>
+    <p>আপনি "ca" লিখলে ফোন যখন "cat", "car" আর "cart" suggest করে, তখন পুরো ডিকশনারি scan না করেই "ca" দিয়ে শুরু হওয়া প্রতিটি শব্দ খুঁজে বের করতে হয়। <b>Trie</b> শব্দগুলোকে একটিমাত্র <b>root</b> থেকে অক্ষরের path হিসেবে রাখে। যেসব শব্দের শুরু একই, তারা path-এর শুরুটা <b>ভাগ করে</b> নেয়।</p>
+    <ul>
+      <li><b>Insert</b>: নিচের দিকে হাঁটুন, প্রতি ধাপে একটি অক্ষর। সেই অক্ষরের edge না থাকলে বানান। শেষ node-কে <b>"এখানে একটি word শেষ"</b> হিসেবে mark করুন (double circle দিয়ে আঁকা)।</li>
+      <li><b>Search</b>: শব্দটির অক্ষর ধরে নামুন। edge না থাকলে শব্দটি নেই। পৌঁছাতে পারলেও শব্দটি আছে শুধু তখনই, যখন শেষ node-টি word end হিসেবে mark করা।</li>
+      <li><b>StartsWith</b> prefix: একই পথ, কিন্তু পৌঁছাতে পারলেই যথেষ্ট।</li>
+    </ul>
+    <p>খেয়াল করুন: <code>car</code>, <code>cart</code>-এর prefix। দুটোই word হতে পারে, তাই "word end" আলাদা একটা mark, "কোনো children নেই" এর সমান নয়।</p>
+  </div>
+
+  <h2>Run করে দেখুন</h2>
+  <div class="inputs">
+    <label>Insert করার word (lowercase অক্ষর, সর্বোচ্চ 6টি word, প্রতিটি 1 থেকে 6 অক্ষরের)<input id="words" value="cat, car, cart, dog, do" size="34"></label>
+    <label>Query (search WORD / prefix TEXT)<input id="queries" value="search car, search ca, prefix ca, search dot" size="50"></label>
+    <button id="go">Run</button>
+  </div>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>নিজে চেষ্টা করুন</h3>
+    <ul>
+      <li><code>cat, car, cart</code> insert করুন। আপনার লেখা 10টি অক্ষরের তুলনায় tree-তে কয়টি node হলো? এই সাশ্রয়টাই trie-র মূল সুবিধা।</li>
+      <li><code>search ca</code> run করুন, তারপর <code>prefix ca</code>। উত্তর আলাদা কেন?</li>
+      <li><code>do</code> আর <code>dog</code> থাকা অবস্থায় <code>search dot</code> run করুন। হাঁটা কোথায় থামে?</li>
+      <li><code>apple, zebra</code>-র মতো একেবারে আলাদা দুটি word insert করুন। তারা কি কিছু ভাগ করে?</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">সাধারণ ভুল</h2>
+    <ul>
+      <li><b>word-end flag ভুলে যাওয়া।</b> এটা না থাকলে "cat" রাখার পর <code>Search("ca")</code> ভুলভাবে yes বলত।</li>
+      <li><b>children map initialize না করা।</b> Go-তে nil map-এ লিখলে panic হয়, তাই প্রতিটি নতুন node-এর জন্য <code>map[rune]*Trie{}</code> বানান।</li>
+      <li><b>Search আর StartsWith গুলিয়ে ফেলা।</b> Search-এ end flag লাগে; StartsWith-এ লাগে না।</li>
+      <li><b>Memory।</b> প্রতিটি node-এ একটি map থাকে। শুধু lowercase অক্ষরের জন্য <code>[26]*Trie</code> array দ্রুততর এবং প্রায়ই ছোট হয়।</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <b>Complexity, সহজ ভাষায়:</b> insert, search আর prefix check, সবকটিতে শব্দের প্রতিটি অক্ষরের জন্য একটি করে ধাপ লাগে, কতগুলো word store করা আছে তাতে কিছু যায় আসে না (L অক্ষরের word-এর জন্য <code>O(L)</code>)। বিনিময়ে memory লাগে: store করা প্রতিটি অক্ষরের জন্য সর্বোচ্চ একটি node।
+  </div>
+
+  <div class="pagenav"><span></span><span></span></div>
+</div>
+
+<script src="../../assets/viz.js"></script>
+<script>
+(function () {
+/*GEN-START*/
+var CODE = [
+  'type Trie struct {',                                                   // 0
+  '    children map[rune]*Trie',                                          // 1
+  '    end      bool',                                                    // 2
+  '}',                                                                    // 3
+  '',                                                                     // 4
+  'func (t *Trie) Insert(word string) {',                                 // 5
+  '    node := t',                                                        // 6
+  '    for _, ch := range word {',                                        // 7
+  '        if node.children[ch] == nil {',                                // 8
+  '            node.children[ch] = &Trie{children: map[rune]*Trie{}}',    // 9
+  '        }',                                                            // 10
+  '        node = node.children[ch]',                                     // 11
+  '    }',                                                                // 12
+  '    node.end = true',                                                  // 13
+  '}',                                                                    // 14
+  '',                                                                     // 15
+  'func (t *Trie) walk(s string) *Trie {',                                // 16
+  '    node := t',                                                        // 17
+  '    for _, ch := range s {',                                           // 18
+  '        if node.children[ch] == nil {',                                // 19
+  '            return nil',                                               // 20
+  '        }',                                                            // 21
+  '        node = node.children[ch]',                                     // 22
+  '    }',                                                                // 23
+  '    return node',                                                      // 24
+  '}',                                                                    // 25
+  '',                                                                     // 26
+  'func (t *Trie) Search(word string) bool {',                            // 27
+  '    n := t.walk(word)',                                                // 28
+  '    return n != nil && n.end',                                         // 29
+  '}',                                                                    // 30
+  '',                                                                     // 31
+  'func (t *Trie) StartsWith(prefix string) bool {',                      // 32
+  '    return t.walk(prefix) != nil',                                     // 33
+  '}',                                                                    // 34
+];
+
+function parseWords(str) {
+  var parts = str.split(/[\s,]+/).filter(Boolean), out = [];
+  if (!parts.length) return { error: 'অন্তত একটি word লিখুন, যেমন: cat, car' };
+  for (var i = 0; i < parts.length; i++) {
+    if (!/^[a-z]{1,6}$/.test(parts[i])) return { error: '"' + parts[i] + '" সঠিক নয়। শুধু lowercase অক্ষর a-z ব্যবহার করুন, 1 থেকে 6 অক্ষর।' };
+    if (out.indexOf(parts[i]) === -1) out.push(parts[i]);
+  }
+  if (out.length > 6) return { error: 'সর্বোচ্চ 6টি আলাদা word ব্যবহার করুন।' };
+  return { words: out };
+}
+function parseQueries(str) {
+  var parts = str.split(',').map(function (s) { return s.trim(); }).filter(Boolean), out = [], m;
+  if (parts.length > 6) return { error: 'সর্বোচ্চ 6টি query ব্যবহার করুন।' };
+  for (var i = 0; i < parts.length; i++) {
+    m = /^(search|prefix)\s+([a-z]{1,6})$/.exec(parts[i]);
+    if (!m) return { error: 'বুঝতে পারছি না: "' + parts[i] + '"। "search WORD" বা "prefix TEXT" লিখুন (lowercase, 1 থেকে 6 অক্ষর)।' };
+    out.push({ type: m[1], text: m[2] });
+  }
+  return { queries: out };
+}
+
+function genTrie(words, queries) {
+  var nid = 0, root = { id: nid++, ch: '', end: false, kids: [] }, steps = [], phase = '', results = [];
+  function clone(n) { return { id: n.id, ch: n.ch, end: n.end, kids: n.kids.map(clone) }; }
+  function snap(text, line, cur, path, mark) {
+    steps.push({ root: clone(root), text: text, line: line, cur: cur === undefined ? -1 : cur, path: path.slice(), mark: mark === undefined ? -1 : mark, phase: phase });
+  }
+  function child(n, ch) { for (var i = 0; i < n.kids.length; i++) if (n.kids[i].ch === ch) return n.kids[i]; return null; }
+  function insert(w) {
+    phase = 'Insert "' + w + '"';
+    var node = root, path = [root.id];
+    snap('Root থেকে শুরু করুন (এটি empty word বোঝায়)।', 6, root.id, path);
+    for (var i = 0; i < w.length; i++) {
+      var ch = w[i], nx = child(node, ch);
+      if (nx) {
+        node = nx; path.push(node.id);
+        snap('অক্ষর "' + ch + '": edge "' + ch + '" আগে থেকেই আছে, তাই সেটাই ব্যবহার করুন (shared prefix!)।', [7, 8, 11], node.id, path);
+      } else {
+        nx = { id: nid++, ch: ch, end: false, kids: [] }; node.kids.push(nx); node = nx; path.push(node.id);
+        snap('অক্ষর "' + ch + '": এখনো edge "' + ch + '" নেই, তাই নতুন node বানান।', [7, 8, 9, 11], -1, path, node.id);
+      }
+    }
+    node.end = true;
+    snap('শব্দ "' + w + '" শেষ: এই node-কে word end হিসেবে mark করুন (double circle)।', 13, -1, path, node.id);
+  }
+  function walk(s, line0) {
+    var node = root, path = [root.id];
+    snap('Root থেকে শুরু করুন।', 17, root.id, path);
+    for (var i = 0; i < s.length; i++) {
+      var nx = child(node, s[i]);
+      if (!nx) { snap('অক্ষর "' + s[i] + '": এখান থেকে "' + s[i] + '" edge নেই, তাই walk nil return করে।', [19, 20], node.id, path); return { node: null, path: path }; }
+      node = nx; path.push(node.id);
+      snap('অক্ষর "' + s[i] + '": edge আছে, সেটা ধরে এগিয়ে যান।', [18, 22], node.id, path);
+    }
+    snap('সব অক্ষর ধরে এগোনো গেছে, তাই walk এই node-টি return করে।', 24, node.id, path);
+    return { node: node, path: path };
+  }
+  words.forEach(insert);
+  queries.forEach(function (q) {
+    phase = (q.type === 'search' ? 'Search "' : 'StartsWith "') + q.text + '"';
+    var w = walk(q.text), ok;
+    if (q.type === 'search') {
+      ok = !!(w.node && w.node.end);
+      snap(!w.node ? 'walk nil return করেছে, তাই Search("' + q.text + '") false।' : (w.node.end ? 'Node-টি word end হিসেবে mark করা আছে, তাই Search("' + q.text + '") true।' : 'পৌঁছেছি, কিন্তু এই node word end হিসেবে mark করা নেই ("' + q.text + '" শুধু আরও বড় একটি শব্দের prefix), তাই Search false।'), [28, 29], -1, w.path, ok ? w.node.id : -1);
+    } else {
+      ok = !!w.node;
+      snap(ok ? 'walk একটি node return করেছে, তাই StartsWith("' + q.text + '") true। (এখানে end flag-এর কোনো গুরুত্ব নেই।)' : 'walk nil return করেছে, তাই StartsWith("' + q.text + '") false।', 33, -1, w.path, ok ? w.node.id : -1);
+    }
+    results.push(ok);
+  });
+  return { steps: steps, results: results, root: root };
+}
+
+function layout(root) {
+  var pos = new Map(), next = 0, maxd = 0;
+  (function place(n, d) {
+    if (d > maxd) maxd = d;
+    if (!n.kids.length) { pos.set(n, { x: next++, d: d }); return; }
+    n.kids.forEach(function (c) { place(c, d + 1); });
+    pos.set(n, { x: (pos.get(n.kids[0]).x + pos.get(n.kids[n.kids.length - 1]).x) / 2, d: d });
+  })(root, 0);
+  return { pos: pos, w: next, h: maxd + 1 };
+}
+/*GEN-END*/
+
+  var app = document.getElementById('app');
+  var errBox = document.getElementById('err');
+
+  function drawTrie(st) {
+    var L = layout(st.root), dx = 48, dy = 56, r = 14, pad = 12;
+    var W = Math.max(L.w * dx + pad * 2, 160), H = L.h * dy + pad, parts = [];
+    function cx(n) { return pad + L.pos.get(n).x * dx + dx / 2; }
+    function cy(n) { return pad + L.pos.get(n).d * dy + r + 4; }
+    L.pos.forEach(function (_, n) {
+      n.kids.forEach(function (c) {
+        var onPath = st.path.indexOf(c.id) !== -1 && st.path.indexOf(n.id) !== -1;
+        parts.push(Viz.s('line', { class: 'edge' + (onPath ? ' hit' : ''), x1: cx(n), y1: cy(n), x2: cx(c), y2: cy(c) }));
+      });
+    });
+    L.pos.forEach(function (_, n) {
+      n.kids.forEach(function (c) {
+        var mx = (cx(n) + cx(c)) / 2, my = (cy(n) + cy(c)) / 2;
+        parts.push(Viz.s('text', { x: mx - 8, y: my, 'text-anchor': 'middle', 'font-size': 14, 'font-weight': 700, style: 'paint-order:stroke;stroke:var(--card);stroke-width:4px', text: c.ch }));
+      });
+    });
+    L.pos.forEach(function (_, n) {
+      var cls = 'node';
+      if (n.id === st.mark) cls += ' found'; else if (n.id === st.cur) cls += ' hit'; else if (st.path.indexOf(n.id) !== -1) cls += ' range';
+      if (n.end) parts.push(Viz.s('circle', { class: 'edge', cx: cx(n), cy: cy(n), r: r + 4, style: 'stroke:var(--ink);stroke-width:1.5px' }));
+      parts.push(Viz.s('circle', { class: cls, cx: cx(n), cy: cy(n), r: r }));
+      if (n.ch === '' ) parts.push(Viz.s('text', { x: cx(n), y: cy(n) + 4, 'text-anchor': 'middle', 'font-size': 11, text: 'root' }));
+    });
+    return Viz.svg(W, H, parts);
+  }
+
+  function render(st, i, body) {
+    body.appendChild(Viz.note('<b>' + st.phase + '</b>'));
+    body.appendChild(drawTrie(st));
+    body.appendChild(Viz.note('অক্ষরগুলো edge-এর উপর বসে আছে। double circle মানে "এখানে একটি word শেষ হয়েছে"।'));
+  }
+
+  function run() {
+    errBox.textContent = '';
+    var w = parseWords(document.getElementById('words').value);
+    if (w.error) { errBox.textContent = w.error; return; }
+    var q = parseQueries(document.getElementById('queries').value);
+    if (q.error) { errBox.textContent = q.error; return; }
+    app.innerHTML = '';
+    var st = Viz.stepper({ mount: app, code: CODE, render: render });
+    st.load(genTrie(w.words, q.queries).steps);
+  }
+
+  document.getElementById('legend').appendChild(Viz.legend([
+    { cls: 'hit', label: 'যে node-এ এখন আছি' }, { cls: 'range', label: 'এ পর্যন্ত যে path ধরে এসেছি' }, { cls: 'found', label: 'নতুন node / query-র উত্তর হ্যাঁ' },
+  ]));
+  document.getElementById('go').addEventListener('click', run);
+  run();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mutex and Data Race - Go visual</title>
+<meta name="description" content="Step through two goroutines doing counter++ at the same time, see an update get lost, then fix it with a mutex.">
+<link rel="stylesheet" href="../assets/viz.css">
+<style>
+.viz-layout{grid-template-columns:minmax(0,1fr)}
+.viz-stage,.viz-code{min-width:0;max-width:100%}
+@media (max-width:760px){.viz-layout.viz-has-code{grid-template-columns:minmax(0,1fr)}}
+body{overflow-x:hidden}
+.viz-svg .ah{fill:var(--accent)}
+.viz-svg .arrow{fill:none;stroke:var(--accent);stroke-width:2.5}
+.viz-svg .arrow.bad{stroke:var(--bad-line)}
+.viz-svg .node.bad{fill:var(--bad);stroke:var(--bad-line)}
+.viz-svg .node.nilp{stroke-dasharray:5 4}
+.viz-svg .nm{font-size:12px;fill:var(--muted)}
+.viz-svg .val{font-size:17px;font-weight:700}
+.viz-svg .ad{font-size:10px;fill:var(--muted)}
+.viz-svg .val.small{font-size:12px}
+.viz-svg .lbl{font-size:12px;fill:var(--accent);font-weight:700}
+.viz-cell.spare{background:transparent;border-style:dashed;color:var(--muted)}
+.hdrs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.chip{border:2px solid var(--cell-line);background:var(--cell);border-radius:10px;padding:4px 10px;font:600 13px var(--mono)}
+.chip.hit{background:var(--hit);border-color:var(--hit-line)}
+.chip.found{background:var(--found);border-color:var(--found-line)}
+.chip.dim{opacity:.45}
+.chip.bad{background:var(--bad);border-color:var(--bad-line)}
+.stackcol{display:flex;flex-direction:column-reverse;gap:6px;max-width:420px}
+.frame{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:6px 10px;font:13px var(--mono)}
+.frame b{display:block;margin-bottom:2px}
+.frame.hit{background:var(--hit);border-color:var(--hit-line)}
+.frame.found{background:var(--found);border-color:var(--found-line)}
+.frame.bad{background:var(--bad);border-color:var(--bad-line)}
+.frame.dim{opacity:.55}
+.out{font:13px var(--mono);background:var(--code-bg);color:var(--code-ink);padding:8px 10px;border-radius:8px;min-height:2.2em;white-space:pre-wrap;margin-top:10px}
+.out i{color:#6b7a90;font-style:normal}
+.row2{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.lane{border:2px solid var(--cell-line);border-radius:10px;background:var(--cell);padding:8px 12px;min-width:170px;font:13px var(--mono)}
+.lane h4{margin:0 0 4px;font:700 13px var(--sans)}
+.lane.hit{background:var(--hit);border-color:var(--hit-line)}
+.lane.found{background:var(--found);border-color:var(--found-line)}
+.lane.bad{background:var(--bad);border-color:var(--bad-line)}
+.lane.dim{opacity:.55}
+.slots{display:flex;gap:6px}
+.slot{width:44px;height:44px;border:2px dashed var(--cell-line);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 15px var(--mono)}
+.slot.full{border-style:solid;background:var(--range);border-color:var(--range-line)}
+.iface{display:inline-flex;border:2px solid var(--cell-line);border-radius:10px;overflow:hidden;background:var(--cell);margin:4px 10px 4px 0}
+.iface div{padding:6px 10px;font:600 13px var(--mono)}
+.iface .t{background:var(--dim)}
+.iface.hit{background:var(--hit);border-color:var(--hit-line)}
+.iface.found{background:var(--found);border-color:var(--found-line)}
+.iface.bad{background:var(--bad);border-color:var(--bad-line)}
+.bar{height:20px;border-radius:5px;background:var(--range);border:2px solid var(--range-line);transition:width .3s}
+.bar.hit{background:var(--hit);border-color:var(--hit-line)}
+.bar.found{background:var(--found);border-color:var(--found-line)}
+.bar.dim{background:var(--dim);border-color:transparent}
+.tl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;align-items:center;font:13px var(--mono)}
+.tree{font:13px var(--mono)} .tree .tn{border:2px solid var(--cell-line);border-radius:8px;padding:4px 8px;margin:4px 0;background:var(--cell);display:inline-block}
+.tree .tn.bad{background:var(--bad);border-color:var(--bad-line)} .tree .tn.hit{background:var(--hit);border-color:var(--hit-line)} .tree .tn.found{background:var(--found);border-color:var(--found-line)}
+.tree ul{list-style:none;margin:0;padding-left:26px;border-left:2px solid var(--line)}
+.mstep{display:block;margin:3px 0;padding:2px 6px;border-radius:6px}.mstep.done{opacity:.55}.mstep.now{background:var(--hit);outline:2px solid var(--hit-line)}</style>
+</head>
+<body>
+<div class="page">
+  <nav class="topnav"><a href="../index.html">&larr; All visuals</a> · <a href="../bn/go/mutex-and-data-race.html">বাংলা</a></nav>
+  <h1>Mutex and Data Race</h1>
+  <p class="lead"><code>counter++</code> is not one action. It is <b>read, add, write</b>, and two goroutines can interleave those steps.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">The idea</h2>
+    <p>Two people share a whiteboard with the number 0. Each one does &ldquo;read the number, add 1 in my head, write the answer back&rdquo;. If both read 0 before either writes, both write 1, and one increment is <b>lost</b>. The board says 1, not 2.</p>
+ <p>That is a <b>data race</b>: two goroutines touch the same variable at the same time and at least one writes. A <b>mutex</b> (mutual exclusion lock) is a pen only one person can hold: take it (<code>Lock</code>), do the whole read-add-write, give it back (<code>Unlock</code>). Nobody else can start until it is free.</p>
+  </div>
+
+  <h2>Watch it work</h2>
+  <div class="inputs">
+    <label>Example<select id="sc"></select></label>
+    <span id="inputs" style="display:contents"></span>
+    <button id="run">Run</button>
+  </div>
+  <p class="viz-note" id="scdesc"></p>
+  <div class="error" id="err"></div>
+  <div id="app"></div>
+  <div id="legend"></div>
+
+  <div class="card try">
+    <h3>Try it</h3>
+    <ul><li>In &ldquo;Your own interleaving&rdquo; try <code>1 1 1 2 2 2</code> (no overlap) and then <code>1 2 2 1 1 2</code>. Which orders lose an update?</li><li>In &ldquo;Fixed with a Mutex&rdquo; look at the blocked steps: why can G2 not read until G1 unlocks?</li><li>Run a real program with <code>go run -race .</code> to see Go report the race for you.</li></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Common mistakes</h2>
+    <ul><li>Assuming <code>counter++</code> is atomic. It is not; use a <code>sync.Mutex</code> or <code>sync/atomic</code>.</li><li>Forgetting <code>Unlock</code> (use <code>defer mu.Unlock()</code> right after <code>Lock</code>), which freezes every other goroutine.</li><li>Copying a struct that contains a mutex. Pass a pointer instead.</li><li>A program can pass its tests and still have a race. Run <code>go test -race ./...</code>; the race detector prints <code>WARNING: DATA RACE</code>.</li></ul>
+  </div>
+
+  <div class="pagenav"><a href="select-and-timeouts.html">&larr; Select and Timeouts</a><a href="waitgroup-and-worker-pool.html">WaitGroup and Worker Pool &rarr;</a></div>
+</div>
+
+<script src="../assets/viz.js"></script>
+<script>
+(function () {
+
+var E = Viz.el;
+/* ---- scenarios + dynamic inputs ---- */
+function multi(scenarios) {
+  var mount = Viz.$('#app'), sel = Viz.$('#sc'), inputsBox = Viz.$('#inputs'), err = Viz.$('#err'), desc = Viz.$('#scdesc');
+  var cur = 0, store = {}, pendingStep = null;
+  var hm = location.hash.match(/sc=(\d+)(?:&step=(\d+))?/);
+  if (hm && scenarios[+hm[1]]) { cur = +hm[1]; pendingStep = hm[2] ? +hm[2] : null; }
+  window.I = function (id) { var n = document.getElementById('in_' + id); return n ? n.value : ''; };
+  window.N = function (id, lo, hi) {
+    var raw = I(id).trim(); var v = Number(raw);
+    if (raw === '' || isNaN(v)) throw new Error('"' + id + '" must be a number.');
+    if (lo !== undefined && v < lo) throw new Error('"' + id + '" must be at least ' + lo + '.');
+    if (hi !== undefined && v > hi) throw new Error('"' + id + '" must be at most ' + hi + '.');
+    return Math.floor(v) === v ? v : Math.floor(v);
+  };
+  scenarios.forEach(function (sc, i) { sel.appendChild(E('option', { value: String(i), text: sc.name })); });
+  function buildInputs() {
+    inputsBox.innerHTML = '';
+    (scenarios[cur].inputs || []).forEach(function (inp) {
+      var key = cur + ':' + inp.id;
+      var val = store[key] !== undefined ? store[key] : inp.value;
+      var ctl;
+      if (inp.options) {
+        ctl = E('select', { id: 'in_' + inp.id }, inp.options.map(function (o) { return E('option', { value: o[0], text: o[1] }); }));
+        ctl.value = val;
+      } else {
+        ctl = E('input', { id: 'in_' + inp.id, value: val, size: inp.size || 10 });
+      }
+      ctl.addEventListener('change', function () { store[key] = ctl.value; show(); });
+      inputsBox.appendChild(E('label', { text: inp.label }, [ctl]));
+    });
+  }
+  function show() {
+    var sc = scenarios[cur];
+    err.textContent = '';
+    mount.innerHTML = '';
+    desc.textContent = sc.desc || '';
+    var steps;
+    try { steps = sc.steps(); } catch (e) { err.textContent = e.message; return; }
+    var st = Viz.stepper({ mount: mount, code: typeof sc.code === 'function' ? sc.code() : sc.code, render: sc.render });
+    st.load(steps);
+    if (pendingStep !== null) { st.go(pendingStep); pendingStep = null; }
+  }
+  sel.addEventListener('change', function () { cur = +sel.value; buildInputs(); show(); });
+  Viz.$('#run').addEventListener('click', function () { show(); });
+  sel.value = String(cur); buildInputs(); show();
+  if (location.hash === '#test') {
+    var log = [];
+    scenarios.forEach(function (sc, k) {
+      try {
+        cur = k; buildInputs();
+        var steps = sc.steps(), code = typeof sc.code === 'function' ? sc.code() : sc.code, tmp = document.createElement('div');
+        if (!steps.length) throw new Error('no steps');
+        steps.forEach(function (stp, j) {
+          tmp.innerHTML = ''; sc.render(stp, j, tmp);
+          if (!tmp.firstChild) throw new Error('empty render at step ' + j);
+          [].concat(stp.line === undefined ? [] : stp.line).forEach(function (ln) { if (!(ln >= 0 && ln < code.length)) throw new Error('bad line ' + ln + ' at step ' + j); });
+          if (!stp.text) throw new Error('no text at step ' + j);
+        });
+        log.push('OK   ' + sc.name + ' (' + steps.length + ' steps)');
+      } catch (e) { log.push('FAIL ' + sc.name + ': ' + e.message); }
+    });
+    cur = 0; sel.value = '0'; buildInputs(); show();
+    document.body.appendChild(E('pre', { id: 'testresult', text: log.join('\n') }));
+  }
+}
+
+/* ---- memory diagram: boxes + arrows (illustrative addresses) ---- */
+var _mid = 0;
+function mem(body, cells, arrows, o) {
+  o = o || {};
+  var W = 124, H = 70, G = 34, X0 = 12, Y0 = 12, n = Math.max(cells.length, 1), id = 'ah' + (++_mid);
+  var width = X0 * 2 + n * W + (n - 1) * G, hasA = arrows && arrows.length, height = Y0 + H + (hasA ? 92 : 14);
+  var kids = [Viz.s('defs', {}, [Viz.s('marker', { id: id, viewBox: '0 0 10 10', refX: '8', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto' }, [Viz.s('path', { d: 'M0,0L10,5L0,10z', class: 'ah' })])])];
+  cells.forEach(function (c, i) {
+    var x = X0 + i * (W + G);
+    kids.push(Viz.s('rect', { x: x, y: Y0, width: W, height: H, rx: 10, class: 'node ' + (c.cls || '') }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 17, 'text-anchor': 'middle', class: 'nm', text: c.name }));
+    kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 42, 'text-anchor': 'middle', class: 'val' + (String(c.value).length > 8 ? ' small' : ''), text: String(c.value) }));
+    if (c.addr) kids.push(Viz.s('text', { x: x + W / 2, y: Y0 + 62, 'text-anchor': 'middle', class: 'ad', text: c.addr }));
+  });
+  (arrows || []).forEach(function (a) {
+    var x1 = X0 + a.from * (W + G) + W / 2, x2 = X0 + a.to * (W + G) + W / 2, y = Y0 + H, d;
+    if (a.from === a.to) { x1 -= 22; x2 += 22; d = 'M' + x1 + ',' + y + ' C' + (x1 - 10) + ',' + (y + 55) + ' ' + (x2 + 10) + ',' + (y + 55) + ' ' + x2 + ',' + (y + 3); }
+    else d = 'M' + x1 + ',' + y + ' C' + x1 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 62) + ' ' + x2 + ',' + (y + 4);
+    kids.push(Viz.s('path', { d: d, class: 'arrow ' + (a.cls || ''), 'marker-end': 'url(#' + id + ')' }));
+    if (a.label) kids.push(Viz.s('text', { x: (x1 + x2) / 2, y: y + 66, 'text-anchor': 'middle', class: 'lbl', text: a.label }));
+  });
+  var svgEl = Viz.svg(width, height, kids); svgEl.style.minWidth = Math.min(width, 600) + 'px';
+  body.appendChild(svgEl);
+  if (o.note !== false) body.appendChild(Viz.note('Addresses like 0xc000012000 are made up for illustration; real addresses differ on every run.'));
+}
+function out(body, lines) {
+  body.appendChild(E('div', { class: 'out', html: lines && lines.length ? lines.map(function (l) { return esc(l); }).join('<br>') : '<i>(program output appears here)</i>' }));
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function chips(items) { return E('div', { class: 'hdrs' }, items.map(function (c) { return E('span', { class: 'chip ' + (c.cls || ''), text: c.text }); })); }
+
+document.getElementById('legend').appendChild(Viz.legend([{cls:'hit',label:'step just executed'},{cls:'dim',label:'waiting / blocked'},{cls:'found',label:'correct result'},{cls:'bad',label:'wrong result'}]));
+
+var LABEL = { lock: 'mu.Lock()', read: 'tmp := counter', add: 'tmp = tmp + 1', write: 'counter = tmp', unlock: 'mu.Unlock()' };
+function render(st, i, body) {
+  var lanes = [0, 1].map(function (g) {
+    var G = st.gs[g];
+    var rows = st.prog.map(function (kind, k) {
+      var cls = 'mstep' + (k < G.pc ? ' done' : '') + (st.active === g && st.justRan === k ? ' now' : '');
+      return E('span', { class: cls, text: (k < G.pc ? '✓ ' : (k === G.pc ? '▶ ' : '  ')) + LABEL[kind] });
+    });
+    return E('div', { class: 'lane ' + (st.active === g ? (st.blocked ? 'dim' : 'hit') : '') }, [E('h4', { text: 'Goroutine ' + (g + 1) }), E('div', { class: 'tmpv', text: 'tmp = ' + (G.tmp === null ? '?' : G.tmp) })].concat(rows).concat(G.blocked ? [E('div', { text: 'BLOCKED: waiting for the lock' })] : []));
+  });
+  var counter = Viz.varBox('counter (shared)', st.counter, { class: st.final === undefined ? (st.wrote ? 'hit' : '') : (st.final ? 'found' : 'bad') });
+  var mid = [counter];
+  if (st.useMutex) mid.push(E('div', { class: 'chip ' + (st.lock === null ? 'found' : 'hit'), text: 'mutex: ' + (st.lock === null ? 'free' : 'held by G' + (st.lock + 1)) }));
+  body.appendChild(E('div', { class: 'row2' }, [lanes[0], E('div', {}, mid), lanes[1]]));
+}
+function simulate(order, useMutex) {
+  var prog = useMutex ? ['lock', 'read', 'add', 'write', 'unlock'] : ['read', 'add', 'write'];
+  var code = useMutex
+    ? ['var (', '    counter int', '    mu      sync.Mutex', ')', 'func worker() {', '    mu.Lock()', '    tmp := counter', '    tmp = tmp + 1', '    counter = tmp', '    mu.Unlock()', '}', 'go worker() // G1', 'go worker() // G2']
+    : ['var counter int', '', 'func worker() {', '    // counter++ really means:', '    tmp := counter', '    tmp = tmp + 1', '    counter = tmp', '}', '', 'go worker() // G1', 'go worker() // G2'];
+  var lineOf = useMutex ? { lock: 5, read: 6, add: 7, write: 8, unlock: 9 } : { read: 4, add: 5, write: 6 };
+  var gs = [{ pc: 0, tmp: null, blocked: false }, { pc: 0, tmp: null, blocked: false }];
+  var counter = 0, lock = null, steps = [];
+  function snap(o) { steps.push(Object.assign({ prog: prog, gs: JSON.parse(JSON.stringify(gs)), counter: counter, lock: lock, useMutex: useMutex }, o)); }
+  snap({ line: undefined, text: 'Two goroutines are about to run worker(). counter is 0. Each needs ' + prog.length + ' small steps.', active: null });
+  var guard = 0;
+  for (var oi = 0; oi < order.length && guard++ < 200; oi++) {
+    var g = order[oi] - 1, G = gs[g], kind = prog[G.pc], name = 'G' + (g + 1);
+    if (G.pc >= prog.length) continue;
+    if (kind === 'lock' && lock !== null && lock !== g) {
+      G.blocked = true;
+      snap({ line: lineOf.lock, text: name + ' tries mu.Lock() but G' + (lock + 1) + ' holds it, so ' + name + ' must WAIT. It cannot touch counter.', active: g, blocked: true, justRan: G.pc });
+      continue;
+    }
+    G.blocked = false;
+    var text, wrote = false;
+    if (kind === 'lock') { lock = g; text = name + ' takes the lock. Nobody else can enter the critical section now.'; }
+    else if (kind === 'read') text = name + ' reads counter (' + counter + ') into its private tmp.', G.tmp = counter;
+    else if (kind === 'add') { G.tmp = G.tmp + 1; text = name + ' adds 1 to its private tmp: tmp = ' + G.tmp + '. Shared counter still ' + counter + '.'; }
+    else if (kind === 'write') { counter = G.tmp; wrote = true; text = name + ' writes tmp (' + G.tmp + ') into counter.'; }
+    else { lock = null; text = name + ' releases the lock.'; }
+    var ran = G.pc; G.pc++;
+    snap({ line: lineOf[kind], text: text, active: g, justRan: ran, wrote: wrote });
+  }
+  if (gs[0].pc < prog.length || gs[1].pc < prog.length) throw new Error('Each goroutine (1 and 2) must run all ' + prog.length + ' of its steps. Use each number exactly ' + prog.length + ' times.');
+  var ok = counter === 2;
+  snap({ line: undefined, active: null, final: ok, text: ok ? 'Both increments counted: counter = 2. Correct.' : 'counter = ' + counter + ', but two increments ran, so it should be 2. One update was LOST. This is a data race.' });
+  return { steps: steps, code: code };
+}
+var last = null;
+function mk(orderFn, useMutex) {
+  return {
+    render: render,
+    code: function () { return last.code; },
+    steps: function () { last = simulate(orderFn(), useMutex); return last.steps; }
+  };
+}
+function parseOrder(txt, per) {
+  var o = txt.split(/[\s,]+/).filter(Boolean).map(Number);
+  if (o.some(function (x) { return x !== 1 && x !== 2; })) throw new Error('Use only 1 and 2 (which goroutine runs next).');
+  var c1 = o.filter(function (x) { return x === 1; }).length, c2 = o.length - c1;
+  if (c1 !== per || c2 !== per) throw new Error('Write ' + per + ' ones and ' + per + ' twos, e.g. "1 2 1 2 1 2".');
+  return o;
+}
+var s1 = mk(function () { return [1, 2, 1, 2, 1, 2]; }, false);
+s1.name = 'Lost update (unlucky order)'; s1.desc = 'G1 and G2 both read 0 before either writes. Fixed order: G1 G2 G1 G2 G1 G2.';
+var s2 = mk(function () { return parseOrder(I('order'), 3); }, false);
+s2.name = 'Your own interleaving'; s2.desc = 'Each number says which goroutine runs its NEXT step. Real programs get an order you do not control.';
+s2.inputs = [{ id: 'order', label: 'order (three 1s, three 2s)', value: '1 2 1 2 1 2', size: 18 }];
+var s3 = mk(function () { var o = []; for (var k = 0; k < 40; k++) o.push(k % 2 === 0 ? 1 : 2); return o; }, true);
+s3.name = 'Fixed with a Mutex'; s3.desc = 'Same unlucky alternation, but the lock forces G2 to wait until G1 is completely done.';
+multi([s1, s2, s3]);
+
+})();
+</script>
+</body>
+</html>
